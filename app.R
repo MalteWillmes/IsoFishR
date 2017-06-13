@@ -126,8 +126,8 @@ ui <- dashboardPage(skin="black",
                             
                         ),
                         box(width=8,height=150,
-                            div(style="float:left; width:400px",textInput("profile.comment","Comment on profile","Comment")),
-                                div(style="float:left; width:100px",textInput("SampleID","Sample ID")),
+                            div(style="float:left; width:400px",textInput("profile.comment","Comment on profile","")),
+                                div(style="float:left; width:100px",textInput("SampleID","Sample ID","")),
                                     div(style="float:left; width:100px",textInput("Userinitials","User")))),
                         
                       fluidRow(                          
@@ -1051,8 +1051,8 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     input$file
     updateNumericInput(session,"trimleft",value=-1)
     updateNumericInput(session,"trimright",value=-1)
-    updateTextInput(session,"profile.comment",value="Comment")
-    updateTextInput(session,"SampleID",value="Sample ID")
+    updateTextInput(session,"profile.comment",value="")
+    updateTextInput(session,"SampleID",value="")
   }) 
   
   # ranges to reset upon new file upload or ranges reset button
