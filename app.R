@@ -633,7 +633,7 @@ server <- shinyServer(function(input, output, session) {
     region_means$TrimRight <- input$trimright
     region_means$Fluency <- input$fluency
     region_means$SpotSize <- input$spotsize
-    region_means$LaserEnergy < input$energy
+    region_means$LaserEnergy <- input$energy
     region_means$IntegrationTime <- input$integration
     region_means$OutlierNum <- input$outlier_num
     region_means$CIoutliers <- input$CI
@@ -641,8 +641,8 @@ server <- shinyServer(function(input, output, session) {
     fullprofile <-processed$processed_data
     
     region_means$Length <- max(fullprofile$distance)
-    colnames(region_means)[58] <- c("Length (um)")
-    region_means <- region_means[,c(1,47,48,49,2,50,3:46,51:58)]
+    colnames(region_means)[59] <- c("Length (um)")
+    region_means <- region_means[,c(1,47,48,49,2,50,3:46,51:59)]
 
     
     fullprofile$RunSpeed <- input$Speed
@@ -661,7 +661,7 @@ server <- shinyServer(function(input, output, session) {
     fullprofile$TrimRight <- input$trimright
     fullprofile$Fluency <- input$fluency
     fullprofile$SpotSize <- input$spotsize
-    fullprofile$LaserEnergy < input$energy
+    fullprofile$LaserEnergy <- input$energy
     fullprofile$IntegrationTime <- input$integration
     fullprofile$OutlierNum <- input$outlier_num
     fullprofile$CIoutliers <- input$CI
@@ -670,9 +670,9 @@ server <- shinyServer(function(input, output, session) {
     fullprofile$User_initials <- input$Userinitials
     fullprofile$Sample_Type <- input$sampletype
     fullprofile$Length <- max(fullprofile$distance)
-    colnames(fullprofile)[46] <- c("Length (um)")
+    colnames(fullprofile)[47] <- c("Length (um)")
     fullprofile$ShinyDate <- Sys.Date()
-    fullprofile <- fullprofile[,c(43,44,45,47,42,26,1:25,27:41,46)]
+    fullprofile <- fullprofile[,c(44,45,46,48,43,26,1:25,27:42,47)]
     
     outlier_plot <- processed$outlier_plot
     
