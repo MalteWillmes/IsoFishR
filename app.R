@@ -43,7 +43,8 @@ ui <- dashboardPage(skin="black",
                      from laser ablation (LA) strontium isotope (Sr) analysis of carbonate and bioapatite samples."),
                   h3("Projects"),
                   tags$ul(
-                    tags$li("Create a new project and save the current settings:"),
+                    tags$li("Create a new project and save the current settings: This feature allows the user to create a 
+                            new project and associated subfolders as well as save the current settings"),
                     tags$li("Project selection:"),
                     tags$li("Project comments:")),
                   h3("Analysis"),
