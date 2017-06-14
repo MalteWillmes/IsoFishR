@@ -21,8 +21,13 @@ install_load <- function (package1,...)  {
 install_load('shiny', 'shinydashboard', 'tidyverse', 'DT', 'zoo', 'ggplot2', 'changepoint','colourpicker')
 
 ui <- dashboardPage(skin="black",
-                    dashboardHeader(title = a(href='http://hobbslab.com', "IsoFishR",
-                                                  img(src='logo.png',height=30 ))),
+                    dashboardHeader(title = "IsoFishR",
+                                    tags$li(a(href = 'www.hobbslab.com',
+                                              img(src = 'logo.png',
+                                                  title = "Hobbslab", height = "30px"),
+                                              style = "padding-top:10px; padding-bottom:10px;"),
+                                            class = "dropdown")),
+                                                 
   dashboardSidebar(
     sidebarMenu(
       p(""),
@@ -130,7 +135,7 @@ ui <- dashboardPage(skin="black",
                         
                       fluidRow(                          
                           box(
-                          width=4,collapsible=TRUE, collapsed=TRUE, title="Change inputs",
+                          width=4,collapsible=TRUE, collapsed=TRUE, title="Change parameters",
                           div(style="float:left; width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
                           div(style="float:left; width:90px",numericInput("Raw88UpperThresh", "Max 88Sr", value=9.8, step = .1)),
                           div(style="float:left; width:90px",numericInput("Speed", "Run speed", value=10, step = 1)),
