@@ -95,6 +95,10 @@ ui <- dashboardPage(skin="black",
                   radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".")),
                   checkboxInput("header","Data has column headings"),
                   numericInput("integration","Integration time",value=5)
+<<<<<<< HEAD
+=======
+                  
+>>>>>>> parent of d9d9c69... Merge branch 'master' of https://github.com/MalteWillmes/IsoFishR
                ),
                 box(
                   title="Input Values",status="warning",width=4,DT::dataTableOutput("inputVals")),
@@ -134,6 +138,7 @@ ui <- dashboardPage(skin="black",
                         
                       fluidRow(                          
                           box(
+<<<<<<< HEAD
 
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change inputs",
                           div(style="float:right; width:125px;",radioButtons("smoother","Smoothing type",choices = list("MA"="MA","Loess"="loess"),inline=TRUE)),
@@ -148,6 +153,8 @@ ui <- dashboardPage(skin="black",
                           numericInput("spotsize","Spot size",value=40),
                           numericInput("energy","Laser energy",value=55),
                           textInput("sampletype",label="Sample type",value="IsoFishR")),
+=======
+>>>>>>> parent of d9d9c69... Merge branch 'master' of https://github.com/MalteWillmes/IsoFishR
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change parameters",
                           div(style="float:left; width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
                           div(style="float:left; width:90px",numericInput("Raw88UpperThresh", "Max 88Sr", value=9.8, step = .1)),
