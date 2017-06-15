@@ -89,8 +89,7 @@ ui <- dashboardPage(skin="black",
                   numericInput("cyclesec","Cycle seconds column number",value=8),
                   radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".")),
                   checkboxInput("header","Data has column headings"),
-                  numericInput("integration","Integration time",value=5),
-                  textInput("sampletype",label="Sample type",value="IsoFishR")
+                  numericInput("integration","Integration time",value=5)
                ),
                 box(
                   title="Input Values",status="warning",width=4,DT::dataTableOutput("inputVals")),
@@ -141,7 +140,8 @@ ui <- dashboardPage(skin="black",
                           div(style="width:90px",numericInput("Speed", "Run speed", value=10, step = 1)),
                           numericInput("fluency","Fluency",value=1.85),
                           numericInput("spotsize","Spot size",value=40),
-                          numericInput("energy","Laser energy",value=55)),
+                          numericInput("energy","Laser energy",value=55),
+                          textInput("sampletype",label="Sample type",value="IsoFishR")),
                           
                           tabBox(title="Filters",height=240,
                             width=8, selected="About",
