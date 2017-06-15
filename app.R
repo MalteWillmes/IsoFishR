@@ -138,7 +138,7 @@ ui <- dashboardPage(skin="black",
                         
                       fluidRow(                          
                           box(
-<<<<<<< HEAD
+
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change inputs",
                           div(style="float:right; width:125px;",radioButtons("smoother","Smoothing type",choices = list("MA"="MA","Loess"="loess"),inline=TRUE)),
                           div(style="width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
@@ -152,7 +152,6 @@ ui <- dashboardPage(skin="black",
                           numericInput("spotsize","Spot size",value=40),
                           numericInput("energy","Laser energy",value=55),
                           textInput("sampletype",label="Sample type",value="IsoFishR")),
-=======
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change parameters",
                           div(style="float:left; width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
                           div(style="float:left; width:90px",numericInput("Raw88UpperThresh", "Max 88Sr", value=9.8, step = .1)),
@@ -166,7 +165,6 @@ ui <- dashboardPage(skin="black",
                           div(style="float:left; width:90px",numericInput("spotsize","Spot size",value=40)),
                           div(style="float:left; width:90px",numericInput("energy","Laser energy",value=55)),
                           div(style="float:left; width:90px",textInput("sampletype",label="Sample type",value="IsoFishR"))),
->>>>>>> 9242302a38c3468dfca25de987727750671105fd
                           
                           tabBox(title="Filters",height=240,
                             width=8, selected="About",
@@ -255,7 +253,7 @@ ui <- dashboardPage(skin="black",
                 tabPanel("Background data",uiOutput("background")))))
               
     
-)))
+))
 
 server <- shinyServer(function(input, output, session) {
   
