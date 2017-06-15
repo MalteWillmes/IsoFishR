@@ -21,8 +21,13 @@ install_load <- function (package1,...)  {
 install_load('shiny', 'shinydashboard', 'tidyverse', 'DT', 'zoo', 'ggplot2', 'changepoint','colourpicker')
 
 ui <- dashboardPage(skin="black",
-                    dashboardHeader(title = a(href='http://hobbslab.com', "IsoFishR",
-                                                  img(src='logo.png',height=30 ))),
+                    dashboardHeader(title = "IsoFishR",
+                                    tags$li(a(href = 'www.hobbslab.com',
+                                              img(src = 'logo.png',
+                                                  title = "Hobbslab", height = "30px"),
+                                              style = "padding-top:10px; padding-bottom:10px;"),
+                                            class = "dropdown")),
+                                                 
   dashboardSidebar(
     sidebarMenu(
       p(""),
@@ -90,6 +95,10 @@ ui <- dashboardPage(skin="black",
                   radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".")),
                   checkboxInput("header","Data has column headings"),
                   numericInput("integration","Integration time",value=5)
+<<<<<<< HEAD
+=======
+                  
+>>>>>>> 9242302a38c3468dfca25de987727750671105fd
                ),
                 box(
                   title="Input Values",status="warning",width=4,DT::dataTableOutput("inputVals")),
@@ -129,6 +138,7 @@ ui <- dashboardPage(skin="black",
                         
                       fluidRow(                          
                           box(
+<<<<<<< HEAD
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change inputs",
                           div(style="float:right; width:125px;",radioButtons("smoother","Smoothing type",choices = list("MA"="MA","Loess"="loess"),inline=TRUE)),
                           div(style="width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
@@ -142,6 +152,21 @@ ui <- dashboardPage(skin="black",
                           numericInput("spotsize","Spot size",value=40),
                           numericInput("energy","Laser energy",value=55),
                           textInput("sampletype",label="Sample type",value="IsoFishR")),
+=======
+                          width=4,collapsible=TRUE, collapsed=TRUE, title="Change parameters",
+                          div(style="float:left; width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
+                          div(style="float:left; width:90px",numericInput("Raw88UpperThresh", "Max 88Sr", value=9.8, step = .1)),
+                          div(style="float:left; width:90px",numericInput("Speed", "Run speed", value=10, step = 1)),
+                          div(style="float:left; width:125px;",radioButtons("smoother","Smoothing type",choices = list("MA"="MA","Loess"="loess"),inline=TRUE)),
+                          div(style="float:left; width:90px",numericInput("average_num","MA window",value=10,step=1,min=1,max=NA)),
+                          div(style="float:left; width:90px",numericInput("span","Loess span",value=0.05,step=0.01,min=0.01,max=1)),
+                          div(style="float:left; width:120px",radioButtons("CI","CI for outliers",choices = list("3"=0.9985,"2"=0.975,"1"=0.84),inline=TRUE)),
+                          div(style="float:left; width:90px",numericInput("outlier_num","Outlier num",value=50,step=1,min=30)),
+                          div(style="float:left; width:90px",numericInput("fluency","Fluency",value=1.85)),
+                          div(style="float:left; width:90px",numericInput("spotsize","Spot size",value=40)),
+                          div(style="float:left; width:90px",numericInput("energy","Laser energy",value=55)),
+                          div(style="float:left; width:90px",textInput("sampletype",label="Sample type",value="IsoFishR"))),
+>>>>>>> 9242302a38c3468dfca25de987727750671105fd
                           
                           tabBox(title="Filters",height=240,
                             width=8, selected="About",
