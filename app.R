@@ -95,10 +95,6 @@ ui <- dashboardPage(skin="black",
                   radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".")),
                   checkboxInput("header","Data has column headings"),
                   numericInput("integration","Integration time",value=5)
-<<<<<<< HEAD
-=======
-                  
->>>>>>> 9242302a38c3468dfca25de987727750671105fd
                ),
                 box(
                   title="Input Values",status="warning",width=4,DT::dataTableOutput("inputVals")),
