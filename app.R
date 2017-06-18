@@ -1183,6 +1183,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     updateSelectInput(session,inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected=input$new.project)
   })
   
+  # button to allow user to update the project settings. Will overwrite the current settings file in a project.
   observeEvent(input$updatesettings,{
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
@@ -1201,6 +1202,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     write.table(settings,file.path("Projects",input$new.project,paste0(input$new.project,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
   })
   
+  # project wide comments input and display
   observeEvent(input$comment,{
     date <- Sys.Date()
     comment <- input$project.comment
