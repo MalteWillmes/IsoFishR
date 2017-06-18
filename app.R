@@ -78,6 +78,10 @@ ui <- dashboardPage(skin="black",
                 box(
                   title = "Project selection", width = 4, status = "primary",
                   selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default")
+                ),
+                box(
+                  title = "Update project settings", width = 4, status = "primary",
+                  actionButton("updatesettings","Update")
                 )
                 ),
                 fluidRow(
@@ -1177,6 +1181,24 @@ output$overwritewarn <- renderPrint({overwritewarn()})
   # update the selected project to the newly created project upon creation (this is turn will read in the new project settings and update them)  
   observeEvent(input$save,{
     updateSelectInput(session,inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected=input$new.project)
+  })
+  
+  observeEvent(input$updatesettings,{
+    settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
+                      input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
+                      input$smoother,input$Raw88LowerThresh,input$Raw88UpperThresh,
+                      input$average_num,input$span,input$outlier_num,
+                      input$CI,input$Speed,input$fluency,input$spotsize, input$energy, input$integration, 
+                      input$sampletype,input$range_one_label,input$range_two_label,
+                      input$range_three_label,input$range_four_label,input$range_five_label,
+                      input$range_six_label,input$range_seven_label,input$range_eight_label)
+    colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
+                            "cyclesec","vskip","header","sep","smoother",
+                            "Raw88LowerThresh", "Raw88UpperThresh", "average_num","span",
+                            "outlier_num","CI","Run speed","Fluency","SpotSize","Energy","Integration", "SampleType",
+                            "RangeOneLabel","RangeTwoLabel","RangeThreelabel","RangeFourLabel",
+                            "RangeFiveLabel","RangeSixLabel","RangeSevenLabel","RangeEightLabel")
+    write.table(settings,file.path("Projects",input$new.project,paste0(input$new.project,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
   })
   
   observeEvent(input$comment,{
