@@ -51,7 +51,7 @@ ui <- dashboardPage(skin="black",
                     tags$li("Create a new project and save the current settings: This feature allows the user to create a 
                             new project and associated subfolders as well as save the current settings"),
                     tags$li("Project selection: Select an existing project"),
-                    tags$li("Project comments:")),
+                    tags$li("Project comments: Save and display project comments")),
                   h3("Analysis"),
                   h3("Data"),
                   h3("Example Data")
