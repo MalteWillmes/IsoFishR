@@ -1199,7 +1199,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
                             "outlier_num","CI","Run speed","Fluency","SpotSize","Energy","Integration", "SampleType",
                             "RangeOneLabel","RangeTwoLabel","RangeThreelabel","RangeFourLabel",
                             "RangeFiveLabel","RangeSixLabel","RangeSevenLabel","RangeEightLabel")
-    write.table(settings,file.path("Projects",input$new.project,paste0(input$new.project,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
+    write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
   })
   
   # project wide comments input and display
