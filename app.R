@@ -1132,7 +1132,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
        updateNumericInput(session,"span",value=settingsdf$span)
        updateNumericInput(session,"outlier_num",value=settingsdf$outlier_num)
        updateRadioButtons(session,"CI",selected=settingsdf$CI)
-       updateNumericInput(session,"Run speed",value=settingsdf$Speed)
+       updateNumericInput(session,"Speed",value=settingsdf$RunSpeed)
        updateTextInput(session,"range_one_label",value=settingsdf$RangeOneLabel)
        updateTextInput(session,"range_two_label",value=settingsdf$RangeTwoLabel)
        updateTextInput(session,"range_three_label",value=settingsdf$RangeThreeLabel)
@@ -1162,7 +1162,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                           "cyclesec","vskip","header","sep","smoother",
                           "Raw88LowerThresh", "Raw88UpperThresh", "average_num","span",
-                          "outlier_num","CI","Run speed","Fluency","SpotSize","Energy","Integration", "SampleType",
+                          "outlier_num","CI","RunSpeed","Fluency","SpotSize","Energy","Integration", "SampleType",
                           "RangeOneLabel","RangeTwoLabel","RangeThreelabel","RangeFourLabel",
                           "RangeFiveLabel","RangeSixLabel","RangeSevenLabel","RangeEightLabel")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
@@ -1196,7 +1196,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "Raw88LowerThresh", "Raw88UpperThresh", "average_num","span",
-                            "outlier_num","CI","Run speed","Fluency","SpotSize","Energy","Integration", "SampleType",
+                            "outlier_num","CI","RunSpeed","Fluency","SpotSize","Energy","Integration", "SampleType",
                             "RangeOneLabel","RangeTwoLabel","RangeThreelabel","RangeFourLabel",
                             "RangeFiveLabel","RangeSixLabel","RangeSevenLabel","RangeEightLabel")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
