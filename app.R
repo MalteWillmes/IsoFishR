@@ -1107,11 +1107,13 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     DT::datatable(inputs,options=list(dom="t"))
   })
   
-  # code to read a settings file from a selected project and update the settings on the settings tab
+  # code to read a settings file from a selected project create a settings object (function)
+  # the object will update if a project setting is updaed with the Update button (input$updatesettings)
   readSettings <- reactive({
+      input$updatesettings
       settingsdf <- read.csv(file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),header=TRUE)
   })
-
+  # take the settings object and set the settings to the defaults in the csv with each new file upload
    observe({
        input$file # updates the settings to the default project settings with a new file upload as well
        settingsdf <- readSettings()
@@ -1183,7 +1185,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     updateSelectInput(session,inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected=input$new.project)
   })
   
-  # button to allow user to update the project settings. Will overwrite the current settings file in a project.
+  # button to allow user to update the project settings. Will overwrite the current settings csv file in a project folder.
   observeEvent(input$updatesettings,{
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
