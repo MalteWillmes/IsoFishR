@@ -134,8 +134,9 @@ ui <- dashboardPage(skin="black",
                         ),
                         box(width=8,height=150,
                             div(style="float:left; width:400px",textInput("profile.comment","Comment on profile","")),
-                                div(style="float:left; width:100px",textInput("SampleID","Sample ID","")),
-                                    div(style="float:left; width:100px",textInput("Userinitials","User")))),
+                            div(style="float:left; width:100px",textInput("SampleID","Sample ID","")),
+                            div(style="float:left; width:100px",textInput("Userinitials","User")),
+                            div(style="float:left; width:100px",checkboxInput("flag","Flag for review")))),
                         
                       fluidRow(                          
                           box(
@@ -652,9 +653,19 @@ server <- shinyServer(function(input, output, session) {
     
     region_means$Length <- max(fullprofile$distance)
     colnames(region_means)[59] <- c("Length (um)")
-    region_means <- region_means[,c(1,47,48,49,2,50,3:46,51:59)]
-
+    region_means$Flag <- ifelse(input$flag==TRUE,"Yes","No")
+    region_means <- region_means[c("RunFile_ID",	"Sample_ID",	"User_initials",	"Sample_Type",	"ShinyDate",	"Comment","Flag",	
+                                  "region",	"Mean_Raw88",	"Mean_Raw87",	"Mean_Raw86",	"Mean_Raw85",	"Mean_Raw84",	
+                                  "Mean_Raw83",	"Mean_CycleSecs",	"Mean_distance",	"Mean_Sr88",	"Mean_Net87",	
+                                  "Mean_Sr86",	"Mean_Rb85",	"Mean_Net84",	"Mean_Kr83",	"Mean_Sr8688",	"Mean_Sr8488",	
+                                  "Mean_Sr8486",	"Mean_Rb85Sr88",	"Mean_MbFactor",	"Mean_Rb87",	"Mean_Sr87",	"Mean_Sr87Sr88",	
+                                  "Mean_Net87Sr86",	"Mean_Sr87Sr86",	"Mean_totalSr",	"Mean_MA",	"Smooth_Min",	"Smooth_Max",	
+                                  "Smooth_2SD",	"Smooth_2SE",	"Smooth_Variance",	"Region_2SD",	"Region_2SE",	"Region_Min",	
+                                  "Region_Max",	"Region_Variance",	"MinRange",	"MaxRange",	"RunSpeed",	"Raw88LowerThresh",	
+                                  "Raw88UpperThresh",	"Smoother",	"Smooth_parameter",	"TrimLeft",	"TrimRight",	"Fluency",	
+                                  "SpotSize",	"LaserEnergy",	"IntegrationTime",	"OutlierNum",	"CIoutliers",	"Length (um)")]
     
+  
     fullprofile$RunSpeed <- input$Speed
     fullprofile$Raw88LowerThresh <- input$Raw88LowerThresh
     fullprofile$Raw88UpperThresh <- input$Raw88UpperThresh
@@ -682,7 +693,15 @@ server <- shinyServer(function(input, output, session) {
     fullprofile$Length <- max(fullprofile$distance)
     colnames(fullprofile)[47] <- c("Length (um)")
     fullprofile$ShinyDate <- Sys.Date()
-    fullprofile <- fullprofile[,c(44,45,46,48,43,26,1:25,27:42,47)]
+    fullprofile$Flag <- ifelse(input$flag==TRUE,"Yes","No")
+    fullprofile <- fullprofile[c("Sample_ID",	"User_initials",	"Sample_Type",	"ShinyDate",	"Comment","Flag",	
+                                 "region",	"Raw88",	"Raw87",	"Raw86",	"Raw85",	"Raw84",	"Raw83",	"CycleSecs",	"distance",	
+                                 "Sr88",	"Net87",	"Sr86",	"Rb85",	"Net84",	"Kr83",	"Sr8688",	"Sr8488",	"Sr8486",	"Rb85Sr88",	
+                                 "MbFactor",	"Rb87",	"Sr87",	"Sr87Sr88",	"Net87Sr86",	"Sr87Sr86",	"totalSr",	"MA",	"MAp2SE",	
+                                 "MAm2SE",	"RunSpeed",	"Raw88LowerThresh",	"Raw88UpperThresh",	"Smoother",	
+                                 "Smooth_parameter",	"TrimLeft",	"TrimRight",	"Fluency",	"SpotSize",	"LaserEnergy",	
+                                 "IntegrationTime",	"OutlierNum",	"CIoutliers",	"Length (um)")]
+    
     
     outlier_plot <- processed$outlier_plot
     
