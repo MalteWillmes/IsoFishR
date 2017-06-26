@@ -136,7 +136,7 @@ ui <- dashboardPage(skin="black",
                             div(style="float:left; width:400px",textInput("profile.comment","Comment on profile","")),
                             div(style="float:left; width:100px",textInput("SampleID","Sample ID","")),
                             div(style="float:left; width:100px",textInput("Userinitials","User")),
-                            div(style="float:left; width:100px",checkboxInput("flag","Flag for review")))),
+                            div(style="float:left; width:200px",checkboxInput("flag","Flag for review")))),
                         
                       fluidRow(                          
                           box(
