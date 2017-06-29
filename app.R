@@ -44,15 +44,44 @@ ui <- dashboardPage(skin="black",
                 box(width = 10, status = "primary",
                   h2("Welcome to IsoFishR"),
                   hr(),
-                  p("This application is designed to process raw run files 
-                     from laser ablation (LA) strontium isotope (Sr) analysis of carbonate and bioapatite samples."),
+                  h4("This application is designed to process raw run files 
+                     from laser ablation (LA) strontium isotope (Sr) analysis of carbonate and bioapatite samples. It includes many features
+                     to make data management and analysis easy."),
                   h3("Projects"),
+                  h4("Full project management including creating a new project based on a group of run files, 
+                    loading an existing project to continue processing samples, updating project settings after a project has been created, and
+                    commenting."),
                   tags$ul(
-                    tags$li("Create a new project and save the current settings: This feature allows the user to create a 
-                            new project and associated subfolders as well as save the current settings"),
-                    tags$li("Project selection: Select an existing project"),
-                    tags$li("Project comments: Save and display project comments")),
+                    tags$li(h4("New project creation including subfolders to organize data and plots:")),
+                    img(src='newproject.png'),
+                    br(),
+                    br(),
+                    tags$li(h4("Select a project from the list of existing projects and load default settings. Analyze as many
+                            samples as you have time for and pick up later where you left off:")),
+                    img(src='selectproject.png'),
+                    br(),
+                    br(),
+                    tags$li(h4("Update a project's settings to the current settings once the best values have been determined:")),
+                    img(src='updateproject.png'),
+                    br(),
+                    br(),
+                    tags$li(h4("Runfile settings: Displays the values of the settings needed to read the run file into the app. Values can be changed here.")),
+                    img(src='runfilesettings.png'),
+                    br(),
+                    br(),
+                    tags$li(h4("Input values: Displays the values of the project parameters such as run speed and detection limits. These values
+                               can be changed on the analysis tab.")),
+                    img(src='inputvalues.png'),
+                    br(),
+                    br(),
+                    tags$li(h4("Project comments: Keep track of progress and project details with the ability to save and view project-wide comments.")),
+                    img(src='projectcomment.png'),
+                    br(),
+                    br()),
                   h3("Analysis"),
+                  h4("Upload, analyze, and save processed data with the data analysis tab. Manually or automatically set profile regions, comment on
+                    the profile, trim data, remove outliers, flag for review, and more!"),
+                  img(src='analysis.png',height="900",width="1300"),
                   h3("Data"),
                   h3("Example Data")
                   ),
@@ -86,7 +115,7 @@ ui <- dashboardPage(skin="black",
                 ),
                 fluidRow(
                   box(
-                  title = "Project settings", width = 4, status="warning",
+                  title = "Runfile settings", width = 4, status="warning",
                   #fileInput("settings_file",label=NULL),
                   numericInput("vskip","Header length",value=46),
                   numericInput("raw88","Raw 88 column number",value=1),
@@ -102,8 +131,8 @@ ui <- dashboardPage(skin="black",
                   
                ),
                 box(
-                  title="Input Values",status="warning",width=4,DT::dataTableOutput("inputVals")),
-                box(title="Project Comments",status="warning",width=4,
+                  title="Input values",status="warning",width=4,DT::dataTableOutput("inputVals")),
+                box(title="Project comments",status="warning",width=4,
                     textAreaInput(inputId="project.comment",label=NULL,value="Add comment here"),
                     actionButton("comment","Save Comment"),DT::dataTableOutput("comments")))),
 
