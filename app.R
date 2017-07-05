@@ -516,7 +516,7 @@ server <- shinyServer(function(input, output, session) {
     # remove the outlier rows
     data <- data[!(data$Sr87Sr86 < vals | data$Sr87Sr86 > val2s),] # removes all rows with an outlier value
     
-    # Step 7c: Apply a 4-point moving average to the remaining Sr87Sr86 data and fill in NAs created at the beginning and end
+    # Step 7c: Apply a moving average to the remaining Sr87Sr86 data and fill in NAs created at the beginning and end
     # by the rollapply function with the nearby values
     data$Sr87Sr86 <- rollapply(data$Sr87Sr86,input$integration, mean, fill="extend", partial=TRUE)
     
