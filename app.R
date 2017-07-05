@@ -22,7 +22,7 @@ install_load('shiny', 'shinydashboard', 'tidyverse', 'DT', 'zoo', 'ggplot2', 'ch
 
 ui <- dashboardPage(skin="black",
                     dashboardHeader(title = "IsoFishR",
-                                    tags$li(a(href = 'www.hobbslab.com',
+                                    tags$li(a(target="_blank", href = 'http://www.hobbslab.com',
                                               img(src = 'logo.png',
                                                   title = "Hobbslab", height = "30px"),
                                               style = "padding-top:10px; padding-bottom:10px;"),
