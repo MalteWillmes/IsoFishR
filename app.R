@@ -1051,9 +1051,10 @@ output$overwritewarn <- renderPrint({overwritewarn()})
   
   #Summary Data Exploration Plot
   plot5 <- function(){
+    
     sumdat <- read.csv(file.path("Projects",input$project.name,paste0(input$project.name,"_summary.csv")),header=TRUE)
     p <- ggplot(sumdat) + theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ 
-    geom_histogram(aes(Mean_MA, fill=region))
+    geom_boxplot(aes(x=region, y=Mean_MA, fill=region))
     
     return(p)}
   
