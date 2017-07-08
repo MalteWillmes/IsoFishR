@@ -25,7 +25,7 @@ ui <- dashboardPage(skin="black",
                                     tags$li(a(target="_blank", href = 'http://www.hobbslab.com',
                                               img(src = 'logo.png',
                                                   title = "Hobbslab", height = "30px"),
-                                              style = "padding-top:10px; padding-bottom:10px;"),
+                                              style = "padding-top:10px; padding-bottom:10px; "),
                                             class = "dropdown")),
                                                  
   dashboardSidebar(
@@ -42,58 +42,61 @@ ui <- dashboardPage(skin="black",
     tabItems(
       tabItem(tabName = "About",
                fluidRow(
-                box(width = 10, status = "primary",
+                box(width = 9, status = "primary",
                   h2("Welcome to IsoFishR"),
                   hr(),
-                  h4("This application is designed to process raw run files 
+                  h5("This application is designed to process raw run files 
                      from laser ablation (LA) strontium isotope (Sr) analysis of carbonate and bioapatite samples. It includes many features
                      to make data management and analysis easy."),
-                  h3("Projects"),
-                  h4("Full project management including creating a new project based on a group of run files, 
+                  h4("Projects"),
+                  h5("Full project management including creating a new project based on a group of run files, 
                     loading an existing project to continue processing samples, updating project settings after a project has been created, and
                     commenting."),
                   tags$ul(
-                    tags$li(h4("New project creation including subfolders to organize data and plots:")),
+                    tags$li(h5("New project creation including subfolders to organize data and plots:")),
                     img(src='newproject.png'),
                     br(),
                     br(),
-                    tags$li(h4("Select a project from the list of existing projects and load default settings. Analyze as many
+                    tags$li(h5("Select a project from the list of existing projects and load default settings. Analyze as many
                             samples as you have time for and pick up later where you left off:")),
                     img(src='selectproject.png'),
                     br(),
                     br(),
-                    tags$li(h4("Update a project's settings to the current settings once the best values have been determined:")),
+                    tags$li(h5("Update a project's settings to the current settings once the best values have been determined:")),
                     img(src='updateproject.png'),
                     br(),
                     br(),
-                    tags$li(h4("Runfile settings: Displays the values of the settings needed to read the run file into the app. Values can be changed here.")),
+                    tags$li(h5("Runfile settings: Displays the values of the settings needed to read the run file into the app. Values can be changed here.")),
                     img(src='runfilesettings.png'),
                     br(),
                     br(),
-                    tags$li(h4("Input values: Displays the values of the project parameters such as run speed and detection limits. These values
+                    tags$li(h5("Input values: Displays the values of the project parameters such as run speed and detection limits. These values
                                can be changed on the analysis tab.")),
                     img(src='inputvalues.png'),
                     br(),
                     br(),
-                    tags$li(h4("Project comments: Keep track of progress and project details with the ability to save and view project-wide comments.")),
+                    tags$li(h5("Project comments: Keep track of progress and project details with the ability to save and view project-wide comments.")),
                     img(src='projectcomment.png'),
                     br(),
                     br()),
                   h3("Analysis"),
                   h4("Upload, analyze, and save processed data with the data analysis tab. Manually or automatically set profile regions, comment on
                     the profile, trim data, remove outliers, flag for review, and more!"),
-                  img(src='analysis.png',height="900",width="1300"),
-                  h3("Data"),
-                  h3("Example Data")
+                  img(src='analysis.png',width="900"),
+                  h4("Data"),
+                  h4("Example Data")
                   ),
                 box(
-                  title = "Version history", width = 2, status="warning",
-                  "0.1 - inital release"
+                  title = "Version history", width = 3, status="warning",
+                  "0.1 - inital release",
+                  br(),
+                  "0.5 - moving forward"
                 ),
               box(
-                title = "Authors", width = 2, status="danger",
-                p("Katherine Ransom (lockhart.katherine@gmail.com)
-                Malte Willmes (mwillmes@ucdavis.edu)")
+                title = "Contact the Authors", width = 3, status="danger",
+                h5("Katherine Ransom (lockhart.katherine@gmail.com)"),
+                br(),
+                h5( "Malte Willmes (mwillmes@ucdavis.edu)")
               ))
     
                ),
@@ -139,9 +142,10 @@ ui <- dashboardPage(skin="black",
 
       tabItem(tabName = "Analysis",
                       fluidRow(
-                        column(9,fluidRow(
+                        column(9,style='padding:5px;',
+                               fluidRow(
                         box(
-                          width = 12, status = "primary",
+                          width = 12, status = "primary",style='padding:2px;',
                           plotOutput("plot1",brush = brushOpts(id ="plot_brush",direction ="x"))),
                         
                         box(width=4,height=270,
@@ -168,7 +172,7 @@ ui <- dashboardPage(skin="black",
                             div(style="float:left; width:100px",textInput("Userinitials","User")),
                             div(style="float:left; width:200px",checkboxInput("flag","Flag for review")))),
                         
-                      fluidRow(                          
+                      fluidRow(                         
                           box(
                           width=4,collapsible=TRUE, collapsed=TRUE, title="Change parameters",
                           div(style="float:left; width:90px", numericInput("Raw88LowerThresh", "Min 88Sr", value=0.5, step = .1)),
@@ -248,7 +252,7 @@ ui <- dashboardPage(skin="black",
                           )
                         ),
                         
-                        column(3,fluidRow(
+                        column(3,style='padding:5px;',fluidRow(
                         box(
                           width =12, status = "warning",style='padding:2px;',
                           plotOutput("plot2",height="195px")),
@@ -1048,7 +1052,8 @@ output$overwritewarn <- renderPrint({overwritewarn()})
   #Summary Data Exploration Plot
   plot5 <- function(){
     sumdat <- read.csv(file.path("Projects",input$project.name,paste0(input$project.name,"_summary.csv")),header=TRUE)
-    p <- ggplot(sumdat) + geom_histogram(aes(Mean_MA))
+    p <- ggplot(sumdat) + theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ 
+    geom_histogram(aes(Mean_MA, fill=region))
     
     return(p)}
   
