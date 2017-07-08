@@ -263,16 +263,18 @@ ui <- dashboardPage(skin="black",
       tabItem(tabName = "Dataexplorer",
               fluidRow(
                 box(
-                  title = "Aggregate Data", width = 4, status = "primary",
-                  selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default"),
+                  title = "Aggregate Data", width = 3, status = "primary",
+                  p("The aggregate data function combines all individual processed full-profile files from the project folder into a single .csv file"),
                   actionButton("aggregatedata","Aggregate Data")
                 ),
                 box(
-                  title = "Batch processing", width = 4, status = "primary",
-                  selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default")
+                  title = "Batch processing", width = 3, status = "primary",
+                  p("Process all run files in a single folder at once")
+                  
                 ),
                 box(
-                  title = "Plotting data", width = 4, status = "primary"
+                  title = "Summary plots", width = 6, status = "primary",
+                  plotOutput("plot5")
                 
                   ))),
 
@@ -1042,6 +1044,15 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     return(p)}
   
   output$plot4 <- renderPlot({plot4()})
+  
+  #Summary Data Exploration Plot
+  plot5 <- function(){
+    sumdat <- read.csv(file.path("Projects",input$project.name,paste0(input$project.name,"_summary.csv")),header=TRUE)
+    p <- ggplot(sumdat) + geom_histogram(aes(Mean_MA))
+    
+    return(p)}
+  
+  output$plot5 <- renderPlot({plot5()})
   
   # Create the brush output for plot 1
   output$brush_info <- renderPrint({
