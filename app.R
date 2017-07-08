@@ -34,7 +34,8 @@ ui <- dashboardPage(skin="black",
       menuItem("About", tabName="About", icon=icon("cog")),
       menuItem("Projects", tabName="Projects", icon=icon("folder")),
       menuItem("Analysis", tabName="Analysis",icon=icon("area-chart")),
-      menuItem("Data", tabName="Data", icon=icon("table")))),
+      menuItem("Data Explorer", tabName="Dataexplorer",icon=icon("bar-chart")),
+      menuItem("Data Table", tabName="Data", icon=icon("table")))),
 
   
   dashboardBody(
@@ -259,7 +260,21 @@ ui <- dashboardPage(skin="black",
                           plotOutput("outlier_plot",height="195px"))))
                       )),
 
-
+      tabItem(tabName = "Dataexplorer",
+              fluidRow(
+                box(
+                  title = "Aggregate Data", width = 4, status = "primary",
+                  selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default"),
+                  actionButton("aggregatedata","Aggregate Data")
+                ),
+                box(
+                  title = "Batch processing", width = 4, status = "primary",
+                  selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default")
+                ),
+                box(
+                  title = "Plotting data", width = 4, status = "primary"
+                
+                  ))),
 
       tabItem(tabName = "Data",
               fluidRow(tabBox(
@@ -268,6 +283,7 @@ ui <- dashboardPage(skin="black",
                 tabPanel("Input data",uiOutput("tb")), 
                 tabPanel("Processed data",uiOutput("processed")),
                 tabPanel("Background data",uiOutput("background")))))
+      
               
     
 )))
@@ -661,6 +677,10 @@ server <- shinyServer(function(input, output, session) {
     plot(outlier_plot)
   })
   
+  
+
+  
+  
   # action to append new sample processed region means to csv file
   warnmsg <- eventReactive(input$appendnew, {
     processed <- processed()
@@ -707,6 +727,7 @@ server <- shinyServer(function(input, output, session) {
     if(input$smoother=="loess"){
       fullprofile$Smooth_parameter <- input$span
     }
+    fullprofile$RunFile_ID <-  unlist(strsplit(as.character(input$file), split='.', fixed=TRUE))[1]
     fullprofile$TrimLeft <- input$trimleft
     fullprofile$TrimRight <- input$trimright
     fullprofile$Fluency <- input$fluency
@@ -720,10 +741,10 @@ server <- shinyServer(function(input, output, session) {
     fullprofile$User_initials <- input$Userinitials
     fullprofile$Sample_Type <- input$sampletype
     fullprofile$Length <- max(fullprofile$distance)
-    colnames(fullprofile)[47] <- c("Length (um)")
+    colnames(fullprofile)[48] <- c("Length (um)")
     fullprofile$ShinyDate <- Sys.Date()
     fullprofile$Flag <- ifelse(input$flag==TRUE,"Yes","No")
-    fullprofile <- fullprofile[c("Sample_ID",	"User_initials",	"Sample_Type",	"ShinyDate",	"Comment","Flag",	
+    fullprofile <- fullprofile[c("RunFile_ID","Sample_ID",	"User_initials",	"Sample_Type",	"ShinyDate",	"Comment","Flag",	
                                  "region",	"Raw88",	"Raw87",	"Raw86",	"Raw85",	"Raw84",	"Raw83",	"CycleSecs",	"distance",	
                                  "Sr88",	"Net87",	"Sr86",	"Rb85",	"Net84",	"Kr83",	"Sr8688",	"Sr8488",	"Sr8486",	"Rb85Sr88",	
                                  "MbFactor",	"Rb87",	"Sr87",	"Sr87Sr88",	"Net87Sr86",	"Sr87Sr86",	"totalSr",	"MA",	"MAp2SE",	
@@ -906,7 +927,6 @@ output$overwritewarn <- renderPrint({overwritewarn()})
       changepts <-change@cpts
       cptsmean<-change@param.est$mean
       p <- p + geom_vline(xintercept=dat$distance[changepts], color="red", linetype="dotted", size=1)
-     # p <- p + geom_hline(yintercept=cptsmean, color="red", linetype="dotted", size=1)
     }
     
     return(p)}
@@ -1263,6 +1283,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
       write.table(comments,file=file.path("Projects",input$project.name,paste0(input$project.name,"_comments.csv")),append=TRUE,col.names = FALSE,row.names=FALSE,sep=",") 
     }
   })
+  
 
    output$comments <-  DT::renderDataTable({
      input$comment
@@ -1274,6 +1295,16 @@ output$overwritewarn <- renderPrint({overwritewarn()})
      }
    })
 
+   
+   # Aggregate data for a project
+   observeEvent(input$aggregatedata, {
+     agdata_path <-paste0("Projects/",input$project.name,"/Data")
+     agfiles <-dir(agdata_path, pattern = "*.csv")
+     data.aggregate <- agfiles %>%
+       map(~ read_csv(file.path(agdata_path, .))) %>% 
+       reduce(rbind)
+     write.table(data.aggregate,file=file.path("Projects",input$project.name,paste0(input$project.name,"_data_aggregate.csv")), row.names=FALSE,sep=",")
+   })
 
   # Stop shiny app when closing the browser
   session$onSessionEnded(stopApp)
