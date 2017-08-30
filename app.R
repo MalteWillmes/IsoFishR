@@ -24,8 +24,8 @@ ui <- dashboardPage(skin="black",
                     dashboardHeader(title = "IsoFishR",
                                     tags$li(a(target="_blank", href = 'http://www.hobbslab.com',
                                               img(src = 'logo.png',
-                                                  title = "Hobbslab", height = "30px"),
-                                              style = "padding-top:10px; padding-bottom:10px; "),
+                                                  title = "Hobbslab", height = "48px"),
+                                              style = "padding-top:1px; padding-bottom:1px; "),
                                             class = "dropdown")),
                                                  
   dashboardSidebar(
@@ -187,7 +187,7 @@ ui <- dashboardPage(skin="black",
                           div(style="float:left; width:90px",numericInput("spotsize","Spot size",value=40)),
                           div(style="float:left; width:90px",numericInput("energy","Laser energy",value=55)),
                           #div(style="float:left; width:90px",selectInput("analysistype","Analysis type", choices = list("Spot" = 1, "Line" = 2), selected = 2)),
-                          div(style="float:left; width:90px",textInput("sampletype",label="Sample type",value="IsoFishR"))),
+                          div(style="float:left; width:90px",textInput("sampletype",label="Sample type",value="Otolith"))),
                           
                           tabBox(title="Filters",height=240,
                             width=8, selected="About",
@@ -1181,7 +1181,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
     updateNumericInput(session,"range_eight_min","",value=-1)
     updateNumericInput(session,"range_eight_max","",value=-1)
   })
-  
+
   output$inputVals <- DT::renderDataTable({
     inputs <- rbind(input$Raw88LowerThresh,input$Raw88UpperThresh,
                     input$average_num,input$span,input$outlier_num,
@@ -1191,7 +1191,7 @@ output$overwritewarn <- renderPrint({overwritewarn()})
                           "CI for Outliers","Run speed")
     colnames(inputs) <- c("Value")
     DT::datatable(inputs,options=list(dom="t"))
-  })
+  })  
   
   # code to read a settings file from a selected project create a settings object (function)
   # the object will update if a project setting is updaed with the Update button (input$updatesettings)
