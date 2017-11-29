@@ -729,7 +729,7 @@ server <- shinyServer(function(input, output, session) {
       p <- p + geom_point(aes(x=Distance,y=Rb85Sr88),size=1, color="orange", shape=1, na.rm=TRUE)
       return(p)}
     
-  ggsave(filename=file.path("Projects",input$project.name,"Plots/87Sr86Sr_processed",paste0(i,"_87Sr86Sr_processed.pdf")), plot = mainplot(), device = "pdf",width=8,height=4,scale=1.5)
+  ggsave(filename=file.path("Projects",input$project.name,"Plots/87Sr86Sr_reduced",paste0(i,"_87Sr86Sr_reduced.pdf")), plot = mainplot(), device = "pdf",width=8,height=4,scale=1.5)
   ggsave(filename=file.path("Projects",input$project.name,"Plots/88Sr",paste0(i,"_88Sr_volts.pdf")), plot = TotalSr_plot(), device = "pdf",width=8,height=4,scale=1.5)
   ggsave(filename=file.path("Projects",input$project.name,"Plots/85Rb88Sr",paste0(i,"_85Rb88Sr.pdf")), plot = Rb_plot(), device = "pdf",width=8,height=4,scale=1.5)
   ggsave(filename=file.path("Projects",input$project.name,"Plots/83Kr",paste0(i,"_83Kr_volts.pdf")), plot = Kr_plot(), device = "pdf",width=8,height=4,scale=1.5)
@@ -1084,7 +1084,7 @@ server <- shinyServer(function(input, output, session) {
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
-      dir.create(paste0("Projects/",input$new.project,"/Plots/87Sr86Sr_processed"))
+      dir.create(paste0("Projects/",input$new.project,"/Plots/87Sr86Sr_reduced"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/87Sr86Sr_analyzed"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/88Sr"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/83Kr"))
