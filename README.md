@@ -1,7 +1,7 @@
 
 ![IsoFishR](https://github.com/MalteWillmes/IsoFishR/blob/master/www/logo.png)
 
-#Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via laser-ablation mass spectrometry. 
+Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via laser-ablation mass spectrometry. 
 The aim of this application is to provide a rapid, reliable, and reproducible data reduction and analysis tool, that can be applied across disciplines. 
 
 Instructions:
