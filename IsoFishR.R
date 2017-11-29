@@ -19,7 +19,7 @@ install_load <- function (package1,...)  {
   } 
 }
 
-install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'ggplot2', 'changepoint','colourpicker', 'shinyWidgets')
+install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets')
 
 library(shiny)
 ####Creating the dashboard and ui outline####
@@ -45,7 +45,7 @@ library(shiny)
                                          h2("Welcome to IsoFishR"),
                                          hr(),
                                          h5("This application is designed to process laser ablation (LA) strontium isotope (87Sr/86Sr) data of carbonate and bioapatite samples. It includes many features
-                                            to make data processing, data management and isotope analysis reliable and reproducible."),
+                                            to make data reduction, data management and isotope analysis reliable and reproducible."),
                                          h5(a(target="_blank", href = 'http://www.hobbslab.com',"Tutorial")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR',"Code on GitHub")),
                                          h5(a(target="_blank", href = 'http://www.hobbslab.com',"Manuscript")),
@@ -140,7 +140,7 @@ library(shiny)
                                    )
                            ),
                                      
-####Data processing####                                    
+####Data reduction####                                    
 tabItem(tabName = "Data_reduction",
 fluidRow(
   box(
@@ -168,7 +168,7 @@ fluidRow(
   box(
     width = NULL,style='padding:2px;',
     uiOutput("Sample_selector"),
-    actionButton("save_data","Save processed data"),
+    actionButton("save_data","Save reduced data"),
     checkboxInput("appending_processed", "Append data?",value=TRUE),
     selectInput("narem", "Remove NAs?", choices=c("TRUE","FALSE"), selected = "TRUE"),
     selectInput("rollfill", "Fill NAs?", choices=c("extend","FALSE"), selected = "extend"))
@@ -203,7 +203,7 @@ fluidRow(
                     fileInput("processed_file","Select .csv file")
                     ),
                   box(
-                    width = NULL, title="Step 2: Select Sample to edit",  status = "primary", style='padding:2px;',height=305,
+                    width = NULL, title="Step 2: Select sample to edit",  status = "primary", style='padding:2px;',height=305,
                     uiOutput("Analyzed_sample_selector"),
                     uiOutput("Sample_ID"),
                     uiOutput("Sample_comment"),
@@ -541,19 +541,19 @@ server <- shinyServer(function(input, output, session) {
     if(input$appending_processed){
       write.table(raw_data_all(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv"))),row.names=FALSE,sep="," ,append = TRUE)
       write.table(background_data(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_02_background_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_02_background_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
-      write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_processed_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_processed_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
+      write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_reduced_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_processed_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
     }
     else{
     write.table(raw_data_all(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv")),row.names=FALSE,col.names= TRUE, sep=",")
     write.table(background_data(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_02_background_data.csv")),col.names= TRUE, row.names=FALSE,sep=",")
-    write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_processed_data.csv")),col.names= TRUE, row.names=FALSE,sep=",")
+    write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_reduced_data.csv")),col.names= TRUE, row.names=FALSE,sep=",")
     },
     silent=TRUE) 
     # if there is no error print a success message otherwise print an error message
     if ("try-error" %in% class(t)){
       save_data_failed_notification <- showNotification(paste("File access denied: Saving failed. Is the file open?"), duration = 8, type="error")
     } else {
-      save_data_notification <- showNotification(paste("Process data saved"), duration = 8, type="message")
+      save_data_notification <- showNotification(paste("Reduced data saved"), duration = 8, type="message")
     }
   })
 
@@ -738,7 +738,7 @@ server <- shinyServer(function(input, output, session) {
   if ("try-error" %in% class(t)){
     save_process_plots_failed_notification <- showNotification(paste("Plot file access denied: Saving failed. Is the file open?"), duration = 12, type="error")
   } else {
-    save_process_plots_notification <- showNotification(paste("Processed plots saved"), duration = 8, type="message")
+    save_process_plots_notification <- showNotification(paste("Reduced data plots saved"), duration = 8, type="message")
   }
   })
   
@@ -1141,7 +1141,7 @@ server <- shinyServer(function(input, output, session) {
 #create a reactiveValues to store the analyzed and edited data.
 analyzer_overwatch <-reactiveValues(analyzed=NULL)
   
-####upload the processed data file####
+####upload the reduced data file####
   analyzed_data <- reactive({
 
     analyzed_data <- input$processed_file
