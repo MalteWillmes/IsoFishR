@@ -183,6 +183,8 @@ fluidRow(
       checkboxInput("main_ma",label="Moving average", value=TRUE),
       checkboxInput("main_gam",label="Gam fit", value=FALSE),
       checkboxInput("main_ocean",label="Ocean", value=FALSE),
+      checkboxInput("reduced_custom",label="Custom line", value=FALSE),
+      numericInput("reduced_custom_input",label="Custom line value",value=0.705),
       colourInput("linecol", "Line", "black", allowTransparent = TRUE,showColour = "background"),
       colourInput("shadecol", "Shading", "gray", allowTransparent = TRUE, showColour = "background"),
       downloadButton('download_main_plot',''),
@@ -234,6 +236,8 @@ fluidRow(
                                    checkboxInput("analyze_ma",label="Moving average", value=TRUE),
                                    checkboxInput("analyze_gam",label="Gam fit", value=FALSE),
                                    checkboxInput("analyze_ocean",label="Ocean", value=FALSE),
+                                   checkboxInput("analyze_custom",label="Custom line", value=FALSE),
+                                   numericInput("analyze_custom_input",label="Custom line value",value=0.705),
                                    colourInput("analyze_linecol", "Line", "black", allowTransparent = TRUE,showColour = "background"),
                                    colourInput("analyze_shadecol", "Shading", "gray", allowTransparent = TRUE, showColour = "background"), 
                                    downloadButton('download_analysis_plot',''),
@@ -609,6 +613,9 @@ server <- shinyServer(function(input, output, session) {
     if(input$main_ocean){
       p <- p + geom_line(aes(x=Distance,y=0.70918), color="blue")}
     
+    if(input$reduced_custom){
+      p <- p + geom_line(aes(x=Distance,y=input$reduced_custom_input), color="orange")}
+    
     return(p)}
   
   output$mainplot <- renderPlot({mainplot()})
@@ -697,6 +704,8 @@ server <- shinyServer(function(input, output, session) {
       
       if(input$main_ocean){
         p <- p + geom_line(aes(x=Distance,y=0.70918), color="blue")}
+      if(input$reduced_custom){
+        p <- p + geom_line(aes(x=Distance,y=input$reduced_custom_input), color="orange")}
       
       return(p)}
     
@@ -775,6 +784,9 @@ server <- shinyServer(function(input, output, session) {
     
     if(input$analyze_ocean){
       p <- p + geom_line(aes(x=Distance,y=0.70918), color="blue")}
+    
+    if(input$analyze_custom){
+      p <- p + geom_line(aes(x=Distance,y=input$analyze_custom_input), color="orange")}
   
       #Manual regions
     p <- p + annotate("rect", xmin = reac$range_one_min, xmax = reac$range_one_max, ymin = -Inf, ymax = +Inf,
@@ -851,6 +863,10 @@ server <- shinyServer(function(input, output, session) {
         
         if(input$analyze_ocean){
           p <- p + geom_line(aes(x=Distance,y=0.70918), color="blue")}
+        
+        if(input$analyze_custom){
+          p <- p + geom_line(aes(x=Distance,y=input$analyze_custom_input), color="orange")}
+        
         #Manual regions
         p <- p + annotate("rect", xmin =manual_region_plotter$min_distance , xmax = manual_region_plotter$max_distance, ymin = -Inf, ymax = +Inf, group=manual_region_plotter$region_number,
                           alpha =manual_region_plotter$region_alpha, fill=manual_region_plotter$region_colors)
