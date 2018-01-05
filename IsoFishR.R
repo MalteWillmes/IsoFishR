@@ -582,6 +582,7 @@ server <- shinyServer(function(input, output, session) {
    
 #mainplot
   mainplot <- function(){
+    req(input$Sample_selector)
     if(is.null(processed_data_cleaned())){return()}
     processed_plot <-processed_data_cleaned()
     processed_plot <-processed_plot %>% filter(name==input$Sample_selector)
@@ -614,6 +615,7 @@ server <- shinyServer(function(input, output, session) {
   
 #Total Sr plot
   TotalSr_plot <- function(){
+    req(input$Sample_selector)
     if(is.null(processed_data_cleaned())){return()}
     processed_plot <-processed_data_cleaned()
     processed_plot <-processed_plot %>% filter(name==input$Sample_selector)
@@ -630,6 +632,7 @@ server <- shinyServer(function(input, output, session) {
   
   #Kr plot
   Kr_plot <- function(){
+    req(input$Sample_selector)
     if(is.null(processed_data_cleaned())){return()}
     processed_plot <-processed_data_cleaned()
     processed_plot <-processed_plot %>% filter(name==input$Sample_selector)
@@ -646,6 +649,7 @@ server <- shinyServer(function(input, output, session) {
   
   #Rb plot
   Rb_plot <- function(){
+    req(input$Sample_selector)
     if(is.null(processed_data_cleaned())){return()}
     processed_plot <-processed_data_cleaned()
     processed_plot <-processed_plot %>% filter(name==input$Sample_selector)
@@ -1252,6 +1256,8 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
   
       #Add results to dataframe and calculate mean value of Changepoint split dataset
       edit_data <- edit_data %>%
+        
+        #Add new changepoints
         mutate (changepoints=replace(changepoints,name==input$Analyzed_sample_selector,TRUE))%>% 
         mutate (change_method=replace(change_method,name==input$Analyzed_sample_selector,input$change_method)) %>% 
         mutate (manual_pen=replace(manual_pen, name==input$Analyzed_sample_selector,input$manual_pen))%>%
@@ -1265,7 +1271,16 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
        group_by(changepoint_number) %>%
      mutate (changepoint_mean=replace(changepoint_mean, name==input$Analyzed_sample_selector, mean(Sr87Sr86_analysis)))%>%
         ungroup()
-    }}
+    }
+      else{
+        edit_data <- edit_data %>%
+          #clear old changepoints
+          mutate (changepoints=replace(changepoints,name==input$Analyzed_sample_selector, FALSE))%>% 
+          mutate (change_method=replace(change_method,name==input$Analyzed_sample_selector,NA)) %>% 
+          mutate (manual_pen=replace(manual_pen, name==input$Analyzed_sample_selector,input$manual_pen))%>%
+          mutate (changepoint_plotting=replace(changepoint_plotting, name==input$Analyzed_sample_selector,FALSE))
+      }
+      }
     
     #Manual region filter
     edit_data <-edit_data %>%
@@ -1297,7 +1312,6 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
       mutate(region_mean=replace(region_mean,name==input$Analyzed_sample_selector, mean(Sr87Sr86_analysis)))%>%
       mutate(region_sd=replace(region_sd,name==input$Analyzed_sample_selector, sd(Sr87Sr86_analysis)))%>%
       ungroup()
-    
     
     #Order the dataframe by ascending distance
     edit_data <- edit_data%>%arrange (name, Distance)
@@ -1335,10 +1349,10 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
     
 
 ####Manual filter selection####
+
 # Reset the manual filter ranges on click of button or on new sample selection
 observe({
   req(input$Analyzed_sample_selector)
-  input$reset_ranges
   input$Analyzed_sample_selector
   input$save_file_edits
   #Find the changes in region numbers, names, min and max distance and create a summary table for lookup
@@ -1395,6 +1409,8 @@ observe({
   
 })
 
+
+    
 # action to read brushed values into the corresponding ranges
 observeEvent(input$readregion1, {
   updateNumericInput(session,  "range_one_min", label = NULL, value = input$analyzed_plot_brush$xmin,
@@ -1484,6 +1500,44 @@ observe({
     reac$range_eight_min <- input$range_eight_min
     reac$range_eight_max <- input$range_eight_max
 })
+
+
+#Reset ranges
+observeEvent(input$reset_ranges,{
+  req(input$Analyzed_sample_selector)
+  updateTextInput(session,"range_one_label", label=NULL, value="Range 1")
+  updateNumericInput(session,"range_one_min","",value=-1)
+  updateNumericInput(session,"range_one_max","",value=-1)
+  
+  updateTextInput(session,"range_two_label", label=NULL, value="Range 2")
+  updateNumericInput(session,"range_two_min","",value=-1)
+  updateNumericInput(session,"range_two_max","",value=-1)
+  
+  updateTextInput(session,"range_three_label", label=NULL, value="Range 3")
+  updateNumericInput(session,"range_three_min","",value=-1)
+  updateNumericInput(session,"range_three_max","",value=-1)
+  
+  updateTextInput(session,"range_four_label", label=NULL, value="Range 4")
+  updateNumericInput(session,"range_four_min","",value=-1)
+  updateNumericInput(session,"range_four_max","",value=-1)
+  
+  updateTextInput(session,"range_five_label", label=NULL, value="Range 5")
+  updateNumericInput(session,"range_five_min","",value=-1)
+  updateNumericInput(session,"range_five_max","",value=-1)
+  
+  updateTextInput(session,"range_six_label", label=NULL, value="Range 6")
+  updateNumericInput(session,"range_six_min","",value=-1)
+  updateNumericInput(session,"range_six_max","",value=-1)
+  
+  updateTextInput(session,"range_seven_label", label=NULL, value="Range 7")
+  updateNumericInput(session,"range_seven_min","",value=-1)
+  updateNumericInput(session,"range_seven_max","",value=-1)
+  
+  updateTextInput(session,"range_eight_label", label=NULL, value="Range 8")
+  updateNumericInput(session,"range_eight_min","",value=-1)
+  updateNumericInput(session,"range_eight_max","",value=-1)
+})
+
 
 #Create a table of the analyzed data#
   output$analyzed_data_table <-  DT::renderDataTable({
