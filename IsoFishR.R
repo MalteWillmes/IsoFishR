@@ -1269,26 +1269,31 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
     
     #Manual region filter
     edit_data <-edit_data %>%
+      
+      #Clear region names and numbers
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector,0)) %>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector,NA))%>%       
+      
       #Add region names
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_one_min<Distance & input$range_one_max>Distance, input$range_one_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_two_min<Distance & input$range_two_max>Distance, input$range_two_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_three_min<Distance & input$range_three_max>Distance, input$range_three_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_four_min<Distance & input$range_four_max>Distance, input$range_four_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_five_min<Distance & input$range_five_max>Distance, input$range_five_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_six_min<Distance & input$range_six_max>Distance, input$range_six_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_seven_min<Distance & input$range_seven_max>Distance, input$range_seven_label, region_name)))%>%
-      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_eight_min<Distance & input$range_eight_max>Distance, input$range_eight_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_one_min<=Distance & input$range_one_max>=Distance, input$range_one_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_two_min<=Distance & input$range_two_max>=Distance, input$range_two_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_three_min<=Distance & input$range_three_max>=Distance, input$range_three_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_four_min<=Distance & input$range_four_max>=Distance, input$range_four_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_five_min<=Distance & input$range_five_max>=Distance, input$range_five_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_six_min<=Distance & input$range_six_max>=Distance, input$range_six_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_seven_min<=Distance & input$range_seven_max>=Distance, input$range_seven_label, region_name)))%>%
+      mutate(region_name=replace(region_name,name==input$Analyzed_sample_selector, ifelse(input$range_eight_min<=Distance & input$range_eight_max>=Distance, input$range_eight_label, region_name)))%>%
       #Add region numbers
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_one_min<Distance & input$range_one_max>Distance, 1, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_two_min<Distance & input$range_two_max>Distance, 2, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_three_min<Distance & input$range_three_max>Distance, 3, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_four_min<Distance & input$range_four_max>Distance, 4, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_five_min<Distance & input$range_five_max>Distance, 5, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_six_min<Distance & input$range_six_max>Distance, 6, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_seven_min<Distance & input$range_seven_max>Distance, 7, region_number)))%>%
-      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_eight_min<Distance & input$range_eight_max>Distance, 8, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_one_min<=Distance & input$range_one_max>=Distance, 1, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_two_min<=Distance & input$range_two_max>=Distance, 2, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_three_min<=Distance & input$range_three_max>=Distance, 3, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_four_min<=Distance & input$range_four_max>=Distance, 4, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_five_min<=Distance & input$range_five_max>=Distance, 5, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_six_min<=Distance & input$range_six_max>=Distance, 6, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_seven_min<=Distance & input$range_seven_max>=Distance, 7, region_number)))%>%
+      mutate(region_number=replace(region_number,name==input$Analyzed_sample_selector, ifelse(input$range_eight_min<=Distance & input$range_eight_max>=Distance, 8, region_number)))%>%
       #Group by region names and calculate mean and sd
-      group_by(region_number)%>%
+      group_by(name,region_number)%>%
       mutate(region_mean=replace(region_mean,name==input$Analyzed_sample_selector, mean(Sr87Sr86_analysis)))%>%
       mutate(region_sd=replace(region_sd,name==input$Analyzed_sample_selector, sd(Sr87Sr86_analysis)))%>%
       ungroup()
@@ -1326,8 +1331,6 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
       trim_status_profile <- distinct(trim_status_profile_var)
       
       return(trim_status_profile)})  
-    
-   
     
     
 
