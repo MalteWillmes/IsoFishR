@@ -77,7 +77,7 @@ library(shiny)
                                               title = "Project management", width = NULL, status = "primary",
                                               selectInput(inputId = 'project.name',label = "Select Project",choices = list.files(path = file.path(".","Projects")),selected="Default"),
                                               textInput(inputId="new.project",label="Create a new project ",value="Project"),
-                                              actionButton("save","Save")
+                                              actionButton("save","Save new project")
                                             ),
                                             box(
                                               title = "Project comments", width = NULL, status = "primary",
@@ -105,9 +105,15 @@ library(shiny)
                                               radioButtons("CI","CI for outliers",choices = list("3"=0.9985,"2"=0.975,"1"=0.84),inline=TRUE),
                                               numericInput("outlier_num","Outlier window",value=50,step=1,min=30),
                                               numericInput("fluency","Fluency",value=1.85),
-                                              numericInput("energy","Laser energy",value=55)
-                                          
-                                              
+                                              numericInput("energy","Laser energy",value=55),
+                                              textInput("defrange1","Range 1 label", value="Range 1"),
+                                              textInput("defrange2","Range 2 label", value="Range 2"),
+                                              textInput("defrange3","Range 3 label", value="Range 3"),
+                                              textInput("defrange4","Range 4 label", value="Range 4"),
+                                              textInput("defrange5","Range 5 label", value="Range 5"),
+                                              textInput("defrange6","Range 6 label", value="Range 6"),
+                                              textInput("defrange7","Range 7 label", value="Range 7"),
+                                              textInput("defrange8","Range 8 label", value="Range 8")
                                             )
                                      ),
                                      
@@ -252,49 +258,49 @@ fluidRow(
                          tabPanel("About", "Filters can be used to split the data into different regions"),
                          tabPanel("Manual Filter",
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_one_label", label=NULL, value = "Range 1")),
+                        div(style="height:20px",textInput("range_one_label", label=NULL)),
                         div(style="height:35px",numericInput("range_one_min","",value=-1)),
                         div(style="height:55px",numericInput("range_one_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion1", "Read",style="background-color:#6b8acd"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_two_label", label=NULL, value = "Range 2")),
+                        div(style="height:20px",textInput("range_two_label", label=NULL)),
                         div(style="height:35px",numericInput("range_two_min","",value=-1)),
                         div(style="height:55px", numericInput("range_two_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion2", "Read",style="background-color:#4cb28d"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_three_label",label=NULL, value = "Range 3")),
+                        div(style="height:20px",textInput("range_three_label",label=NULL)),
                         div(style="height:35px",numericInput("range_three_min","",value=-1)),
                         div(style="height:55px",numericInput("range_three_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion3", "Read",style="background-color:#72853c"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_four_label",label=NULL, value = "Range 4")),
+                        div(style="height:20px",textInput("range_four_label",label=NULL)),
                         div(style="height:35px",numericInput("range_four_min","",value=-1)),
                         div(style="height:55px", numericInput("range_four_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion4", "Read",style="background-color:#c78a40"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_five_label", label=NULL, value = "Range 5")),
+                        div(style="height:20px",textInput("range_five_label", label=NULL)),
                         div(style="height:35px",numericInput("range_five_min","",value=-1)),
                         div(style="height:55px",numericInput("range_five_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion5", "Read",style="background-color:#c75d9c"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_six_label", label=NULL, value = "Range 6")),
+                        div(style="height:20px",textInput("range_six_label", label=NULL)),
                         div(style="height:35px",numericInput("range_six_min","",value=-1)),
                         div(style="height:55px",numericInput("range_six_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion6", "Read",style="background-color:#cb554f"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_seven_label", label=NULL, value = "Range 7")),
+                        div(style="height:20px",textInput("range_seven_label", label=NULL)),
                         div(style="height:35px",numericInput("range_seven_min","",value=-1)),
                         div(style="height:55px",numericInput("range_seven_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion7", "Read",style="background-color:#9061c9"))),
                     
                     div(style="float:left;width: 80px",
-                        div(style="height:20px",textInput("range_eight_label", label=NULL, value = "Range 8")),
+                        div(style="height:20px",textInput("range_eight_label", label=NULL)),
                         div(style="height:35px",numericInput("range_eight_min","",value=-1)),
                         div(style="height:55px",numericInput("range_eight_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion8", "Read",style="background-color:#83b844"))),
@@ -1048,12 +1054,11 @@ server <- shinyServer(function(input, output, session) {
   
 ####Project management code ####
   readSettings <- reactive({
-    input$updatesettings
     settingsdf <- read.csv(file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),header=TRUE)
   })
-  # take the settings object and set the settings to the defaults in the csv with each new file upload
+  # take the settings object and set the settings to the defaults
   observe({
-    input$file 
+    input$project.name
     settingsdf <- readSettings()
     updateTextInput(session, "username",value = settingsdf$username)
     updateNumericInput(session, "raw88", value = settingsdf$raw88)
@@ -1084,10 +1089,38 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"blanktime",value=settingsdf$blanktime)
     updateNumericInput(session,"Sr8688ratio",value=settingsdf$Sr8688ratio)
     updateNumericInput(session,"Rb8587ratio",value=settingsdf$Rb8587ratio)
-
+    updateTextInput(session,"defrange1",value=settingsdf$range1_label)
+    updateTextInput(session,"defrange2",value=settingsdf$range2_label)
+    updateTextInput(session,"defrange3",value=settingsdf$range3_label)
+    updateTextInput(session,"defrange4",value=settingsdf$range4_label)
+    updateTextInput(session,"defrange5",value=settingsdf$range5_label)
+    updateTextInput(session,"defrange6",value=settingsdf$range6_label)
+    updateTextInput(session,"defrange7",value=settingsdf$range7_label)
+    updateTextInput(session,"defrange8",value=settingsdf$range8_label)
   })
   
+  observe({
+    input$project.name
+    updateTextInput(session,"range_one_label",value=input$defrange1)
+    updateTextInput(session,"range_two_label",value=input$defrange2)
+    updateTextInput(session,"range_three_label",value=input$defrange3)
+    updateTextInput(session,"range_four_label",value=input$defrange4)
+    updateTextInput(session,"range_five_label",value=input$defrange5)
+    updateTextInput(session,"range_six_label",value=input$defrange6)
+    updateTextInput(session,"range_seven_label",value=input$defrange7)
+    updateTextInput(session,"range_eight_label",value=input$defrange8)
+  })
   
+  observeEvent(input$updatesettings,{
+    updateTextInput(session,"range_one_label",value=input$defrange1)
+    updateTextInput(session,"range_two_label",value=input$defrange2)
+    updateTextInput(session,"range_three_label",value=input$defrange3)
+    updateTextInput(session,"range_four_label",value=input$defrange4)
+    updateTextInput(session,"range_five_label",value=input$defrange5)
+    updateTextInput(session,"range_six_label",value=input$defrange6)
+    updateTextInput(session,"range_seven_label",value=input$defrange7)
+    updateTextInput(session,"range_eight_label",value=input$defrange8)
+  })
   
   # create a new project and create the files and subdirectories 
   observeEvent(input$save,{
@@ -1096,11 +1129,11 @@ server <- shinyServer(function(input, output, session) {
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$gam_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
-                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username)
+                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username")
+                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
@@ -1125,11 +1158,11 @@ server <- shinyServer(function(input, output, session) {
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$gam_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
-                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username)
+                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username")
+                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
   })
   
@@ -1391,35 +1424,35 @@ observe({
   range7_data<-range_observer%>%filter(region_number==7)
   range8_data<-range_observer%>%filter(region_number==8)
   
-  updateTextInput(session,"range_one_label", label=NULL, value=ifelse(nrow(range1_data)==0, "Range 1", range1_data$region_name))
+  updateTextInput(session,"range_one_label", label=NULL, value=ifelse(nrow(range1_data)==0, input$defrange1, range1_data$region_name))
   updateNumericInput(session,"range_one_min","",value=ifelse(nrow(range1_data)==0, -1, range1_data$min_distance))
   updateNumericInput(session,"range_one_max","",value=ifelse(nrow(range1_data)==0, -1, range1_data$max_distance))
   
-  updateTextInput(session,"range_two_label", label=NULL, value=ifelse(nrow(range2_data)==0, "Range 2", range2_data$region_name))
+  updateTextInput(session,"range_two_label", label=NULL, value=ifelse(nrow(range2_data)==0, input$defrange2, range2_data$region_name))
   updateNumericInput(session,"range_two_min","",value=ifelse(nrow(range2_data)==0, -1, range2_data$min_distance))
   updateNumericInput(session,"range_two_max","",value=ifelse(nrow(range2_data)==0, -1, range2_data$max_distance))
   
-  updateTextInput(session,"range_three_label", label=NULL, value=ifelse(nrow(range3_data)==0, "Range 3", range3_data$region_name))
+  updateTextInput(session,"range_three_label", label=NULL, value=ifelse(nrow(range3_data)==0, input$defrange3, range3_data$region_name))
   updateNumericInput(session,"range_three_min","",value=ifelse(nrow(range3_data)==0, -1, range3_data$min_distance))
   updateNumericInput(session,"range_three_max","",value=ifelse(nrow(range3_data)==0, -1, range3_data$max_distance))
   
-  updateTextInput(session,"range_four_label", label=NULL, value=ifelse(nrow(range4_data)==0, "Range 4", range4_data$region_name))
+  updateTextInput(session,"range_four_label", label=NULL, value=ifelse(nrow(range4_data)==0, input$defrange4, range4_data$region_name))
   updateNumericInput(session,"range_four_min","",value=ifelse(nrow(range4_data)==0, -1, range4_data$min_distance))
   updateNumericInput(session,"range_four_max","",value=ifelse(nrow(range4_data)==0, -1, range4_data$max_distance))
   
-  updateTextInput(session,"range_five_label", label=NULL, value=ifelse(nrow(range5_data)==0, "Range 5", range5_data$region_name))
+  updateTextInput(session,"range_five_label", label=NULL, value=ifelse(nrow(range5_data)==0, input$defrange5, range5_data$region_name))
   updateNumericInput(session,"range_five_min","",value=ifelse(nrow(range5_data)==0, -1, range5_data$min_distance))
   updateNumericInput(session,"range_five_max","",value=ifelse(nrow(range5_data)==0, -1, range5_data$max_distance))
   
-  updateTextInput(session,"range_six_label", label=NULL, value=ifelse(nrow(range6_data)==0, "Range 6", range6_data$region_name))
+  updateTextInput(session,"range_six_label", label=NULL, value=ifelse(nrow(range6_data)==0, input$defrange6, range6_data$region_name))
   updateNumericInput(session,"range_six_min","",value=ifelse(nrow(range6_data)==0, -1, range6_data$min_distance))
   updateNumericInput(session,"range_six_max","",value=ifelse(nrow(range6_data)==0, -1, range6_data$max_distance))
   
-  updateTextInput(session,"range_seven_label", label=NULL, value=ifelse(nrow(range7_data)==0, "Range 7", range7_data$region_name))
+  updateTextInput(session,"range_seven_label", label=NULL, value=ifelse(nrow(range7_data)==0, input$defrange7, range7_data$region_name))
   updateNumericInput(session,"range_seven_min","",value=ifelse(nrow(range7_data)==0, -1, range7_data$min_distance))
   updateNumericInput(session,"range_seven_max","",value=ifelse(nrow(range7_data)==0, -1, range7_data$max_distance))
   
-  updateTextInput(session,"range_eight_label", label=NULL, value=ifelse(nrow(range8_data)==0, "Range 8", range8_data$region_name))
+  updateTextInput(session,"range_eight_label", label=NULL, value=ifelse(nrow(range8_data)==0, input$defrange8, range8_data$region_name))
   updateNumericInput(session,"range_eight_min","",value=ifelse(nrow(range8_data)==0, -1, range8_data$min_distance))
   updateNumericInput(session,"range_eight_max","",value=ifelse(nrow(range8_data)==0, -1, range8_data$max_distance))
   
