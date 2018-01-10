@@ -20,8 +20,13 @@ install_load <- function (package1,...)  {
 }
 
 install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets')
-
 library(shiny)
+
+#Turn off warnings
+options(warn=-1)
+#Uncomment to turn warnings back on
+#options(warn=0)
+
 ####Creating the dashboard and ui outline####
    ui <- dashboardPage(skin="black", title="IsoFishR",
                        dashboardHeader(title = img(src = 'logo.png',
@@ -551,7 +556,7 @@ server <- shinyServer(function(input, output, session) {
     if(input$appending_processed){
       write.table(raw_data_all(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv"))),row.names=FALSE,sep="," ,append = TRUE)
       write.table(background_data(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_02_background_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_02_background_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
-      write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_reduced_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_processed_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
+      write.table(processed_data_cleaned(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_reduced_data.csv")),col.names=!file.exists(file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_03_reduced_data.csv"))),row.names=FALSE,sep=",",append = TRUE)
     }
     else{
     write.table(raw_data_all(),file=file.path("Projects",input$project.name,"/Data",paste0(input$project.name,"_01_raw_data.csv")),row.names=FALSE,col.names= TRUE, sep=",")
@@ -1153,6 +1158,7 @@ server <- shinyServer(function(input, output, session) {
   
   # button to allow user to update the project settings. Will overwrite the current settings csv file in a project folder.
   observeEvent(input$updatesettings,{
+    t <- try({
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
@@ -1164,10 +1170,18 @@ server <- shinyServer(function(input, output, session) {
                             "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
                             "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
+    silent=TRUE})
+    # if there is no error print a success message otherwise print an error message
+    if ("try-error" %in% class(t)){
+      save_settings_failed_notification <- showNotification(paste("File access denied: Saving failed. Is the file open?"), duration = 8, type="error")
+    } else {
+      save_settings_notification <- showNotification(paste("Project settings saved"), duration = 8, type="message")
+    }
   })
   
   # project wide comments input and display
   observeEvent(input$comment,{
+    t <- try({
     date <- Sys.Date()
     comment <- input$project.comment
     comments <- cbind.data.frame(date,comment)
@@ -1175,6 +1189,12 @@ server <- shinyServer(function(input, output, session) {
       write.table(comments,file=file.path("Projects",input$project.name,paste0(input$project.name,"_comments.csv")),col.names = c("Date","Comment"),row.names=FALSE,sep=",")
     }else{
       write.table(comments,file=file.path("Projects",input$project.name,paste0(input$project.name,"_comments.csv")),append=TRUE,col.names = FALSE,row.names=FALSE,sep=",") 
+    }
+    silent=TRUE})
+    if ("try-error" %in% class(t)){
+      save_settings_failed_notification <- showNotification(paste("File access denied: Saving failed. Is the file open?"), duration = 8, type="error")
+    } else {
+      save_settings_notification <- showNotification(paste("Comment saved"), duration = 8, type="message")
     }
   })
   
