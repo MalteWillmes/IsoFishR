@@ -55,7 +55,7 @@ options(warn=-1)
                                          hr(),
                                          h5("This application is designed to process laser ablation (LA) strontium isotope (87Sr/86Sr) data of carbonate and bioapatite samples. It includes many features
                                             to make data reduction, data management and isotope analysis reliable and reproducible."),
-                                         h5(a(target="_blank", href = 'http://www.hobbslab.com',"Tutorial")),
+                                         h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR/blob/master/README.md',"Tutorial")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR',"Code on GitHub")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR/blob/master/LICENSE',"MIT license")),
                                          h5("Funding sources: This program has been developed in the Biogeochemistry and Fish Ecology Lab at UC Davis, California.")
