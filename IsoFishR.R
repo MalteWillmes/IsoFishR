@@ -1,3 +1,6 @@
+#Clear the environment
+rm(list=ls())
+
 ####Installing all required packages####
 install_load <- function (package1,...)  {   
   
@@ -18,8 +21,9 @@ install_load <- function (package1,...)  {
     }
   } 
 }
-
 install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets')
+
+
 library(shiny)
 
 #Turn off warnings
@@ -53,9 +57,9 @@ options(warn=-1)
                                             to make data reduction, data management and isotope analysis reliable and reproducible."),
                                          h5(a(target="_blank", href = 'http://www.hobbslab.com',"Tutorial")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR',"Code on GitHub")),
-                                         h5(a(target="_blank", href = 'http://www.hobbslab.com',"Manuscript")),
-                                         h5("Funding sources: This program has been developed in the Biogeochemistry and Fish Ecology Lab at UC Davis, California."),
-                                         h5("License information:")),
+                                         h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR/blob/master/LICENSE',"MIT license")),
+                                         h5("Funding sources: This program has been developed in the Biogeochemistry and Fish Ecology Lab at UC Davis, California.")
+                                         ),
                                      box(
                                        title = "Version history", width = 3, status="warning",
                                        "0.1 - initial release (12/2016)",
@@ -64,12 +68,14 @@ options(warn=-1)
                                        br(),
                                        "0.6 - updated projects management (8/2017)",
                                        br(),
-                                       "0.9 - GitHub release (11/2017)"
+                                       "0.9 - GitHub commit (11/2017)",
+                                       br(),
+                                       "1.0 - GitHub release (01/2018)"
                                      ),
                                      box(
                                        title = "Contact the Authors", width = 3, status="danger",
-                                       h5("Katherine Ransom (lockhart.katherine@gmail.com)"),
                                        h5( "Malte Willmes (mwillmes@ucdavis.edu)"),
+                                       h5("Katherine Ransom (lockhart.katherine@gmail.com)"),
                                        h5( "James Hobbs (jahobbs@ucdavis.edu)")
                                      ))
                                    
@@ -85,6 +91,10 @@ options(warn=-1)
                                               actionButton("save","Save new project")
                                             ),
                                             box(
+                                              title = "Update project settings", width = NULL, solidHeader = TRUE, status = "warning",
+                                              actionButton("updatesettings","Update")
+                                            ),
+                                            box(
                                               title = "Project comments", width = NULL, status = "primary",
                                                 textAreaInput(inputId="project.comment",label=NULL,value="Add comment here"),
                                                 actionButton("comment","Save Comment"),DT::dataTableOutput("comments")
@@ -93,10 +103,6 @@ options(warn=-1)
                                             ),
                                      
                                      column(width = 4,
-                                            box(
-                                              title = "Update project settings", width = NULL, solidHeader = TRUE, status = "warning",
-                                              actionButton("updatesettings","Update")
-                                            ),
                                             box(
                                               title = "Default analysis parameters", width = NULL, status = "primary",
                                               textInput("username","User name"),
@@ -192,6 +198,8 @@ fluidRow(
       checkboxInput("main_points",label="Points", value=TRUE),
       checkboxInput("main_outlier_points",label="Outlier", value=TRUE),
       checkboxInput("main_ma",label="Moving average", value=TRUE),
+      checkboxInput("main_ci",label="95% CI", value=TRUE),
+      checkboxInput("main_sd",label="SD", value=FALSE),
       checkboxInput("main_gam",label="Gam fit", value=FALSE),
       checkboxInput("main_ocean",label="Ocean", value=FALSE),
       checkboxInput("reduced_custom",label="Custom line", value=FALSE),
@@ -245,6 +253,8 @@ fluidRow(
                                    checkboxInput("analyze_points",label="Points", value=TRUE),
                                    checkboxInput("analyze_outlier_points",label="Outlier", value=TRUE),
                                    checkboxInput("analyze_ma",label="Moving average", value=TRUE),
+                                   checkboxInput("analyze_ci",label="95% CI", value=TRUE),
+                                   checkboxInput("analyze_sd",label="SD", value=FALSE),
                                    checkboxInput("analyze_gam",label="Gam fit", value=FALSE),
                                    checkboxInput("analyze_ocean",label="Ocean", value=FALSE),
                                    checkboxInput("analyze_custom",label="Custom line", value=FALSE),
@@ -608,9 +618,13 @@ server <- shinyServer(function(input, output, session) {
     p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
     p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
 
-    
+    if(input$main_sd){
+    p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
+    }
+    if(input$main_ci){
+    p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$shadecol)
+    }
     if(input$main_ma){
-      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
     if(input$main_gam){
       p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol)
@@ -701,9 +715,14 @@ server <- shinyServer(function(input, output, session) {
       p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
       
       
+      if(input$main_sd){
+        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
+      }
+      if(input$main_ci){
+        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$shadecol)
+      }
       if(input$main_ma){
-        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol, na.rm=TRUE)
-        p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$linecol)}
+        p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
       if(input$main_gam){
         p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
         p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), na.rm=TRUE, color=input$linecol)}
@@ -780,10 +799,15 @@ server <- shinyServer(function(input, output, session) {
     p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
     p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
    
-     
-    if(input$analyze_ma){
+    if(input$analyze_sd){
       p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=TRUE)
+    }
+    if(input$analyze_ci){
+      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$analyze_shadecol, na.rm=TRUE)
+    }
+    if(input$analyze_ma){
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
+    
     if(input$analyze_gam){
       p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), na.rm=TRUE, color=input$linecol)}
@@ -860,8 +884,13 @@ server <- shinyServer(function(input, output, session) {
         p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
         
         
-        if(input$analyze_ma){
+        if(input$analyze_sd){
           p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=TRUE)
+        }
+        if(input$analyze_ci){
+          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$analyze_shadecol, na.rm=TRUE)
+        }
+        if(input$analyze_ma){
           p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
         if(input$analyze_gam){
           p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
