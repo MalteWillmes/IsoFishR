@@ -9,7 +9,7 @@ Instructions:
 - Open the IsoFish.R file with R or R Studio
 - Make sure you are in an empty R environment (no previous workspace or packages loaded as this can cause conflicts)
 - Run the IsoFish.R file (in R studio: small green arrow on the right called "run app", make sure this is set to "run external")
-![Rstudio](https://github.com/MalteWillmes/IsoFishR/blob/master/www/R_studio.jpg)
+![Rstudio](https://github.com/MalteWillmes/IsoFishR/blob/master/www/R_studio.JPG)
 
 Projects:
 - Projects allow the user to modify and store the import data settings and to change the default data reduction and data analysis parameters
