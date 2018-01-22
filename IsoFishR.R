@@ -107,7 +107,7 @@ options(warn=-1)
                                               title = "Default analysis parameters", width = NULL, status = "primary",
                                               textInput("username","User name"),
                                               textInput("sampletype",label="Sample type",value="Otolith"),
-                                              textInput("analysistype","Analysis type", value="Line"),
+                                              radioButtons("analysistype","Analysis type", choices=list ("Line"="Line", "Spot"="Spot")),
                                               numericInput("spotsize","Spot size",value=40),
                                               numericInput("speed", "Run speed", value=10, step = 1),
                                               radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","Gam"="Gam", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
@@ -187,9 +187,8 @@ fluidRow(
     uiOutput("Sample_selector"),
     actionButton("save_data","Save reduced data"),
     checkboxInput("appending_processed", "Append data?",value=TRUE),
-    selectInput("narem", "Remove NAs?", choices=c("TRUE","FALSE"), selected = "TRUE"),
-    selectInput("rollfill", "Fill NAs?", choices=c("extend","FALSE"), selected = "extend"))
-  
+    uiOutput('narem'),
+    uiOutput('rollfill'))
     ),
     column(width = 9,
   box(
@@ -956,6 +955,21 @@ server <- shinyServer(function(input, output, session) {
     selectInput("Analyzed_sample_selector",label="Select sample",choices=analyzed_sample_names)
     
   })
+  
+  #Point or line data 
+  output$narem <- renderUI ({
+    analysistype_selected <- input$analysistype
+    selection_narem <- ifelse(analysistype_selected =="Line",TRUE,FALSE)
+    selectInput("narem", label="Remove NAs?", choices=c("TRUE","FALSE"), selected = selection_narem)
+
+  })
+  output$rollfill <- renderUI ({
+    analysistype_selected <- input$analysistype
+    selection_rollfill <- ifelse(analysistype_selected =="Line","extend",FALSE)
+    selectInput("rollfill", label="Fill NAs?", choices=c("extend","FALSE"), selected = selection_rollfill)
+  })
+
+
   #Checking the Sample_ID
   output$Sample_ID <- renderUI ({
     #Check if available
@@ -1119,7 +1133,7 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"energy",value=settingsdf$energy)
     updateNumericInput(session,"integration",value=settingsdf$integration)
     updateTextInput(session,"sampletype",value=settingsdf$sampletype)
-    updateTextInput(session,"analysistype",value=settingsdf$analysistype)
+    updateRadioButtons(session,"analysistype",selected=settingsdf$analysistype)
     updateNumericInput(session,"blanktime",value=settingsdf$blanktime)
     updateNumericInput(session,"Sr8688ratio",value=settingsdf$Sr8688ratio)
     updateNumericInput(session,"Rb8587ratio",value=settingsdf$Rb8587ratio)
