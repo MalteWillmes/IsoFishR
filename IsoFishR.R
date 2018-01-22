@@ -220,7 +220,8 @@ fluidRow(
                   box(
                     width = NULL, title="Step 1: Select data to be analyzed",  status = "primary", style='padding:2px;',
                     htmlOutput("AnalysisHTML"),
-                    fileInput("processed_file","Select .csv file")
+                    fileInput("processed_file","Select .csv file",
+                              accept=c("txt/csv", "text/comma-separated-values,text/plain", ".csv"))
                     ),
                   box(
                     width = NULL, title="Step 2: Select sample to edit",  status = "primary", style='padding:2px;',height=305,
@@ -346,8 +347,18 @@ fluidRow(
                            
 tabItem(tabName = "Data_table",
         fluidRow(
-          box(width=12,
-              div(style = 'overflow-x: scroll',DT::dataTableOutput('analyzed_data_table')))))
+          tabBox(width = 12,
+            # The id lets us use input$tabset1 on the server to find the current tab
+            id = "tabset_datatables",
+            tabPanel("Reduced data all", 
+                     div(style = 'overflow-x: scroll',DT::dataTableOutput('reduced_data_table_all'))
+            ),
+            tabPanel("Analyzed data summary", 
+                     div(style = 'overflow-x: scroll',DT::dataTableOutput('analyzed_data_table_summary'))
+                     ),
+            tabPanel("Analyzed data all ", 
+                     div(style = 'overflow-x: scroll',DT::dataTableOutput('analyzed_data_table_all')
+                         )))))
 )))
 
                            
@@ -1651,13 +1662,31 @@ observeEvent(input$reset_ranges,{
 })
 
 
-#Create a table of the analyzed data#
-  output$analyzed_data_table <-  DT::renderDataTable({
-    analyzed_data_table <- analyzer_overwatch$analyzed
-    if(is.null(analyzed_data_table)){return()}
-    DT::datatable(analyzed_data_table, options = list(pageLength = 20))
+#Create the data tables
+# Reduced data table
+#all analyzed data
+output$reduced_data_table_all <-  DT::renderDataTable({
+  reduced_data_table_all <- processed_data_cleaned()
+  if(is.null(reduced_data_table_all)){return()}
+  DT::datatable(reduced_data_table_all, options = list(pageLength = 20))
+})
+#all analyzed data
+  output$analyzed_data_table_all <-  DT::renderDataTable({
+    analyzed_data_table_all <- analyzer_overwatch$analyzed
+    if(is.null(analyzed_data_table_all)){return()}
+    DT::datatable(analyzed_data_table_all, options = list(pageLength = 20))
   })
-
+#summary table
+  output$analyzed_data_table_summary <-  DT::renderDataTable({
+    req(analyzer_overwatch$analyzed)
+    analyzed_data_table_summary <- analyzer_overwatch$analyzed
+    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_mean) %>% 
+      group_by (region_number) %>%
+      distinct (name, .keep_all = TRUE) %>%
+      mutate (region_mean=round(region_mean, 5))
+    if(is.null(analyzed_data_table_summary)){return()}
+    DT::datatable(analyzed_data_table_summary, options = list(pageLength = 20))
+  })
 
     
   #### Stop shiny app when closing the browser ####
