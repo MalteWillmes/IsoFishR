@@ -338,7 +338,7 @@ fluidRow(
                   box(
                     title = "Step 7: Export data", width = 3, background = "black", style='padding:2px;',
                     actionButton("save_edits","Export analyzed data"),
-                    checkboxInput("appending_analyzed", "Append data?",value=TRUE)
+                    checkboxInput("appending_analyzed", "Append data?",value=FALSE)
                   )
                   
            )
