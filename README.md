@@ -2,7 +2,11 @@
 ![IsoFishR](https://github.com/MalteWillmes/IsoFishR/blob/master/www/logo.png)
 
 Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via laser-ablation mass spectrometry. 
-The aim of this application is to provide a rapid, reliable, and reproducible data reduction and analysis tool, that can be applied across disciplines. 
+The aim of this application is to provide a rapid, reliable, and reproducible data reduction and analysis tool, that can be applied across disciplines.
+
+Requirements
+- R version 3.2 or higher. Download at https://www.r-project.org/
+- Rstudio (optional but recommended). Download at https://www.rstudio.com/
 
 Instructions:
 - Download the app from github as a .zip file and extract to a convenient location
