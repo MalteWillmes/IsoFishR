@@ -1683,10 +1683,11 @@ output$reduced_data_table_all <-  DT::renderDataTable({
   output$analyzed_data_table_summary <-  DT::renderDataTable({
     req(analyzer_overwatch$analyzed)
     analyzed_data_table_summary <- analyzer_overwatch$analyzed
-    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mean) %>% 
+    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mean, region_sd) %>% 
       group_by (region_name) %>%
       distinct (name, .keep_all = TRUE) %>%
-      mutate (region_mean=round(region_mean, 5))
+      mutate (region_mean=round(region_mean, 5))%>%
+    mutate (region_sd=round(region_sd, 5))
     if(is.null(analyzed_data_table_summary)){return()}
     DT::datatable(analyzed_data_table_summary, options = list(pageLength = 20))
   })
