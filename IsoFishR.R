@@ -43,7 +43,7 @@ options(warn=-1)
                            menuItem("Projects", tabName="Projects", icon=icon("folder")),
                            menuItem("Data Reduction ", tabName="Data_reduction",icon=icon("cogs")),
                            menuItem("Data Analysis", tabName="Data_analysis",icon=icon("area-chart")),
-                           menuItem("Data Table", tabName="Data_table", icon=icon("table")))),
+                           menuItem("Data Reporting", tabName="Data_reporting", icon=icon("table")))),
 ####About####                      
                        
                        dashboardBody(
@@ -346,20 +346,21 @@ fluidRow(
            )),
            
                            
-tabItem(tabName = "Data_table",
+tabItem(tabName = "Data_reporting",
         fluidRow(
           tabBox(width = 12,
             # The id lets us use input$tabset1 on the server to find the current tab
             id = "tabset_datatables",
-            tabPanel("Reduced data all", 
-                     div(style = 'overflow-x: scroll',DT::dataTableOutput('reduced_data_table_all'))
-            ),
+            
             tabPanel("Analyzed data summary", 
                      div(style = 'overflow-x: scroll',DT::dataTableOutput('analyzed_data_table_summary'))
                      ),
             tabPanel("Analyzed data all ", 
                      div(style = 'overflow-x: scroll',DT::dataTableOutput('analyzed_data_table_all')
-                         )))))
+                         )),
+            tabPanel("Reduced data all", 
+                     div(style = 'overflow-x: scroll',DT::dataTableOutput('reduced_data_table_all'))
+            ))))
 )))
 
                            
