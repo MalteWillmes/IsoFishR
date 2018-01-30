@@ -108,6 +108,7 @@ options(warn=-1)
                                               textInput("username","User name"),
                                               textInput("sampletype",label="Sample type",value="Otolith"),
                                               radioButtons("analysistype","Analysis type", choices=list ("Line"="Line", "Spot"="Spot")),
+                                              textInput("sampledirection",label="Analysis direction",value=""),
                                               numericInput("spotsize","Spot size",value=40),
                                               numericInput("speed", "Run speed", value=10, step = 1),
                                               radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","Gam"="Gam", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
@@ -1144,6 +1145,7 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"energy",value=settingsdf$energy)
     updateNumericInput(session,"integration",value=settingsdf$integration)
     updateTextInput(session,"sampletype",value=settingsdf$sampletype)
+    updateTextInput(session,"sampledirection",value=settingsdf$sampledirection)
     updateRadioButtons(session,"analysistype",selected=settingsdf$analysistype)
     updateNumericInput(session,"blanktime",value=settingsdf$blanktime)
     updateNumericInput(session,"Sr8688ratio",value=settingsdf$Sr8688ratio)
@@ -1188,11 +1190,11 @@ server <- shinyServer(function(input, output, session) {
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$gam_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
-                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
+                      input$sampletype,input$analysistype,input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
@@ -1218,11 +1220,11 @@ server <- shinyServer(function(input, output, session) {
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$gam_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
-                      input$sampletype, input$analysistype, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
+                      input$sampletype, input$analysistype, input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
     silent=TRUE})
     # if there is no error print a success message otherwise print an error message
@@ -1680,8 +1682,8 @@ output$reduced_data_table_all <-  DT::renderDataTable({
   output$analyzed_data_table_summary <-  DT::renderDataTable({
     req(analyzer_overwatch$analyzed)
     analyzed_data_table_summary <- analyzer_overwatch$analyzed
-    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_mean) %>% 
-      group_by (region_number) %>%
+    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mean) %>% 
+      group_by (region_name) %>%
       distinct (name, .keep_all = TRUE) %>%
       mutate (region_mean=round(region_mean, 5))
     if(is.null(analyzed_data_table_summary)){return()}
