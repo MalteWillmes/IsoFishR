@@ -785,7 +785,7 @@ server <- shinyServer(function(input, output, session) {
       return(p)}
     
   ggsave(filename=file.path("Projects",input$project.name,"Plots/87Sr86Sr_reduced",paste0(i,"_87Sr86Sr_reduced.pdf")), plot = mainplot(), device = "pdf",width=8,height=4,scale=1.5)
-  ggsave(filename=file.path("Projects",input$project.name,"Plots/88Sr",paste0(i,"_88Sr_volts.pdf")), plot = TotalSr_plot(), device = "pdf",width=8,height=4,scale=1.5)
+  ggsave(filename=file.path("Projects",input$project.name,"Plots/totalSr",paste0(i,"_totalSr_volts.pdf")), plot = TotalSr_plot(), device = "pdf",width=8,height=4,scale=1.5)
   ggsave(filename=file.path("Projects",input$project.name,"Plots/85Rb88Sr",paste0(i,"_85Rb88Sr.pdf")), plot = Rb_plot(), device = "pdf",width=8,height=4,scale=1.5)
   ggsave(filename=file.path("Projects",input$project.name,"Plots/83Kr",paste0(i,"_83Kr_volts.pdf")), plot = Kr_plot(), device = "pdf",width=8,height=4,scale=1.5)
   },silent=TRUE)
@@ -1201,7 +1201,7 @@ server <- shinyServer(function(input, output, session) {
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/87Sr86Sr_reduced"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/87Sr86Sr_analyzed"))
-      dir.create(paste0("Projects/",input$new.project,"/Plots/88Sr"))
+      dir.create(paste0("Projects/",input$new.project,"/Plots/totalSr"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/83Kr"))
       dir.create(paste0("Projects/",input$new.project,"/Plots/85Rb88Sr"))
       dir.create(paste0("Projects/",input$new.project,"/Data"))
