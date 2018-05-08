@@ -21,7 +21,7 @@ install_load <- function (package1,...)  {
     }
   } 
 }
-install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets')
+install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets','shinyBS')
 
 
 library(shiny)
@@ -111,11 +111,12 @@ options(warn=-1)
                                               textInput("sampledirection",label="Analysis direction",value=""),
                                               numericInput("spotsize","Spot size",value=40),
                                               numericInput("speed", "Run speed", value=10, step = 1),
-                                              radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","Gam"="Gam", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
+                                              radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","spline"="Spline", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
                                               numericInput("average_num","Moving average window",value=10,step=1,min=1,max=NA),
-                                              numericInput("gam_k","gam k value",value=10,step=1,min=0.01,max=1000),
-                                              radioButtons("CI","CI for outliers",choices = list("3"=0.9985,"2"=0.975,"1"=0.84),inline=TRUE),
-                                              numericInput("outlier_num","Outlier window",value=50,step=1,min=30),
+                                              numericInput("spline_k","Spline k value",value=10,step=1,min=0.01,max=1000),
+                                              radioButtons("CI","Outlier detection xIQR ",choices = list(3,2,1.5,1),inline=TRUE),
+                                              #bsTooltip(id = "CI", title = "Q1-k*IQR and Q3+k*IQR", placement = "left", trigger = "hover"),
+                                              numericInput("outlier_num","Outlier moving window",value=20,step=1,min=30),
                                               numericInput("fluency","Fluency",value=1.85),
                                               numericInput("energy","Laser energy",value=55),
                                               textInput("defrange1","Range 1 label", value="Range 1"),
@@ -200,7 +201,7 @@ fluidRow(
       checkboxInput("main_ma",label="Moving average", value=TRUE),
       checkboxInput("main_ci",label="95% CI", value=TRUE),
       checkboxInput("main_sd",label="SD", value=FALSE),
-      checkboxInput("main_gam",label="Gam fit", value=FALSE),
+      checkboxInput("main_spline",label="spline fit", value=FALSE),
       checkboxInput("main_ocean",label="Ocean", value=FALSE),
       checkboxInput("reduced_custom",label="Custom line", value=FALSE),
       numericInput("reduced_custom_input",label="Custom line value",value=0.705),
@@ -256,7 +257,7 @@ fluidRow(
                                    checkboxInput("analyze_ma",label="Moving average", value=TRUE),
                                    checkboxInput("analyze_ci",label="95% CI", value=TRUE),
                                    checkboxInput("analyze_sd",label="SD", value=FALSE),
-                                   checkboxInput("analyze_gam",label="Gam fit", value=FALSE),
+                                   checkboxInput("analyze_spline",label="spline fit", value=FALSE),
                                    checkboxInput("analyze_ocean",label="Ocean", value=FALSE),
                                    checkboxInput("analyze_custom",label="Custom line", value=FALSE),
                                    numericInput("analyze_custom_input",label="Custom line value",value=0.705),
@@ -474,28 +475,31 @@ server <- shinyServer(function(input, output, session) {
     #Outlier rejection
       CI <- as.numeric(input$CI) # user input confidence interval
       processed <- processed %>% group_by(name) %>% 
-        mutate(means=rollapply(Sr87Sr86,input$outlier_num, mean,fill="extend"))%>%
-        mutate(sds=rollapply(Sr87Sr86,input$outlier_num, sd,fill="extend"))%>%
-        mutate(z_roll=Sr87Sr86-means/sds)%>%
-        mutate(vals=qnorm(CI,lower.tail=FALSE)*sds+means)%>%
-        mutate(val2s=qnorm(CI)*sds+means )%>%
-        mutate(Sr87Sr86_outlier=ifelse(Sr87Sr86 > vals & Sr87Sr86 < val2s, NA, Sr87Sr86))%>% 
-        mutate(Sr87Sr86=ifelse(Sr87Sr86 > vals & Sr87Sr86 < val2s, Sr87Sr86,NA))
+        mutate(median=rollapply(Sr87Sr86,input$outlier_num, mean,fill="extend", partial=TRUE))%>%
+        mutate(upper75prob = rollapply(Sr87Sr86, width = input$outlier_num, FUN = quantile, partial = TRUE, probs = 0.75, na.rm=TRUE),
+               lower25prob = rollapply(Sr87Sr86, width = input$outlier_num, FUN = quantile, partial = TRUE, probs = 0.25, na.rm=TRUE),
+               IQR_range = upper75prob - lower25prob,
+               up=upper75prob+(CI*IQR_range),
+               low=lower25prob-(CI*IQR_range),
+               Sr87Sr86_outlier=ifelse(Sr87Sr86>up|Sr87Sr86<low, Sr87Sr86, NA),
+               Sr87Sr86 = ifelse(Sr87Sr86>up|Sr87Sr86<low, NA, Sr87Sr86))
+              
         
-    
+      
+      
     #Apply smoothing function: Moving average 
       processed <- processed  %>% group_by(name) %>%
                                 mutate(Sr87Sr86_MA=rollapply(Sr87Sr86, input$average_num, FUN= mean, partial=TRUE,fill=input$rollfill, na.rm=input$narem))%>%
                                 mutate(Sr87Sr86_MA_sds=rollapply(Sr87Sr86,input$average_num,FUN=sd, partial=TRUE, fill=input$rollfill, na.rm=input$narem))%>%
                                 mutate(Sr87Sr86_MA_ses= (Sr87Sr86_MA_sds/sqrt(input$average_num)))
       
-    #Apply Gam fit
-      processed_gam <- processed  %>% group_by(name)%>% do(Sr87Sr86_Gam=gam(Sr87Sr86 ~ s(Distance, k=input$gam_k), data=.))  
-      processed_gam_aug <- augment(processed_gam, Sr87Sr86_Gam)
+    #Apply Spline fit
+      processed_spline <- processed  %>% group_by(name)%>% do(Sr87Sr86_spline=gam(Sr87Sr86 ~ s(Distance, k=input$spline_k), data=.))  
+      processed_spline_aug <- augment(processed_spline, Sr87Sr86_spline)
       
 
     #Join data together based on name and Distance
-      processed <- left_join(processed, processed_gam_aug, by = c("name","Distance"))
+      processed <- left_join(processed, processed_spline_aug, by = c("name","Distance"))
       #Estimate NA values
       processed <- processed %>% mutate (.fitted=na.approx(.fitted, na.rm = FALSE))%>% mutate (.se.fit=na.approx(.se.fit, na.rm = FALSE))
       
@@ -505,8 +509,8 @@ server <- shinyServer(function(input, output, session) {
                                    mutate(Date=strftime(Sys.time(), format="%Y-%m-%d_%H:%M:%S"))%>%
                                    mutate(Run_ID=name)%>%
                                    mutate(Sr87Sr86=Sr87Sr86.x) %>%
-                                   mutate(Sr87Sr86_Gam=.fitted) %>%
-                                   mutate(Sr87Sr86_Gam_ses=.se.fit)%>%
+                                   mutate(Sr87Sr86_spline=.fitted) %>%
+                                   mutate(Sr87Sr86_spline_ses=.se.fit)%>%
                                    mutate(profile_direction="Profile is normal")%>%
                                    mutate(trim_left=0)%>%
                                    mutate(trim_right=0)%>%
@@ -553,8 +557,8 @@ server <- shinyServer(function(input, output, session) {
     processed_data_cleaned <- processed_data()
     if(is.null(processed_data())){return()}
     #Add the columns to keep for the next step in data processed (remove blanks, raw ratios, and ratio calculations)
-    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_Gam, 
-                                                                                     Sr87Sr86_Gam_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
+    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_spline, 
+                                                                                     Sr87Sr86_spline_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
                                                                                      region_number, region_name, region_mean, region_sd) %>%
       mutate(Distance=round(Distance, digits=0))%>%
       mutate(totalSr=round(totalSr, digits=4))%>%
@@ -565,8 +569,8 @@ server <- shinyServer(function(input, output, session) {
       mutate(Sr87Sr86_MA=round(Sr87Sr86_MA, digits=8))%>%
       mutate(Sr87Sr86_MA_sds=round(Sr87Sr86_MA_sds, digits=8))%>%
       mutate(Sr87Sr86_MA_ses=round(Sr87Sr86_MA_ses, digits=8)) %>%
-      mutate(Sr87Sr86_Gam=round(Sr87Sr86_Gam, digits=8)) %>%
-      mutate(Sr87Sr86_Gam_ses=round(Sr87Sr86_Gam_ses, digits=8))%>%
+      mutate(Sr87Sr86_spline=round(Sr87Sr86_spline, digits=8)) %>%
+      mutate(Sr87Sr86_spline_ses=round(Sr87Sr86_spline_ses, digits=8))%>%
      group_by(name)%>%
       mutate (row_num=row_number())%>%
       ungroup()
@@ -638,9 +642,9 @@ server <- shinyServer(function(input, output, session) {
     }
     if(input$main_ma){
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
-    if(input$main_gam){
-      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol)
-      p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), color=input$linecol)}
+    if(input$main_spline){
+      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_spline-Sr87Sr86_spline_ses, ymax=Sr87Sr86_spline+Sr87Sr86_spline_ses), fill=input$shadecol)
+      p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_spline), color=input$linecol)}
     
     if(input$main_points){
       p <- p + geom_point(aes(x=Distance,y=Sr87Sr86), shape=1)}
@@ -735,9 +739,9 @@ server <- shinyServer(function(input, output, session) {
       }
       if(input$main_ma){
         p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
-      if(input$main_gam){
-        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
-        p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), na.rm=TRUE, color=input$linecol)}
+      if(input$main_spline){
+        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_spline-Sr87Sr86_spline_ses, ymax=Sr87Sr86_spline+Sr87Sr86_spline_ses), fill=input$shadecol, na.rm=TRUE)
+        p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_spline), na.rm=TRUE, color=input$linecol)}
       
       if(input$main_points){
         p <- p + geom_point(aes(x=Distance,y=Sr87Sr86), shape=1, na.rm=TRUE)}
@@ -820,9 +824,9 @@ server <- shinyServer(function(input, output, session) {
     if(input$analyze_ma){
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
     
-    if(input$analyze_gam){
-      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
-      p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), na.rm=TRUE, color=input$linecol)}
+    if(input$analyze_spline){
+      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_spline-Sr87Sr86_spline_ses, ymax=Sr87Sr86_spline+Sr87Sr86_spline_ses), fill=input$shadecol, na.rm=TRUE)
+      p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_spline), na.rm=TRUE, color=input$linecol)}
     
     if(input$analyze_points){
       p <- p + geom_point(aes(x=Distance,y=Sr87Sr86), shape=1, na.rm=TRUE)}
@@ -904,9 +908,9 @@ server <- shinyServer(function(input, output, session) {
         }
         if(input$analyze_ma){
           p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
-        if(input$analyze_gam){
-          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_Gam-Sr87Sr86_Gam_ses, ymax=Sr87Sr86_Gam+Sr87Sr86_Gam_ses), fill=input$shadecol, na.rm=TRUE)
-          p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_Gam), na.rm=TRUE, color=input$linecol)}
+        if(input$analyze_spline){
+          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_spline-Sr87Sr86_spline_ses, ymax=Sr87Sr86_spline+Sr87Sr86_spline_ses), fill=input$shadecol, na.rm=TRUE)
+          p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_spline), na.rm=TRUE, color=input$linecol)}
         
         if(input$analyze_points){
           p <- p + geom_point(aes(x=Distance,y=Sr87Sr86), shape=1, na.rm=TRUE)}
@@ -1136,7 +1140,7 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"raw88lowerthresh",value=settingsdf$raw88lowerthresh)
     updateNumericInput(session,"raw88upperthresh",value=settingsdf$raw88upperthresh)
     updateNumericInput(session,"average_num",value=settingsdf$average_num)
-    updateNumericInput(session,"gam_k",value=settingsdf$gam_k)
+    updateNumericInput(session,"spline_k",value=settingsdf$spline_k)
     updateNumericInput(session,"outlier_num",value=settingsdf$outlier_num)
     updateRadioButtons(session,"CI",selected=settingsdf$CI)
     updateNumericInput(session,"speed",value=settingsdf$runspeed)
@@ -1189,12 +1193,12 @@ server <- shinyServer(function(input, output, session) {
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
-                      input$average_num,input$gam_k,input$outlier_num,
+                      input$average_num,input$spline_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
                       input$sampletype,input$analysistype,input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
-                            "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
+                            "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
                             "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
@@ -1219,12 +1223,12 @@ server <- shinyServer(function(input, output, session) {
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
-                      input$average_num,input$gam_k,input$outlier_num,
+                      input$average_num,input$spline_k,input$outlier_num,
                       input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
                       input$sampletype, input$analysistype, input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
-                            "raw88lowerthresh", "raw88upperthresh", "average_num","gam_k",
+                            "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
                             "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
     silent=TRUE})
@@ -1294,8 +1298,8 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
                                         mutate (Sr87Sr86_MA=as.numeric(Sr87Sr86_MA))%>% 
                                         mutate (Sr87Sr86_MA_sds=as.numeric(Sr87Sr86_MA_sds))%>% 
                                         mutate (Sr87Sr86_MA_ses=as.numeric(Sr87Sr86_MA_ses))%>% 
-                                        mutate (Sr87Sr86_Gam=as.numeric(Sr87Sr86_Gam))%>% 
-                                        mutate (Sr87Sr86_Gam_ses=as.numeric(Sr87Sr86_Gam_ses))%>% 
+                                        mutate (Sr87Sr86_spline=as.numeric(Sr87Sr86_spline))%>% 
+                                        mutate (Sr87Sr86_spline_ses=as.numeric(Sr87Sr86_spline_ses))%>% 
                                         mutate (trim_left=as.numeric(trim_left))%>% 
                                         mutate (trim_right=as.numeric(trim_right))%>%
                                         mutate (changepoints=as.logical(changepoints))%>%
@@ -1318,8 +1322,8 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
     if(input$smoother=="MA"){
     analyzed_data<- analyzed_data %>% mutate (Sr87Sr86_analysis=Sr87Sr86_MA)
     }
-    if(input$smoother=="Gam"){
-      analyzed_data <- analyzed_data %>% mutate(Sr87Sr86_analysis=Sr87Sr86_Gam)
+    if(input$smoother=="spline"){
+      analyzed_data <- analyzed_data %>% mutate(Sr87Sr86_analysis=Sr87Sr86_spline)
     }
     
     analyzer_overwatch$analyzed <- analyzed_data
