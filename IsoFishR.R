@@ -270,7 +270,7 @@ fluidRow(
                                    circle = TRUE, status = "warning", size = "sm",
                                    icon = icon("gear"), label = NULL, tooltip = "Graph Settings", right = FALSE,
                                    up = FALSE)),
-                    plotOutput("analyzed_plot", height=420, brush = brushOpts(id ="analyzed_plot_brush",direction ="x"))
+                    plotOutput("analyzed_plot", height=420, brush = brushOpts(id ="analyzed_plot_brush",direction ="x"), hover=hoverOpts(id="plot_hover", delayType ="debounce"))
                     
                   ),
             
@@ -325,7 +325,8 @@ fluidRow(
                         div(style="height:55px",numericInput("range_eight_max","",value=-1)),
                         div(style= "height:35px",actionButton("readregion8", "Read",style="background-color:#83b844"))),
                     div(style="float:right; width:100px",actionButton("reset_ranges", "Reset ranges")),
-                    div(style="float:right; width:100px",verbatimTextOutput("brush_info"))
+                    div(style="float:right; width:100px","Range selection",verbatimTextOutput("brush_info")),
+                    div(style="float:right; width:100px","Hover position", verbatimTextOutput("plot_hoverinfo"))
                     ),
                     tabPanel("Changepoints", 
                              div(style="float:left;width:120px;",uiOutput('change_points_check')),
@@ -873,6 +874,11 @@ server <- shinyServer(function(input, output, session) {
   output$brush_info <- renderPrint({
     str(input$analyzed_plot_brush$xmin)
     str(input$analyzed_plot_brush$xmax)
+    
+  })
+  output$plot_hoverinfo <- renderPrint({
+    str(input$plot_hover$x)
+    str(input$plot_hover$y)
   })
   
 
