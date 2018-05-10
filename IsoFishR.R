@@ -21,7 +21,7 @@ install_load <- function (package1,...)  {
     }
   } 
 }
-install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets','shinyBS')
+install_load('shiny', 'mgcv', 'shinydashboard', 'tidyverse','broom', 'DT', 'zoo', 'changepoint','colourpicker', 'shinyWidgets')
 
 
 library(shiny)
@@ -53,12 +53,16 @@ options(warn=-1)
                                      box(width = 9, status = "primary",
                                          h2("Welcome to IsoFishR"),
                                          hr(),
-                                         h5("This application is designed to process laser ablation (LA) strontium isotope (87Sr/86Sr) data of carbonate and bioapatite samples. It includes many features
-                                            to make data reduction, data management and isotope analysis reliable and reproducible."),
+                                         h5("IsoFishR aims to provide a fast, reproducible, and transparent data reduction application for laser-ablation strontium isotope analysis"),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR/blob/master/README.md',"Tutorial")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR',"Code on GitHub")),
                                          h5(a(target="_blank", href = 'https://github.com/MalteWillmes/IsoFishR/blob/master/LICENSE',"MIT license")),
-                                         h5("Funding sources: This program has been developed in the Biogeochemistry and Fish Ecology Lab at UC Davis, California.")
+                                         tags$br(),
+                                         h5("Funding sources"),
+                                         h5("This program has been developed in the Biogeochemistry and Fish Ecology Lab at UC Davis, California."),
+                                         tags$br(),
+                                         h5("Acknowledgements"),
+                                         h5("We would like to thank Julie Griffin, Mackenzie Gilliam, James Chhor, and Brian Healey for testing the application and providing helpful comments.")
                                          ),
                                      box(
                                        title = "Version history", width = 3, status="warning",
@@ -114,8 +118,7 @@ options(warn=-1)
                                               radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","spline"="Spline", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
                                               numericInput("average_num","Moving average window",value=10,step=1,min=1,max=NA),
                                               numericInput("spline_k","Spline k value",value=10,step=1,min=0.01,max=1000),
-                                              radioButtons("CI","Outlier detection xIQR ",choices = list(3,2,1.5,1),inline=TRUE),
-                                              #bsTooltip(id = "CI", title = "Q1-k*IQR and Q3+k*IQR", placement = "left", trigger = "hover"),
+                                              radioButtons("CI","Outlier detection k*IQR ",choices = list(3,2,1.5,1),inline=TRUE),
                                               numericInput("outlier_num","Outlier moving window",value=20,step=1,min=30),
                                               numericInput("fluency","Fluency",value=1.85),
                                               numericInput("energy","Laser energy",value=55),
@@ -201,10 +204,10 @@ fluidRow(
       checkboxInput("main_ma",label="Moving average", value=TRUE),
       checkboxInput("main_ci",label="95% CI", value=TRUE),
       checkboxInput("main_sd",label="SD", value=FALSE),
-      checkboxInput("main_spline",label="spline fit", value=FALSE),
-      checkboxInput("main_ocean",label="Ocean", value=FALSE),
+      checkboxInput("main_spline",label="Spline fit", value=FALSE),
+      checkboxInput("main_ocean",label="Mean ocean", value=FALSE),
       checkboxInput("reduced_custom",label="Custom line", value=FALSE),
-      numericInput("reduced_custom_input",label="Custom line value",value=0.705),
+      numericInput("reduced_custom_input",label="Custom line 87Sr/86Sr",value=0.705),
       colourInput("linecol", "Line", "black", allowTransparent = TRUE,showColour = "background"),
       colourInput("shadecol", "Shading", "gray", allowTransparent = TRUE, showColour = "background"),
       downloadButton('download_main_plot',''),
@@ -257,10 +260,10 @@ fluidRow(
                                    checkboxInput("analyze_ma",label="Moving average", value=TRUE),
                                    checkboxInput("analyze_ci",label="95% CI", value=TRUE),
                                    checkboxInput("analyze_sd",label="SD", value=FALSE),
-                                   checkboxInput("analyze_spline",label="spline fit", value=FALSE),
-                                   checkboxInput("analyze_ocean",label="Ocean", value=FALSE),
+                                   checkboxInput("analyze_spline",label="Spline fit", value=FALSE),
+                                   checkboxInput("analyze_ocean",label="Mean ocean", value=FALSE),
                                    checkboxInput("analyze_custom",label="Custom line", value=FALSE),
-                                   numericInput("analyze_custom_input",label="Custom line value",value=0.705),
+                                   numericInput("analyze_custom_input",label="Custom line 87Sr/86Sr",value=0.705),
                                    colourInput("analyze_linecol", "Line", "black", allowTransparent = TRUE,showColour = "background"),
                                    colourInput("analyze_shadecol", "Shading", "gray", allowTransparent = TRUE, showColour = "background"), 
                                    downloadButton('download_analysis_plot',''),
@@ -530,8 +533,9 @@ server <- shinyServer(function(input, output, session) {
                                    mutate (region_number=0)%>%
                                    mutate (region_name="")%>%
                                    mutate (region_mean=0)%>%
-                                   mutate (region_sd=0)
-
+                                   mutate (region_sd=0)%>%
+                                   mutate (region_mindistance=0)%>%
+                                   mutate (region_maxdistance=0)
     return(processed)})
 
 ####Create data subsets####
@@ -559,7 +563,7 @@ server <- shinyServer(function(input, output, session) {
     #Add the columns to keep for the next step in data processed (remove blanks, raw ratios, and ratio calculations)
     processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_spline, 
                                                                                      Sr87Sr86_spline_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
-                                                                                     region_number, region_name, region_mean, region_sd) %>%
+                                                                                     region_number, region_name, region_mean, region_sd, region_mindistance, region_maxdistance) %>%
       mutate(Distance=round(Distance, digits=0))%>%
       mutate(totalSr=round(totalSr, digits=4))%>%
       mutate(Raw83=round(Raw83, digits=8))%>%
@@ -1047,7 +1051,7 @@ server <- shinyServer(function(input, output, session) {
  output$profile_direction_selector<- renderUI ({
    #Check if available
    req(input$Analyzed_sample_selector)
-   selectInput("profile_direction_selector", "Change direction of profile", c("No change","Flip profile"), selected="No change")
+   selectInput("profile_direction_selector", "Change direction of profile", c("No change","Reverse profile"), selected="No change")
 
  })
  
@@ -1311,8 +1315,9 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
                                         mutate (region_number=as.numeric(region_number))%>%
                                         mutate (region_name=as.character(region_name))%>%
                                         mutate (region_mean=as.numeric(region_mean))%>%
-                                        mutate (region_sd=as.numeric(region_sd))
-    
+                                        mutate (region_sd=as.numeric(region_sd))%>%
+                                        mutate (region_mindistance=as.numeric(region_mindistance))%>%
+                                        mutate (region_maxdistance=as.numeric(region_maxdistance))
 
     
     #Select to which Sr87Sr86 values filtering will be applied
@@ -1354,12 +1359,12 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
     }
     
     #Reverse the profile if selected
-    if(input$profile_direction_selector=="Flip profile"&status_profile()=="Profile has been reversed"){
+    if(input$profile_direction_selector=="Reverse profile"&status_profile()=="Profile has been reversed"){
       edit_data <-edit_data %>%
         mutate(profile_direction=replace(profile_direction,name==input$Analyzed_sample_selector,"Profile is normal"))%>%
         mutate(Distance=replace(Distance,name==input$Analyzed_sample_selector,rev(Distance)))
     }
-    if(input$profile_direction_selector=="Flip profile"&status_profile()=="Profile is normal"){
+    if(input$profile_direction_selector=="Reverse profile"&status_profile()=="Profile is normal"){
       edit_data <-edit_data %>%
         mutate(profile_direction=replace(profile_direction,name==input$Analyzed_sample_selector,"Profile has been reversed"))%>%
         mutate(Distance=replace(Distance,name==input$Analyzed_sample_selector,rev(Distance)))
@@ -1441,6 +1446,8 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
       group_by(name,region_number)%>%
       mutate(region_mean=replace(region_mean,name==input$Analyzed_sample_selector, mean(Sr87Sr86_analysis)))%>%
       mutate(region_sd=replace(region_sd,name==input$Analyzed_sample_selector, sd(Sr87Sr86_analysis)))%>%
+      mutate(region_mindistance=replace(region_mindistance,name==input$Analyzed_sample_selector, min(Distance)))%>%
+      mutate(region_maxdistance=replace(region_maxdistance,name==input$Analyzed_sample_selector, max(Distance)))%>%
       ungroup()
     
     #Order the dataframe by ascending distance
@@ -1671,7 +1678,7 @@ observeEvent(input$reset_ranges,{
 
 #Create the data tables
 # Reduced data table
-#all analyzed data
+#all reduced data
 output$reduced_data_table_all <-  DT::renderDataTable({
   reduced_data_table_all <- processed_data_cleaned()
   if(is.null(reduced_data_table_all)){return()}
@@ -1687,11 +1694,13 @@ output$reduced_data_table_all <-  DT::renderDataTable({
   output$analyzed_data_table_summary <-  DT::renderDataTable({
     req(analyzer_overwatch$analyzed)
     analyzed_data_table_summary <- analyzer_overwatch$analyzed
-    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mean, region_sd) %>% 
+    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mindistance, region_maxdistance, region_mean, region_sd) %>% 
       group_by (region_name) %>%
       distinct (name, .keep_all = TRUE) %>%
       mutate (region_mean=round(region_mean, 5))%>%
-    mutate (region_sd=round(region_sd, 5))
+      mutate (region_sd=round(region_sd, 5))%>%
+      mutate (region_mindistance=round(region_mindistance,0))%>%
+      mutate (region_maxdistance=round(region_maxdistance,0))
     if(is.null(analyzed_data_table_summary)){return()}
     DT::datatable(analyzed_data_table_summary, options = list(pageLength = 20))
   })
