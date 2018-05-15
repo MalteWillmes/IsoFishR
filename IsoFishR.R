@@ -43,7 +43,11 @@ options(warn=-1)
                            menuItem("Projects", tabName="Projects", icon=icon("folder")),
                            menuItem("Data Reduction ", tabName="Data_reduction",icon=icon("cogs")),
                            menuItem("Data Analysis", tabName="Data_analysis",icon=icon("area-chart")),
-                           menuItem("Data Reporting", tabName="Data_reporting", icon=icon("table")))),
+                           menuItem("Data Reporting", tabName="Data_reporting", icon=icon("table")),
+                           hr(),
+                           htmlOutput("ProcessHTML"),
+                           htmlOutput("AnalysesHTML")
+                           )),
 ####About####                      
                        
                        dashboardBody(
@@ -121,18 +125,20 @@ options(warn=-1)
                                               radioButtons("CI","Outlier detection k*IQR ",choices = list(3,2,1.5,1),inline=TRUE),
                                               numericInput("outlier_num","Outlier moving window",value=20,step=1,min=30),
                                               numericInput("fluency","Fluency",value=1.85),
-                                              numericInput("energy","Laser energy",value=55),
-                                              textInput("defrange1","Range 1 label", value="Range 1"),
-                                              textInput("defrange2","Range 2 label", value="Range 2"),
-                                              textInput("defrange3","Range 3 label", value="Range 3"),
-                                              textInput("defrange4","Range 4 label", value="Range 4"),
-                                              textInput("defrange5","Range 5 label", value="Range 5"),
-                                              textInput("defrange6","Range 6 label", value="Range 6"),
-                                              textInput("defrange7","Range 7 label", value="Range 7"),
-                                              textInput("defrange8","Range 8 label", value="Range 8")
-                                            )
+                                              numericInput("energy","Laser energy",value=55)
+                                            ),
+                                     box(
+                                       title = "Default manual filter names", width = NULL, status = "primary",
+                                     textInput("defrange1","Range 1 label", value="Range 1"),
+                                     textInput("defrange2","Range 2 label", value="Range 2"),
+                                     textInput("defrange3","Range 3 label", value="Range 3"),
+                                     textInput("defrange4","Range 4 label", value="Range 4"),
+                                     textInput("defrange5","Range 5 label", value="Range 5"),
+                                     textInput("defrange6","Range 6 label", value="Range 6"),
+                                     textInput("defrange7","Range 7 label", value="Range 7"),
+                                     textInput("defrange8","Range 8 label", value="Range 8")
+                                     )
                                      ),
-                                     
                                      column(width = 4,
                                             box(
                                               title = "Data reduction settings", width = NULL, status = "danger",
@@ -167,7 +173,6 @@ tabItem(tabName = "Data_reduction",
 fluidRow(
   box(
     title = "Data reduction", width = 3, status = "primary", height=200, style='padding:2px;',
-    htmlOutput("ProcessHTML"),
     fileInput("file","Select one or multiple runfiles", multiple = TRUE)
 
   ),
@@ -224,7 +229,6 @@ fluidRow(
            column(width = 3,
                   box(
                     width = NULL, title="Step 1: Select data to be analyzed",  status = "primary", style='padding:2px;',
-                    htmlOutput("AnalysisHTML"),
                     fileInput("processed_file","Select .csv file",
                               accept=c("txt/csv", "text/comma-separated-values,text/plain", ".csv"))
                     ),
@@ -376,9 +380,10 @@ server <- shinyServer(function(input, output, session) {
   output$ProcessHTML <- renderText({
     paste("Selected project: ", input$project.name)
   })
-  output$AnalysisHTML <- renderText({
-    paste("Selected project: ", input$project.name)
+  output$AnalysesHTML <- renderText({
+    paste("Analysis type: ", input$analysistype)
   })
+
  
 ####Read runfiles####
   raw_data_all <- reactive({
@@ -512,6 +517,7 @@ server <- shinyServer(function(input, output, session) {
       processed <- processed  %>%  mutate(Sample_ID=name)%>%
                                    mutate(Date=strftime(Sys.time(), format="%Y-%m-%d_%H:%M:%S"))%>%
                                    mutate(Run_ID=name)%>%
+                                   mutate(Sr84Sr86=Sr8486) %>%
                                    mutate(Sr87Sr86=Sr87Sr86.x) %>%
                                    mutate(Sr87Sr86_spline=.fitted) %>%
                                    mutate(Sr87Sr86_spline_ses=.se.fit)%>%
@@ -562,13 +568,14 @@ server <- shinyServer(function(input, output, session) {
     processed_data_cleaned <- processed_data()
     if(is.null(processed_data())){return()}
     #Add the columns to keep for the next step in data processed (remove blanks, raw ratios, and ratio calculations)
-    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_spline, 
+    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr84Sr86, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_spline, 
                                                                                      Sr87Sr86_spline_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
                                                                                      region_number, region_name, region_mean, region_sd, region_mindistance, region_maxdistance) %>%
       mutate(Distance=round(Distance, digits=0))%>%
       mutate(totalSr=round(totalSr, digits=4))%>%
       mutate(Raw83=round(Raw83, digits=8))%>%
       mutate(Rb85Sr88=round(Rb85Sr88, digits=8))%>%
+      mutate(Sr84Sr86=round(Sr84Sr86, digits=8))%>%
       mutate(Sr87Sr86=round(Sr87Sr86, digits=8))%>%
       mutate(Sr87Sr86_outlier=round(Sr87Sr86_outlier, digits=8))%>%
       mutate(Sr87Sr86_MA=round(Sr87Sr86_MA, digits=8))%>%
@@ -675,7 +682,7 @@ server <- shinyServer(function(input, output, session) {
     
     p <- ggplot(processed_plot)
     p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=("Sr (V)"), x=expression(paste("Distance (",mu,"m)")))
-    p <- p + scale_y_continuous(labels = fmt_dcimals(2), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 10))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(2), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
     p <- p + geom_point(aes(x=Distance,y=totalSr), size=1, color="red", shape=1, na.rm=TRUE)
     
     
@@ -692,7 +699,7 @@ server <- shinyServer(function(input, output, session) {
     
     p <- ggplot(processed_plot)
     p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=expression(paste(""^"83"*"Kr (V)")), x=expression(paste("Distance (",mu,"m)")))
-    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 10))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
     p <- p + geom_point(aes(x=Distance,y=Raw83), size=1, color="lightgreen", shape=1 , na.rm=TRUE)
     
     
@@ -709,7 +716,7 @@ server <- shinyServer(function(input, output, session) {
     
     p <- ggplot(processed_plot)
     p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=expression(paste(""^"85"*"Rb/"^"88"*"Sr")), x=expression(paste("Distance (",mu,"m)")))
-    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 10))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
     p <- p + geom_point(aes(x=Distance,y=Rb85Sr88),size=1, color="orange", shape=1, na.rm=TRUE)
     
     
@@ -1303,6 +1310,7 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
                                         mutate (totalSr=as.numeric(totalSr))%>% 
                                         mutate (Raw83=as.numeric(Raw83))%>% 
                                         mutate (Rb85Sr88=as.numeric(Rb85Sr88))%>% 
+                                        mutate (Sr84Sr86=as.numeric(Sr84Sr86))%>% 
                                         mutate (Sr87Sr86=as.numeric(Sr87Sr86))%>% 
                                         mutate (Sr87Sr86_outlier=as.numeric(Sr87Sr86_outlier))%>% 
                                         mutate (Sr87Sr86_MA=as.numeric(Sr87Sr86_MA))%>% 
