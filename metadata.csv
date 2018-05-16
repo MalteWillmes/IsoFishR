@@ -9,6 +9,7 @@ Distance,Calculated using run speed and cycle seconds
 totalSr,Raw88+Raw86+Raw84+Sr87
 Raw83,Voltage on mass 83
 Rb85Sr88,85Rb/88Sr
+Sr84Sr86,84Sr/86Sr
 Sr87Sr86,87Sr/86Sr
 Sr87Sr86_outlier,87Sr/86Sr outlier values
 Sr87Sr86_MA,87Sr/86Sr moving average

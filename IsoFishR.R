@@ -122,7 +122,7 @@ options(warn=-1)
                                               radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","spline"="Spline", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
                                               numericInput("average_num","Moving average window",value=10,step=1,min=1,max=NA),
                                               numericInput("spline_k","Spline k value",value=10,step=1,min=0.01,max=1000),
-                                              radioButtons("CI","Outlier detection k*IQR ",choices = list(3,2,1.5,1),inline=TRUE),
+                                              radioButtons("SD_outlier","Standard deviation for outlier detection",choices = list("3"=3,"2"=2,"1"=1, "No outlier rejection"="NA"), inline=TRUE),
                                               numericInput("outlier_num","Outlier moving window",value=20,step=1,min=30),
                                               numericInput("fluency","Fluency",value=1.85),
                                               numericInput("energy","Laser energy",value=55)
@@ -441,13 +441,13 @@ server <- shinyServer(function(input, output, session) {
     
     #Clean processed data: Remove any values below or above the detection threshold
     processed <- processed %>% group_by(name) %>%
-                               filter(Raw88>=input$raw88lowerthresh)%>%
-                               filter(Raw88<=input$raw88upperthresh)
+      filter(Raw88>=input$raw88lowerthresh)%>%
+      filter(Raw88<=input$raw88upperthresh)
+    
     
     #Perform a background subtraction on the processed data
      processed <- processed  %>% group_by(name) %>% 
                  left_join(background, processed, by = "name")%>%
-                 #mutate_each(funs(replace(., .<0, 0)))
                  mutate(Raw88=Raw88-Blk88)%>%
                  mutate(Raw87=Raw87-Blk87)%>%
                  mutate(Raw86=Raw86-Blk86)%>%
@@ -482,25 +482,33 @@ server <- shinyServer(function(input, output, session) {
                    mutate(totalSr=Raw88+Raw86+Raw84+Sr87)
       
     #Outlier rejection
-      CI <- as.numeric(input$CI) # user input confidence interval
-      processed <- processed %>% group_by(name) %>% 
-        mutate(median=rollapply(Sr87Sr86,input$outlier_num, mean,fill="extend", partial=TRUE))%>%
-        mutate(upper75prob = rollapply(Sr87Sr86, width = input$outlier_num, FUN = quantile, partial = TRUE, probs = 0.75, na.rm=TRUE),
-               lower25prob = rollapply(Sr87Sr86, width = input$outlier_num, FUN = quantile, partial = TRUE, probs = 0.25, na.rm=TRUE),
-               IQR_range = upper75prob - lower25prob,
-               up=upper75prob+(CI*IQR_range),
-               low=lower25prob-(CI*IQR_range),
-               Sr87Sr86_outlier=ifelse(Sr87Sr86>up|Sr87Sr86<low, Sr87Sr86, NA),
-               Sr87Sr86 = ifelse(Sr87Sr86>up|Sr87Sr86<low, NA, Sr87Sr86))
+      #Outlier rejection
+      SDin <- as.numeric(input$SD_outlier) # user input confidence interval
+      if (is.na(SDin)) {
+        processed <- processed %>% group_by(name) %>% 
+          mutate(means=rollapply(Sr87Sr86,input$outlier_num, median,  partial=TRUE, fill="extend"))%>%
+          mutate(sds=rollapply(Sr87Sr86,input$outlier_num, sd,  partial=TRUE, fill="extend"))%>%
+          mutate(Sr87Sr86_outlier=NA)%>%
+          mutate(Sr87Sr86=Sr87Sr86)
+      }else {
+        processed <- processed %>% group_by(name) %>% 
+          mutate(means=rollapply(Sr87Sr86,input$outlier_num, median,fill="extend"))%>%
+          mutate(sds=rollapply(Sr87Sr86,input$outlier_num, sd,fill="extend"))%>%
+          mutate(Sr87Sr86_outlier=ifelse(Sr87Sr86 > (means+SDin*sds) | Sr87Sr86 < (means-SDin*sds), Sr87Sr86, NA))%>% 
+          mutate(Sr87Sr86=ifelse(Sr87Sr86 > means+SDin*sds | Sr87Sr86 < (means-SDin*sds), NA,Sr87Sr86 ))
+      }
+      
               
         
       
       
     #Apply smoothing function: Moving average 
       processed <- processed  %>% group_by(name) %>%
-                                mutate(Sr87Sr86_MA=rollapply(Sr87Sr86, input$average_num, FUN= mean, partial=TRUE,fill=input$rollfill, na.rm=input$narem))%>%
-                                mutate(Sr87Sr86_MA_sds=rollapply(Sr87Sr86,input$average_num,FUN=sd, partial=TRUE, fill=input$rollfill, na.rm=input$narem))%>%
-                                mutate(Sr87Sr86_MA_ses= (Sr87Sr86_MA_sds/sqrt(input$average_num)))
+                                mutate(Sr87Sr86_MA=rollapply(Sr87Sr86, input$average_num, FUN= mean, partial = TRUE,fill=input$rollfill, na.rm=input$narem, align = "center"))%>%
+                                mutate(Sr87Sr86_MA_sds=rollapply(Sr87Sr86,input$average_num,FUN=sd, partial = TRUE, fill=input$rollfill, na.rm=input$narem, align = "center"))%>%
+                                mutate(Sr87Sr86_MA_ses= (Sr87Sr86_MA_sds/sqrt(input$average_num)))%>%
+                                mutate(Sr87Sr86_MA_CI95up=Sr87Sr86_MA+1.96*Sr87Sr86_MA_ses)%>%
+                                mutate(Sr87Sr86_MA_CI95low=Sr87Sr86_MA-1.96*Sr87Sr86_MA_ses)
       
     #Apply Spline fit
       processed_spline <- processed  %>% group_by(name)%>% do(Sr87Sr86_spline=gam(Sr87Sr86 ~ s(Distance, k=input$spline_k), data=.))  
@@ -527,7 +535,7 @@ server <- shinyServer(function(input, output, session) {
                                    mutate(recalc_distance=TRUE)%>%
                                    mutate(comment="")%>%
                                    mutate(flag_review=FALSE) %>%
-                                   select(-Sr87Sr86.x, -Sr87Sr86.y, -.rownames, -.hat, -.cooksd, -.resid, -.sigma, -.fitted, -.se.fit) %>%
+                                   select(-Sr87Sr86.x, -Sr87Sr86.y, -.hat, -.cooksd, -.resid, -.sigma, -.fitted, -.se.fit) %>%
                                    ungroup()%>%
                                    mutate(name=paste0(Run_ID,"_",strftime(Sys.time(), format="%Y%m%d%H%M%S")))%>%
                                    group_by(name)%>%
@@ -568,7 +576,7 @@ server <- shinyServer(function(input, output, session) {
     processed_data_cleaned <- processed_data()
     if(is.null(processed_data())){return()}
     #Add the columns to keep for the next step in data processed (remove blanks, raw ratios, and ratio calculations)
-    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr84Sr86, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses,Sr87Sr86_spline, 
+    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr84Sr86, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses, Sr87Sr86_MA_CI95up, Sr87Sr86_MA_CI95low, Sr87Sr86_spline, 
                                                                                      Sr87Sr86_spline_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
                                                                                      region_number, region_name, region_mean, region_sd, region_mindistance, region_maxdistance) %>%
       mutate(Distance=round(Distance, digits=0))%>%
@@ -581,6 +589,8 @@ server <- shinyServer(function(input, output, session) {
       mutate(Sr87Sr86_MA=round(Sr87Sr86_MA, digits=8))%>%
       mutate(Sr87Sr86_MA_sds=round(Sr87Sr86_MA_sds, digits=8))%>%
       mutate(Sr87Sr86_MA_ses=round(Sr87Sr86_MA_ses, digits=8)) %>%
+      mutate(Sr87Sr86_MA_CI95up=round(Sr87Sr86_MA_CI95up,digits=8))%>%
+      mutate(Sr87Sr86_MA_CI95low=round(Sr87Sr86_MA_CI95low,digits=8))%>%
       mutate(Sr87Sr86_spline=round(Sr87Sr86_spline, digits=8)) %>%
       mutate(Sr87Sr86_spline_ses=round(Sr87Sr86_spline_ses, digits=8))%>%
      group_by(name)%>%
@@ -650,7 +660,7 @@ server <- shinyServer(function(input, output, session) {
     p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
     }
     if(input$main_ci){
-    p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$shadecol)
+    p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA_CI95low, ymax=Sr87Sr86_MA_CI95up), fill=input$shadecol)
     }
     if(input$main_ma){
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
@@ -684,7 +694,6 @@ server <- shinyServer(function(input, output, session) {
     p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=("Sr (V)"), x=expression(paste("Distance (",mu,"m)")))
     p <- p + scale_y_continuous(labels = fmt_dcimals(2), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
     p <- p + geom_point(aes(x=Distance,y=totalSr), size=1, color="red", shape=1, na.rm=TRUE)
-    
     
     return(p)}
   
@@ -747,7 +756,7 @@ server <- shinyServer(function(input, output, session) {
         p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
       }
       if(input$main_ci){
-        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$shadecol)
+        p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA_CI95low, ymax=Sr87Sr86_MA_CI95up), fill=input$shadecol)
       }
       if(input$main_ma){
         p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), color=input$linecol)}
@@ -828,10 +837,10 @@ server <- shinyServer(function(input, output, session) {
     p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
    
     if(input$analyze_sd){
-      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=TRUE)
+      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=FALSE)
     }
     if(input$analyze_ci){
-      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$analyze_shadecol, na.rm=TRUE)
+      p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA_CI95low, ymax=Sr87Sr86_MA_CI95up), fill=input$analyze_shadecol, na.rm=FALSE)
     }
     if(input$analyze_ma){
       p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
@@ -918,10 +927,10 @@ server <- shinyServer(function(input, output, session) {
         
         
         if(input$analyze_sd){
-          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=TRUE)
+          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=FALSE)
         }
         if(input$analyze_ci){
-          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-(1.96*Sr87Sr86_MA_ses), ymax=Sr87Sr86_MA+(1.96*Sr87Sr86_MA_ses)), fill=input$analyze_shadecol, na.rm=TRUE)
+          p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA_CI95low, ymax=Sr87Sr86_MA_CI95up), fill=input$analyze_shadecol, na.rm=FALSE)
         }
         if(input$analyze_ma){
           p <- p +geom_line(aes(x=Distance,y=Sr87Sr86_MA), na.rm=TRUE, color=input$analyze_linecol)}
@@ -1159,7 +1168,7 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"average_num",value=settingsdf$average_num)
     updateNumericInput(session,"spline_k",value=settingsdf$spline_k)
     updateNumericInput(session,"outlier_num",value=settingsdf$outlier_num)
-    updateRadioButtons(session,"CI",selected=settingsdf$CI)
+    updateRadioButtons(session,"SD_outlier",selected=settingsdf$SD_outlier)
     updateNumericInput(session,"speed",value=settingsdf$runspeed)
     updateNumericInput(session,"fluency",value=settingsdf$fluency)
     updateNumericInput(session,"spotsize",value=settingsdf$spotsize)
@@ -1211,12 +1220,12 @@ server <- shinyServer(function(input, output, session) {
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
-                      input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
+                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
                       input$sampletype,input$analysistype,input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
@@ -1241,12 +1250,12 @@ server <- shinyServer(function(input, output, session) {
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
-                      input$CI,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
+                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
                       input$sampletype, input$analysistype, input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
-                            "outlier_num","CI","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
     silent=TRUE})
     # if there is no error print a success message otherwise print an error message
@@ -1315,7 +1324,9 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
                                         mutate (Sr87Sr86_outlier=as.numeric(Sr87Sr86_outlier))%>% 
                                         mutate (Sr87Sr86_MA=as.numeric(Sr87Sr86_MA))%>% 
                                         mutate (Sr87Sr86_MA_sds=as.numeric(Sr87Sr86_MA_sds))%>% 
-                                        mutate (Sr87Sr86_MA_ses=as.numeric(Sr87Sr86_MA_ses))%>% 
+                                        mutate (Sr87Sr86_MA_ses=as.numeric(Sr87Sr86_MA_ses))%>%
+                                        mutate (Sr87Sr86_MA_CI95up=as.numeric(Sr87Sr86_MA_CI95up))%>%
+                                        mutate (Sr87Sr86_MA_CI95low=as.numeric(Sr87Sr86_MA_CI95low))%>%
                                         mutate (Sr87Sr86_spline=as.numeric(Sr87Sr86_spline))%>% 
                                         mutate (Sr87Sr86_spline_ses=as.numeric(Sr87Sr86_spline_ses))%>% 
                                         mutate (trim_left=as.numeric(trim_left))%>% 
