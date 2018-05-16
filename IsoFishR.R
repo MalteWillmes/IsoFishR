@@ -143,6 +143,7 @@ options(warn=-1)
                                             box(
                                               title = "Data reduction settings", width = NULL, status = "danger",
                                               numericInput("integration","Integration time/s",value=5),
+                                              checkboxInput("blanksubcheck", "Enable blank correction", value = TRUE, width = NULL),
                                               numericInput("blanktime","Blank time (s)",value=30),
                                               numericInput("raw88lowerthresh", "Min 88Sr", value=0.5, step = .1),
                                               numericInput("raw88upperthresh", "Max 88Sr", value=9.8, step = .1),
@@ -423,20 +424,20 @@ server <- shinyServer(function(input, output, session) {
     raw <- raw %>% group_by(name) %>% replace(1:6, rollapply(raw[1:6],width=input$integration, by=input$integration, FUN=mean, partial=TRUE,fill=NA)) %>%
                 drop_na()
                
-    
+    if(input$blanksubcheck){
     #Split data to background and sample based on background time
     processed <- raw   %>% group_by(name) %>%
                            filter(CycleSecs>input$blanktime)
     background <- raw  %>% group_by(name) %>%
                            filter(CycleSecs<=input$blanktime)
-    
+
     #Clean background data: Remove any values above the detection threshold and summarize
     background <- background %>% group_by(name) %>%
                                  filter(Raw88<input$raw88lowerthresh)%>%
                                  select (-CycleSecs)%>%
                                  rename(Blk88=Raw88, Blk87=Raw87, Blk86=Raw86, Blk85=Raw85, Blk84=Raw84, Blk83=Raw83)%>%
                                  summarise_all(funs(mean))
-                                 
+    
                                  
     
     #Clean processed data: Remove any values below or above the detection threshold
@@ -454,6 +455,13 @@ server <- shinyServer(function(input, output, session) {
                  mutate(Raw85=Raw85-Blk85)%>%
                  mutate(Raw84=Raw84-Blk84)%>%
                  mutate(Raw83=Raw83-Blk83)
+    } 
+    #If no background subtraction just filter by detector cutoffs
+    else{
+      processed <- raw   %>% group_by(name)%>%
+      filter(Raw88>=input$raw88lowerthresh)%>%
+        filter(Raw88<=input$raw88upperthresh)
+    }
        
     #Calculate distance based on user input of laser scan speed
       processed <- processed  %>% group_by(name) %>% 
@@ -1168,13 +1176,14 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session,"average_num",value=settingsdf$average_num)
     updateNumericInput(session,"spline_k",value=settingsdf$spline_k)
     updateNumericInput(session,"outlier_num",value=settingsdf$outlier_num)
-    updateRadioButtons(session,"SD_outlier",selected=settingsdf$SD_outlier)
+    ifelse(is.na(settingsdf$SD_outlier),updateRadioButtons(session,"SD_outlier",selected="NA"),updateRadioButtons(session,"SD_outlier",selected=settingsdf$SD_outlier))
     updateNumericInput(session,"speed",value=settingsdf$runspeed)
     updateNumericInput(session,"fluency",value=settingsdf$fluency)
     updateNumericInput(session,"spotsize",value=settingsdf$spotsize)
     updateNumericInput(session,"speed",value=settingsdf$speed)
     updateNumericInput(session,"energy",value=settingsdf$energy)
     updateNumericInput(session,"integration",value=settingsdf$integration)
+    updateCheckboxInput(session,"blanksubcheck",value=settingsdf$blanksubcheck)
     updateTextInput(session,"sampletype",value=settingsdf$sampletype)
     updateTextInput(session,"sampledirection",value=settingsdf$sampledirection)
     updateRadioButtons(session,"analysistype",selected=settingsdf$analysistype)
@@ -1220,12 +1229,12 @@ server <- shinyServer(function(input, output, session) {
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
-                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
+                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, input$blanksubcheck,
                       input$sampletype,input$analysistype,input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
-                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration","blanksubcheck", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
       dir.create(paste0("Projects/",input$new.project))
       dir.create(paste0("Projects/",input$new.project,"/Plots"))
@@ -1250,12 +1259,12 @@ server <- shinyServer(function(input, output, session) {
                       input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
-                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, 
+                      input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, input$blanksubcheck,
                       input$sampletype, input$analysistype, input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
                             "cyclesec","vskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
-                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
+                            "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration","blanksubcheck", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
     silent=TRUE})
     # if there is no error print a success message otherwise print an error message
