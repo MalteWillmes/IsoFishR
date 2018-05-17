@@ -275,8 +275,7 @@ fluidRow(
                                    circle = TRUE, status = "warning", size = "sm",
                                    icon = icon("gear"), label = NULL, tooltip = "Graph Settings", right = FALSE,
                                    up = FALSE)),
-                    plotOutput("analyzed_plot", height=420, brush = brushOpts(id ="analyzed_plot_brush",direction ="x"), hover=hoverOpts(id="plot_hover", delayType ="debounce"))
-                    
+                    uiOutput("analysisplotter")
                   ),
             
                   tabBox(title="Step 5: Filters",height=280, width = 9, selected="About",
@@ -331,7 +330,8 @@ fluidRow(
                         div(style= "height:35px",actionButton("readregion8", "Read",style="background-color:#83b844"))),
                     div(style="float:right; width:100px",actionButton("reset_ranges", "Reset ranges")),
                     div(style="float:right; width:100px","Range selection",verbatimTextOutput("brush_info")),
-                    div(style="float:right; width:100px","Hover position", verbatimTextOutput("plot_hoverinfo"))
+                    div(style="float:right; width:100px","Hover position", verbatimTextOutput("plot_hoverinfo")),
+                    div(style="float:left; width:100px",checkboxInput("zoomselect",label="Enable manual filter selection", value=FALSE))
                     ),
                     tabPanel("Changepoints", 
                              div(style="float:left;width:120px;",uiOutput('change_points_check')),
@@ -843,7 +843,7 @@ server <- shinyServer(function(input, output, session) {
     p <- p + labs(y=expression(paste(""^"87"*"Sr/"^"86"*"Sr")), x=expression(paste("Distance (",mu,"m)")), title=paste0("Runfile:"," ",unlist(strsplit(as.character(input$Analyzed_sample_selector), split='.', fixed=TRUE))[1]," ","Sample ID:"," ",input$Sample_ID))
     p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
     p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
-   
+    p <- p +coord_cartesian(xlim = ranges_zoom$x, ylim = ranges_zoom$y, expand = FALSE)
     if(input$analyze_sd){
       p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$analyze_shadecol, na.rm=FALSE)
     }
@@ -1020,7 +1020,6 @@ server <- shinyServer(function(input, output, session) {
     selectInput("rollfill", label="Fill NAs?", choices=c("extend","FALSE"), selected = selection_rollfill)
   })
 
-
   #Checking the Sample_ID
   output$Sample_ID <- renderUI ({
     #Check if available
@@ -1102,6 +1101,29 @@ server <- shinyServer(function(input, output, session) {
      select(name, recalc_distance)%>%
      summarise(recalc_distance=first(recalc_distance))
    checkboxInput("recalculate_distance", "Recalculate distance?",value=rec$recalc_distance)
+ })
+ 
+ #Create the analysis plot and allow for either zoom or range selection
+ output$analysisplotter<- renderUI ({
+   if(input$zoomselect){
+     plotOutput("analyzed_plot", height=420, brush = brushOpts(id ="analyzed_plot_brush",direction ="x"), hover=hoverOpts(id="plot_hover", delayType ="debounce"))}
+   else{
+     plotOutput("analyzed_plot", height=420, dblclick = "plot1_dblclick", brush = brushOpts(id ="analyzed_plot_brush_zoom", resetOnNew = TRUE), hover=hoverOpts(id="plot_hover", delayType ="debounce"))
+   }
+ })
+
+ ranges_zoom <- reactiveValues(x = NULL, y = NULL)
+ 
+ observeEvent(input$plot1_dblclick, {
+   brush <- input$analyzed_plot_brush_zoom
+   if (!is.null(brush)) {
+     ranges_zoom$x <- c(brush$xmin, brush$xmax)
+     ranges_zoom$y <- c(brush$ymin, brush$ymax)
+     
+   } else {
+     ranges_zoom$x <- NULL
+     ranges_zoom$y <- NULL
+   }
  })
  
  
