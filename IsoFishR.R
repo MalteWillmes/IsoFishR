@@ -475,7 +475,7 @@ server <- shinyServer(function(input, output, session) {
                  mutate(Sr8486=Raw84/Raw86)%>%
                  mutate(Sr8786_raw=Raw87/Raw86)%>%
                  mutate(Rb85Sr88=Raw85/Raw88)%>%
-                 mutate(MbFactor=log10(input$Sr8688ratio/Sr8688)/log10(85.9092607/87.9056123))
+                 mutate(MbFactor=ln(input$Sr8688ratio/Sr8688)/ln(85.9092607/87.9056123))
     
     #Rubidium correction and apply Mass Bias
       processed <- processed  %>% group_by(name) %>%
