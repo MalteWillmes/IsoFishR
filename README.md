@@ -4,6 +4,10 @@
 Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via laser-ablation mass spectrometry. 
 The aim of this application is to provide a rapid, reliable, and reproducible data reduction and analysis tool, that can be applied across disciplines.
 
+There is a bug that prevents the app from running with the newest shiny version. Please use shiny 1.0.5 until we have fixed the bug. You can install specific package versions with the following commands:
+library (devtools)
+install_version("shiny", version = "1.0.5", repos = "http://cran.us.r-project.org")
+
 Requirements
 - R version 3.2 or higher. Download at https://www.r-project.org/
 - Rstudio (optional but recommended). Download at https://www.rstudio.com/
