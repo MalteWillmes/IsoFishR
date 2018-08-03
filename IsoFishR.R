@@ -1190,14 +1190,12 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session, "cyclesec", value=settingsdf$cyclesec)
     updateNumericInput(session, "vskip", value=settingsdf$vskip)
     updateCheckboxInput(session,"header",value=settingsdf$header)
-   # ifelse(is.na(settingsdf$sep),updateRadioButtons(session,"sep",selected="\t"),updateRadioButtons(session,"sep",selected=settingsdf$sep))
     updateRadioButtons(session,"smoother",selected=settingsdf$smoother)
     updateNumericInput(session,"raw88lowerthresh",value=settingsdf$raw88lowerthresh)
     updateNumericInput(session,"raw88upperthresh",value=settingsdf$raw88upperthresh)
     updateNumericInput(session,"average_num",value=settingsdf$average_num)
     updateNumericInput(session,"spline_k",value=settingsdf$spline_k)
     updateNumericInput(session,"outlier_num",value=settingsdf$outlier_num)
-    #ifelse(is.na(settingsdf$SD_outlier),updateRadioButtons(session,"SD_outlier",selected="NA"),updateRadioButtons(session,"SD_outlier",selected=settingsdf$SD_outlier))
     updateNumericInput(session,"speed",value=settingsdf$runspeed)
     updateNumericInput(session,"fluency",value=settingsdf$fluency)
     updateNumericInput(session,"spotsize",value=settingsdf$spotsize)
@@ -1219,6 +1217,19 @@ server <- shinyServer(function(input, output, session) {
     updateTextInput(session,"defrange6",value=settingsdf$range6_label)
     updateTextInput(session,"defrange7",value=settingsdf$range7_label)
     updateTextInput(session,"defrange8",value=settingsdf$range8_label)
+    if (is.na(settingsdf$SD_outlier)){
+      updateRadioButtons(session,"SD_outlier",selected="NA")  
+    }
+    else {
+      updateRadioButtons(session,"SD_outlier",selected=settingsdf$SD_outlier)
+    }
+    if (is.na(settingsdf$sep)){
+      updateRadioButtons(session,"sep",selected="\t") 
+    }
+    else {
+      updateRadioButtons(session,"sep",selected=settingsdf$sep)
+    }
+    
   })
   
   observe({
