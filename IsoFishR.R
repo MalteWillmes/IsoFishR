@@ -117,15 +117,15 @@ options(warn=-1)
                                               textInput("sampletype",label="Sample type",value="Otolith"),
                                               radioButtons("analysistype","Analysis type", choices=list ("Line"="Line", "Spot"="Spot")),
                                               textInput("sampledirection",label="Analysis direction",value=""),
-                                              numericInput("spotsize","Spot size",value=40),
-                                              numericInput("speed", "Run speed", value=10, step = 1),
+                                              numericInput("spotsize",label= "Spot size (um)",value=40),
+                                              numericInput("speed", "Run speed (um/s)", value=10, step = 1),
                                               radioButtons("smoother","Smoothing type for analysis",choices = list("MA"="MA","spline"="Spline", "Data Points (no smoothing)"="Data_points"),inline=TRUE),
                                               numericInput("average_num","Moving average window",value=10,step=1,min=1,max=NA),
                                               numericInput("spline_k","Spline k value",value=10,step=1,min=0.01,max=1000),
                                               radioButtons("SD_outlier","Standard deviation for outlier detection",choices = list("3"=3,"2"=2,"1"=1, "No outlier rejection"="NA"), inline=TRUE),
                                               numericInput("outlier_num","Outlier moving window",value=20,step=1,min=30),
-                                              numericInput("fluency","Fluency",value=1.85),
-                                              numericInput("energy","Laser energy",value=55)
+                                              numericInput("fluency","Fluency (J/cm2)",value=1.85),
+                                              numericInput("energy","Laser energy (%)",value=55)
                                             ),
                                      box(
                                        title = "Default manual filter names", width = NULL, status = "primary",
@@ -145,8 +145,8 @@ options(warn=-1)
                                               numericInput("integration","Integration time/s",value=5),
                                               checkboxInput("blanksubcheck", "Enable blank correction", value = TRUE, width = NULL),
                                               numericInput("blanktime","Blank time (s)",value=30),
-                                              numericInput("raw88lowerthresh", "Min 88Sr", value=0.5, step = .1),
-                                              numericInput("raw88upperthresh", "Max 88Sr", value=9.8, step = .1),
+                                              numericInput("raw88lowerthresh", "Min 88Sr (V)", value=0.5, step = .1),
+                                              numericInput("raw88upperthresh", "Max 88Sr (V)", value=9.8, step = .1),
                                               numericInput("Sr8688ratio", "86Sr/88Sr ratio", value=0.1194, step = .001),
                                               numericInput("Rb8587ratio", "85Rb/87Rb", value=2.59712, step = .001)
                                             ),
