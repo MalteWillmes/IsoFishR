@@ -142,7 +142,7 @@ options(warn=-1)
                                      column(width = 4,
                                             box(
                                               title = "Data reduction settings", width = NULL, status = "danger",
-                                              numericInput("integration","Integration time/s",value=5),
+                                              numericInput("integration","Integration time (data points)",value=5),
                                               checkboxInput("blanksubcheck", "Enable blank correction", value = TRUE, width = NULL),
                                               numericInput("blanktime","Blank time (s)",value=30),
                                               numericInput("raw88lowerthresh", "Min 88Sr (V)", value=0.5, step = .1),
