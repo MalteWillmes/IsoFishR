@@ -179,13 +179,13 @@ fluidRow(
   ),
 
   box(
-    width = 3, status = "danger",style='padding:2px;',
+    title = " total Sr (V)", collapsible = TRUE, width = 3, status = "danger",style='padding:2px;',
     plotOutput("TotalSr_plot", height=200)),
   box(
-    width = 3, status = "success",style='padding:2px;',
+    title = "83Kr (V)",collapsible = TRUE, width = 3, status = "success",style='padding:2px;',
     plotOutput("Kr_plot", height=200)),
   box(
-    width = 3, status = "warning",style='padding:2px;',
+    title = "85Rb/88Sr", collapsible = TRUE, width = 3, status = "warning",style='padding:2px;',
     plotOutput("Rb_plot", height=200))
   
   
@@ -257,8 +257,21 @@ fluidRow(
            ),
            
            column(width = 9,
+           box(
+             title = " total Sr (V)", collapsible = TRUE, width = 4, status = "danger",style='padding:2px;',
+             plotOutput("TotalSr_plot_analyzed", height=200)),
+           box(
+             title = "83Kr (V)",collapsible = TRUE, width = 4, status = "success",style='padding:2px;',
+             plotOutput("Kr_plot_analyzed", height=200)),
+           box(
+             title = "85Rb/88Sr", collapsible = TRUE, width = 4, status = "warning",style='padding:2px;',
+             plotOutput("Rb_plot_analyzed", height=200)
+           )),
+           
+           column(width = 9,
+
                   box(
-                    status = "warning", width = NULL, height=470,style='padding:2px;',
+                    width = NULL, height=470,style='padding:2px;',
                     div(style="width:40px",dropdownButton(
                                    checkboxInput("analyze_points",label="Points", value=TRUE),
                                    checkboxInput("analyze_outlier_points",label="Outlier", value=TRUE),
@@ -904,7 +917,53 @@ server <- shinyServer(function(input, output, session) {
     str(input$plot_hover$y)
   })
   
-
+  #Total Sr plot
+  TotalSr_plot_analyzed <- function(){
+    req(input$Analyzed_sample_selector)
+    analyzed_plot <- analyzer_overwatch$analyzed 
+    analyzed_plot <- analyzed_plot %>% filter(name==input$Analyzed_sample_selector)
+    
+    p <- ggplot(analyzed_plot)
+    p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=("Sr (V)"), x=expression(paste("Distance (",mu,"m)")))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(2), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
+    p <- p + geom_point(aes(x=Distance,y=totalSr), size=1, color="red", shape=1, na.rm=TRUE)
+    
+    return(p)}
+  
+  output$TotalSr_plot_analyzed <- renderPlot({TotalSr_plot_analyzed()})
+  
+  #Kr plot
+  Kr_plot_analyzed <- function(){
+    req(input$Analyzed_sample_selector)
+    analyzed_plot <- analyzer_overwatch$analyzed 
+    analyzed_plot <- analyzed_plot %>% filter(name==input$Analyzed_sample_selector)
+    
+    p <- ggplot(analyzed_plot)
+    p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=expression(paste(""^"83"*"Kr (V)")), x=expression(paste("Distance (",mu,"m)")))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
+    p <- p + geom_point(aes(x=Distance,y=Raw83), size=1, color="lightgreen", shape=1 , na.rm=TRUE)
+    
+    
+    return(p)}
+  
+  output$Kr_plot_analyzed <- renderPlot({Kr_plot_analyzed()})
+  
+  #Rb plot
+  Rb_plot_analyzed <- function(){
+    req(input$Analyzed_sample_selector)
+    analyzed_plot <- analyzer_overwatch$analyzed 
+    analyzed_plot <- analyzed_plot %>% filter(name==input$Analyzed_sample_selector)
+    
+    p <- ggplot(analyzed_plot)
+    p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") + labs(y=expression(paste(""^"85"*"Rb/"^"88"*"Sr")), x=expression(paste("Distance (",mu,"m)")))
+    p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 8)) +  scale_x_continuous(expand=c(.01,0.01), breaks = scales::pretty_breaks(n = 8))
+    p <- p + geom_point(aes(x=Distance,y=Rb85Sr88),size=1, color="orange", shape=1, na.rm=TRUE)
+    
+    
+    return(p)}
+  
+  output$Rb_plot_analyzed <- renderPlot({Rb_plot_analyzed()})
+  
 ####Action to save all plots from analysis tab ####
   
   observeEvent(input$save_edits, {
