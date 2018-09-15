@@ -769,7 +769,7 @@ server <- shinyServer(function(input, output, session) {
       p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") 
       p <- p + labs(y=expression(paste(""^"87"*"Sr/"^"86"*"Sr")), x=expression(paste("Distance (",mu,"m)")), title=processed_plot$name)
       p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
-      p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
+      p <- p + scale_y_continuous(labels = fmt_dcimals(4), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
       
       
       if(input$main_sd){
@@ -989,7 +989,7 @@ server <- shinyServer(function(input, output, session) {
         p <- p + theme_bw()+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="none") 
         p <- p + labs(y=expression(paste(""^"87"*"Sr/"^"86"*"Sr")), x=expression(paste("Distance (",mu,"m)")), title= paste0(analyzed_plot$name, " ","Sample ID:"," ",analyzed_plot$Sample_ID))
         p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
-        p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
+        p <- p + scale_y_continuous(labels = fmt_dcimals(4), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
         
         
         if(input$analyze_sd){
