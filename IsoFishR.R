@@ -153,7 +153,8 @@ options(warn=-1)
                                             
                                             box(
                                               title = "Runfile import settings", width = NULL, status = "danger",
-                                              numericInput("vskip","Header length",value=46),
+                                              numericInput("vskip"," Skip Header length",value=46),
+                                              numericInput("fskip"," Skip Footer length",value=0),
                                               numericInput("raw88","Raw 88 column number",value=1),
                                               numericInput("raw87","Raw 87 column number",value=2),
                                               numericInput("raw86","Raw 86 column number",value=3),
@@ -399,7 +400,8 @@ server <- shinyServer(function(input, output, session) {
     raw_data_all<-""
     if(is.null(infile)){return()} 
     for(i in 1:length(input$file[,1])){
-      raw_data <- read.table(c(input$file[[i, 'datapath']]), skip=input$vskip, sep=input$sep,header=ifelse(input$header==TRUE,TRUE,FALSE))
+      raw_data <- read.table(c(input$file[[i, 'datapath']]), skip=input$vskip, sep=input$sep,header=ifelse(input$header==TRUE,TRUE,FALSE),stringsAsFactors =FALSE )
+      raw_data <- raw_data[1:(nrow(raw_data)-input$fskip),]
       raw_data <- cbind(raw_data, input$file[i,],row.names = NULL)
       raw_data_all <- rbind(raw_data_all, raw_data)
     }
@@ -413,6 +415,7 @@ server <- shinyServer(function(input, output, session) {
      names(raw_data_all)[input$raw83] <- c("Raw83")
      names(raw_data_all)[input$cyclesec] <- c("CycleSecs")
      raw_data_all <- raw_data_all[,c("Raw88", "Raw87","Raw86", "Raw85",  "Raw84", "Raw83", "CycleSecs","name")]
+     raw_data_all <- raw_data_all  %>% filter (Raw88!= "")
 
     return(raw_data_all)})
   
@@ -1241,6 +1244,7 @@ server <- shinyServer(function(input, output, session) {
     updateNumericInput(session, "raw83", value=settingsdf$raw83)
     updateNumericInput(session, "cyclesec", value=settingsdf$cyclesec)
     updateNumericInput(session, "vskip", value=settingsdf$vskip)
+    updateNumericInput(session, "fskip", value=settingsdf$fskip)
     updateCheckboxInput(session,"header",value=settingsdf$header)
     updateRadioButtons(session,"smoother",selected=settingsdf$smoother)
     updateNumericInput(session,"raw88lowerthresh",value=settingsdf$raw88lowerthresh)
@@ -1310,13 +1314,13 @@ server <- shinyServer(function(input, output, session) {
   # create a new project and create the files and subdirectories 
   observeEvent(input$save,{
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
-                      input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
+                      input$raw83,input$cyclesec,input$vskip,input$fskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
                       input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, input$blanksubcheck,
                       input$sampletype,input$analysistype,input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
-                            "cyclesec","vskip","header","sep","smoother",
+                            "cyclesec","vskip","fskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
                             "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration","blanksubcheck", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username", "range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     if(dir.exists(paste0("Projects/",input$new.project))==FALSE){
@@ -1340,13 +1344,13 @@ server <- shinyServer(function(input, output, session) {
   observeEvent(input$updatesettings,{
     t <- try({
     settings <- cbind(input$raw88,input$raw87,input$raw86,input$raw85,input$raw84,
-                      input$raw83,input$cyclesec,input$vskip,input$header,input$sep,
+                      input$raw83,input$cyclesec,input$vskip,input$fskip,input$header,input$sep,
                       input$smoother,input$raw88lowerthresh,input$raw88upperthresh,
                       input$average_num,input$spline_k,input$outlier_num,
                       input$SD_outlier,input$speed,input$fluency,input$spotsize, input$energy, input$integration, input$blanksubcheck,
                       input$sampletype, input$analysistype, input$sampledirection, input$blanktime, input$Sr8688ratio, input$Rb8587ratio,input$username, input$defrange1, input$defrange2, input$defrange3, input$defrange4, input$defrange5, input$defrange6, input$defrange7, input$defrange8)
     colnames(settings) <- c("raw88","raw87","raw86","raw85","raw84","raw83",
-                            "cyclesec","vskip","header","sep","smoother",
+                            "cyclesec","vskip","fskip","header","sep","smoother",
                             "raw88lowerthresh", "raw88upperthresh", "average_num","spline_k",
                             "outlier_num","SD_outlier","speed","fluency","spotsize","energy","integration","blanksubcheck", "sampletype", "analysistype", "sampledirection", "blanktime", "Sr8688ratio", "Rb8587ratio","username","range1_label", "range2_label","range3_label", "range4_label", "range5_label", "range6_label", "range7_label", "range8_label")
     write.table(settings,file.path("Projects",input$project.name,paste0(input$project.name,"_settings.csv")),row.names=FALSE,col.names=TRUE,sep=",")
