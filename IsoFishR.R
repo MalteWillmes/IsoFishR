@@ -161,7 +161,7 @@ options(warn=-1)
                                               numericInput("raw84","Raw 84 column number",value=5),
                                               numericInput("raw83","Raw 83 column number",value=6),
                                               numericInput("cyclesec","Cycle seconds column number",value=8),
-                                              radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".")),
+                                              radioButtons("sep","Separator type",choices = list(Comma=",",Tab="\t",Decimal=".", Semicolon=";")),
                                               checkboxInput("header","Data has column headings")
                                             )
                                            
