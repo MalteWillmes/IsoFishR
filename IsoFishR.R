@@ -171,39 +171,33 @@ options(warn=-1)
                                      
 ####Data reduction####                                    
 tabItem(tabName = "Data_reduction",
-fluidRow(
-  box(
-    title = "Data reduction", width = 3, status = "primary", height=200, style='padding:2px;',
-    fileInput("file","Select one or multiple runfiles", multiple = TRUE)
-
-  ),
-
-  box(
-    title = " total Sr (V)", collapsible = TRUE, width = 3, status = "danger",style='padding:2px;',
-    plotOutput("TotalSr_plot", height=200)),
-  box(
-    title = "83Kr (V)",collapsible = TRUE, width = 3, status = "success",style='padding:2px;',
-    plotOutput("Kr_plot", height=200)),
-  box(
-    title = "85Rb/88Sr", collapsible = TRUE, width = 3, status = "warning",style='padding:2px;',
-    plotOutput("Rb_plot", height=200))
-  
-  
- ),
 
 fluidRow(
     column(width = 3,
   box(
     width = NULL,style='padding:2px;',
+    fileInput("file","Select one or multiple runfiles", multiple = TRUE),
     uiOutput("Sample_selector"),
     actionButton("save_data","Save reduced data"),
     checkboxInput("appending_processed", "Append data?",value=TRUE),
     uiOutput('narem'),
     uiOutput('rollfill'))
     ),
+  
     column(width = 9,
+           box(
+             title = " total Sr (V)", collapsible = TRUE, width = 4, status = "danger",style='padding:2px;',
+             plotOutput("TotalSr_plot", height=200)),
+           box(
+             title = "83Kr (V)",collapsible = TRUE, width = 4, status = "success",style='padding:2px;',
+             plotOutput("Kr_plot", height=200)),
+           box(
+             title = "85Rb/88Sr", collapsible = TRUE, width = 4, status = "warning",style='padding:2px;',
+             plotOutput("Rb_plot", height=200))),
+          
+ column(width = 9,
   box(
-    width = NULL, style='padding:2px;', height=400,
+    width = NULL, style='padding:2px;', height=480,
     div(style="width:40px",dropdownButton(
       checkboxInput("main_points",label="Points", value=TRUE),
       checkboxInput("main_outlier_points",label="Outlier", value=TRUE),
@@ -220,7 +214,7 @@ fluidRow(
       circle = TRUE, status = "warning", size = "sm",
       icon = icon("gear"), label = NULL, tooltip = "Graph Settings", right = FALSE,
       up = FALSE)),
-    plotOutput("mainplot", height=360)
+    plotOutput("mainplot", height=420)
     )))),
 
   
@@ -271,7 +265,7 @@ fluidRow(
            column(width = 9,
 
                   box(
-                    width = NULL, height=470,style='padding:2px;',
+                    width = NULL, height=480,style='padding:2px;',
                     div(style="width:40px",dropdownButton(
                                    checkboxInput("analyze_points",label="Points", value=TRUE),
                                    checkboxInput("analyze_outlier_points",label="Outlier", value=TRUE),
@@ -675,7 +669,6 @@ server <- shinyServer(function(input, output, session) {
     p <- p + labs(y=expression(paste(""^"87"*"Sr/"^"86"*"Sr")), x=expression(paste("Distance (",mu,"m)")), title=paste0("Runfile:"," ",unlist(strsplit(as.character(input$Sample_selector), split='.', fixed=TRUE))[1]))
     p <- p + theme(axis.text.x  = element_text(size=12), axis.text.y  = element_text(size=12), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15))
     p <- p + scale_y_continuous(labels = fmt_dcimals(5), breaks = scales::pretty_breaks(n = 10)) +  scale_x_continuous(expand=c(0,0), breaks = scales::pretty_breaks(n = 10))
-
     if(input$main_sd){
     p <- p +geom_ribbon(aes(x=Distance,ymin=Sr87Sr86_MA-Sr87Sr86_MA_sds, ymax=Sr87Sr86_MA+Sr87Sr86_MA_sds), fill=input$shadecol)
     }
