@@ -909,8 +909,8 @@ server <- shinyServer(function(input, output, session) {
     
   })
   output$plot_hoverinfo <- renderPrint({
-    str(input$plot_hover$x)
-    str(input$plot_hover$y)
+    str(input$plot_hover$x,give.head = FALSE)
+    str(input$plot_hover$y,give.head = FALSE, digits=5)
   })
   
   #Total Sr plot
