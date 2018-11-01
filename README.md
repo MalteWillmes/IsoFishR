@@ -3,6 +3,7 @@
 
 Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via laser-ablation mass spectrometry. 
 The aim of this application is to provide a rapid, reliable, and reproducible data reduction and analysis tool, that can be applied across disciplines.
+A paper outlining the application is now available in PlosOne https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0204519
 
 Requirements
 - R version 3.2 or higher. Download at https://www.r-project.org/
