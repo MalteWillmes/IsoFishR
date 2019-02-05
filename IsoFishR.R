@@ -406,7 +406,7 @@ server <- shinyServer(function(input, output, session) {
       raw_data_all <- rbind(raw_data_all, raw_data)
     }
      ##Drop extra columns and rename and order the raw data
-     raw_data_all <- raw_data_all %>% filter(name!="")%>%select (-size, -type,-datapath)
+     raw_data_all <- raw_data_all %>% filter(name!="")%>%dplyr::select (-size, -type,-datapath)
      names(raw_data_all)[input$raw88] <- c("Raw88")
      names(raw_data_all)[input$raw87] <- c("Raw87")
      names(raw_data_all)[input$raw86] <- c("Raw86")
@@ -443,7 +443,7 @@ server <- shinyServer(function(input, output, session) {
     #Clean background data: Remove any values above the detection threshold and summarize
     background <- background %>% group_by(name) %>%
                                  filter(Raw88<input$raw88lowerthresh)%>%
-                                 select (-CycleSecs)%>%
+                                 dplyr::select (-CycleSecs)%>%
                                  rename(Blk88=Raw88, Blk87=Raw87, Blk86=Raw86, Blk85=Raw85, Blk84=Raw84, Blk83=Raw83)%>%
                                  summarise_all(funs(mean))
     
@@ -552,7 +552,7 @@ server <- shinyServer(function(input, output, session) {
                                    mutate(recalc_distance=TRUE)%>%
                                    mutate(comment="")%>%
                                    mutate(flag_review=FALSE) %>%
-                                   select(-Sr87Sr86.x, -Sr87Sr86.y, -.hat, -.cooksd, -.resid, -.sigma, -.fitted, -.se.fit) %>%
+                                   dplyr::select(-Sr87Sr86.x, -Sr87Sr86.y, -.hat, -.cooksd, -.resid, -.sigma, -.fitted, -.se.fit) %>%
                                    ungroup()%>%
                                    mutate(name=paste0(Run_ID,"_",strftime(Sys.time(), format="%Y%m%d%H%M%S")))%>%
                                    group_by(name)%>%
@@ -593,7 +593,7 @@ server <- shinyServer(function(input, output, session) {
     processed_data_cleaned <- processed_data()
     if(is.null(processed_data())){return()}
     #Add the columns to keep for the next step in data processed (remove blanks, raw ratios, and ratio calculations)
-    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>% select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr84Sr86, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses, Sr87Sr86_MA_CI95up, Sr87Sr86_MA_CI95low, Sr87Sr86_spline, 
+    processed_data_cleaned <- processed_data_cleaned  %>% group_by(name) %>%  dplyr::select (name, Run_ID, Sample_ID, Date, CycleSecs, Distance, totalSr, Raw83, Rb85Sr88, Sr84Sr86, Sr87Sr86, Sr87Sr86_outlier, Sr87Sr86_MA, Sr87Sr86_MA_sds, Sr87Sr86_MA_ses, Sr87Sr86_MA_CI95up, Sr87Sr86_MA_CI95low, Sr87Sr86_spline, 
                                                                                      Sr87Sr86_spline_ses, profile_direction, trim_right, trim_left, recalc_distance, comment, flag_review, changepoints, manual_pen, change_method, changepoint_number,changepoint_mean, changepoint_plotting,
                                                                                      region_number, region_name, region_mean, region_sd, region_mindistance, region_maxdistance) %>%
       mutate(Distance=round(Distance, digits=0))%>%
@@ -971,9 +971,9 @@ server <- shinyServer(function(input, output, session) {
         if(is.null(analyzed_data())){return()}
         analyzed_plot <- analyzer_overwatch$analyzed
         analyzed_plot <- analyzed_plot %>% filter(name==i)
-        manual_region_plotter <- analyzed_plot %>% group_by(region_number) %>% select(region_number, Distance)%>%
+        manual_region_plotter <- analyzed_plot %>% group_by(region_number) %>%  dplyr::select(region_number, Distance)%>%
         mutate (min_distance =min(Distance))%>%
-        mutate (max_distance=max(Distance))%>% select(-Distance)%>%distinct()
+        mutate (max_distance=max(Distance))%>%  dplyr::select(-Distance)%>%distinct()
         region_colors <- c("NA", "#6b8acd", "#4cb28d", "#72853c", "#c78a40", "#c75d9c", "#cb554f", "#9061c9", "#83b844")
         region_alpha <- c(0,0.8,0.8,0.8,0.8,0.8,0.8,0.8,0.8)
         region_colors <-data.frame(region_colors, region_alpha) %>%
@@ -1082,7 +1082,7 @@ server <- shinyServer(function(input, output, session) {
     sample_id <- analyzer_overwatch$analyzed
     sample_id <- sample_id %>% group_by(name) %>%
       filter(name==input$Analyzed_sample_selector)%>%
-      select(name, Sample_ID)%>%
+      dplyr::select(name, Sample_ID)%>%
       summarise(Sample_ID=first(Sample_ID))
     textInput("Sample_ID", label="Sample ID", value=sample_id$Sample_ID)
   })
@@ -1095,7 +1095,7 @@ server <- shinyServer(function(input, output, session) {
    sample_comment <- analyzer_overwatch$analyzed
    sample_comment <- sample_comment %>% group_by(name) %>%
       filter(name==input$Analyzed_sample_selector)%>%
-      select(name, comment)%>%
+     dplyr::select(name, comment)%>%
      summarise(comment=first(comment))
    textInput("Sample_comment", label="Comment", value=sample_comment$comment)
   })
@@ -1117,7 +1117,7 @@ server <- shinyServer(function(input, output, session) {
    flag <- analyzer_overwatch$analyzed
    flag <- flag %>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, flag_review)%>%
+     dplyr::select(name, flag_review)%>%
      summarise(flag_review=first(flag_review))
    checkboxInput("flag_review", "Flag for review?",value=flag$flag_review)
  })
@@ -1152,7 +1152,7 @@ server <- shinyServer(function(input, output, session) {
    rec <- analyzer_overwatch$analyzed
    rec <- rec %>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, recalc_distance)%>%
+     dplyr::select(name, recalc_distance)%>%
      summarise(recalc_distance=first(recalc_distance))
    checkboxInput("recalculate_distance", "Recalculate distance?",value=rec$recalc_distance)
  })
@@ -1189,7 +1189,7 @@ server <- shinyServer(function(input, output, session) {
    change_check <- analyzer_overwatch$analyzed
    change_check <- change_check%>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, changepoints)%>%
+     dplyr::select(name, changepoints)%>%
      summarise(changepoints=first(changepoints))
    checkboxInput("change_points_check", "Enable Changepoints?", value=change_check$changepoints)
  }) 
@@ -1200,7 +1200,7 @@ server <- shinyServer(function(input, output, session) {
    change_methodselect <- analyzer_overwatch$analyzed
    change_methodselect <- change_methodselect%>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, change_method)%>%
+     dplyr::select(name, change_method)%>%
      summarise(change_method=first(change_method))
    selectInput("change_method",label="Method",choices= c("PELT", "AMOC", "SegNeigh", "BinSeg"), selected=change_methodselect$change_method)
  }) 
@@ -1211,7 +1211,7 @@ server <- shinyServer(function(input, output, session) {
    change_penalty <- analyzer_overwatch$analyzed
    change_penalty <- change_penalty %>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, manual_pen)%>%
+     dplyr::select(name, manual_pen)%>%
      summarise(manual_pen=first(manual_pen))
    numericInput("manual_pen",label="Penalty value",value=change_penalty$manual_pen,step=0.00001,min=0,max=0.01)
  }) 
@@ -1222,7 +1222,7 @@ server <- shinyServer(function(input, output, session) {
    changepoint_plotting_checking <- analyzer_overwatch$analyzed
    changepoint_plotting_checking <- changepoint_plotting_checking%>% group_by(name) %>%
      filter(name==input$Analyzed_sample_selector)%>%
-     select(name, changepoint_plotting)%>%
+     dplyr::select(name, changepoint_plotting)%>%
      summarise(changepoint_plotting=first(changepoint_plotting))
    checkboxInput("changepoint_plotting_check", "Plot Changepoints?", value=changepoint_plotting_checking$changepoint_plotting)
  }) 
@@ -1589,7 +1589,7 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
       if(is.null(status_profile)){return()} 
       profile_status_var<- profile_status_var %>% group_by(name) %>%
         filter(name==input$Analyzed_sample_selector)%>%
-        select(name, profile_direction)%>%
+        dplyr::select(name, profile_direction)%>%
         distinct(profile_direction)
       status_profile <-profile_status_var$profile_direction
       return(status_profile)})  
@@ -1600,7 +1600,7 @@ analyzer_overwatch <-reactiveValues(analyzed=NULL)
       if(is.null(trim_status_profile )){return()} 
       trim_status_profile_var<- trim_status_profile_var %>% group_by(name) %>%
         filter(name==input$Analyzed_sample_selector)%>%
-        select(name, trim_right,trim_left)
+        dplyr::select(name, trim_right,trim_left)
       trim_status_profile <- distinct(trim_status_profile_var)
       
       return(trim_status_profile)})  
@@ -1617,11 +1617,11 @@ observe({
   #Find the changes in region numbers, names, min and max distance and create a summary table for lookup
   range_observer <-analyzer_overwatch$analyzed %>%
     filter(name==input$Analyzed_sample_selector)%>%
-    select (name, Distance, region_number, region_name)%>%
+    dplyr::select (name, Distance, region_number, region_name)%>%
     group_by(region_number)%>%
     mutate (min_distance=min(Distance))%>%
     mutate (max_distance=max(Distance))%>%
-    select (-Distance)%>%
+    dplyr::select (-Distance)%>%
     distinct()%>%
     ungroup()
   
@@ -1816,7 +1816,8 @@ output$reduced_data_table_all <-  DT::renderDataTable({
   output$analyzed_data_table_summary <-  DT::renderDataTable({
     req(analyzer_overwatch$analyzed)
     analyzed_data_table_summary <- analyzer_overwatch$analyzed
-    analyzed_data_table_summary <- analyzed_data_table_summary %>% select(name, Sample_ID, region_number, region_name, region_mindistance, region_maxdistance, region_mean, region_sd) %>% 
+    analyzed_data_table_summary <- analyzed_data_table_summary %>% 
+      dplyr::select(name, Sample_ID, region_number, region_name, region_mindistance, region_maxdistance, region_mean, region_sd) %>% 
       group_by (region_name) %>%
       distinct (name, .keep_all = TRUE) %>%
       mutate (region_mean=round(region_mean, 5))%>%
