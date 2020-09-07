@@ -210,7 +210,7 @@ fluidRow(
       checkboxInput("reduced_custom",label="Custom line", value=FALSE),
       numericInput("reduced_custom_input",label="Custom line 87Sr/86Sr",value=0.705),
       colourInput("linecol", "Line", "black", allowTransparent = TRUE,showColour = "background"),
-      colourInput("shadecol", "Shading", "gray", allowTransparent = TRUE, showColour = "background"),
+      colourInput("shadecol", "Shading", "gray95", allowTransparent = TRUE, showColour = "background"),
       downloadButton('download_main_plot',''),
       circle = TRUE, status = "warning", size = "sm",
       icon = icon("gear"), label = NULL, tooltip = "Graph Settings", right = FALSE,
@@ -427,7 +427,7 @@ server <- shinyServer(function(input, output, session) {
     if(is.null(raw_data_all())){return()}
     
     #Change to numeric
-    raw <- raw %>% group_by(name) %>% mutate_all(funs(as.numeric)) 
+    raw <- raw %>% group_by(name)%>% mutate(across(.fns=as.numeric))  
     
     #Calculate average based on integration time
     raw <- raw %>% group_by(name) %>% replace(1:6, rollapply(raw[1:6],width=input$integration, by=input$integration, FUN=mean, partial=TRUE,fill=NA)) %>%
@@ -528,12 +528,17 @@ server <- shinyServer(function(input, output, session) {
                                 mutate(Sr87Sr86_MA_CI95low=Sr87Sr86_MA-1.96*Sr87Sr86_MA_ses)
       
     #Apply Spline fit
-      processed_spline <- processed  %>% group_by(name)%>% do(Sr87Sr86_spline=gam(Sr87Sr86 ~ s(Distance, k=input$spline_k), data=.))  
-      processed_spline_aug <- augment(processed_spline, Sr87Sr86_spline)
-      
+      processed_spline <- processed  %>% 
+        group_by(name)%>% 
+        nest()%>%
+        mutate(Sr87Sr86_spline = map(data, ~mgcv::gam(Sr87Sr86 ~ s(Distance, k=input$spline_k, bs="tp"), data=.x))) %>%
+        mutate(processed_spline_aug = map2(Sr87Sr86_spline, data, ~broom::augment(.x, newdata = .y, se_fit = TRUE))) %>%
+        unnest(processed_spline_aug)%>%
+        dplyr::select(name, Distance,.fitted,.se.fit)  
+        
 
     #Join data together based on name and Distance
-      processed <- left_join(processed, processed_spline_aug, by = c("name","Distance"))
+      processed <- left_join(processed, processed_spline, by = c("name","Distance"))
       #Estimate NA values
       processed <- processed %>% mutate (.fitted=na.approx(.fitted, na.rm = FALSE))%>% mutate (.se.fit=na.approx(.se.fit, na.rm = FALSE))
       
@@ -543,7 +548,7 @@ server <- shinyServer(function(input, output, session) {
                                    mutate(Date=strftime(Sys.time(), format="%Y-%m-%d_%H:%M:%S"))%>%
                                    mutate(Run_ID=name)%>%
                                    mutate(Sr84Sr86=Sr8486) %>%
-                                   mutate(Sr87Sr86=Sr87Sr86.x) %>%
+                                   mutate(Sr87Sr86=Sr87Sr86) %>%
                                    mutate(Sr87Sr86_spline=.fitted) %>%
                                    mutate(Sr87Sr86_spline_ses=.se.fit)%>%
                                    mutate(profile_direction="Profile is normal")%>%
@@ -552,7 +557,7 @@ server <- shinyServer(function(input, output, session) {
                                    mutate(recalc_distance=TRUE)%>%
                                    mutate(comment="")%>%
                                    mutate(flag_review=FALSE) %>%
-                                   dplyr::select(-Sr87Sr86.x, -Sr87Sr86.y, -.hat, -.cooksd, -.resid, -.sigma, -.fitted, -.se.fit) %>%
+                                   dplyr::select( -.fitted, -.se.fit) %>%
                                    ungroup()%>%
                                    mutate(name=paste0(Run_ID,"_",strftime(Sys.time(), format="%Y%m%d%H%M%S")))%>%
                                    group_by(name)%>%
