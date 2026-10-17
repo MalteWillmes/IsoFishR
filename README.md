@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/MalteWillmes/IsoFishR/master/www/logo.png" alt="IsoFishR" height="72">
+<img src="man/figures/logo.png" alt="IsoFishR" height="72">
 
 # IsoFishR 2 (development version)
 
