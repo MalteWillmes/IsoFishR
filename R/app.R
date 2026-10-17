@@ -78,8 +78,11 @@ app_server <- function(initial_project = NULL, user = default_user()) {
     # rebuilt on every edit.
     open_path <- shiny::reactiveVal(NULL)
     pending_open <- shiny::reactiveVal(NULL)
+    # Page shown when a project opens: a new project starts on its settings.
+    first_tab <- shiny::reactiveVal("Workspace")
 
-    do_open <- function(path, read_only = FALSE, force = FALSE) {
+    do_open <- function(path, read_only = FALSE, force = FALSE, tab = "Workspace") {
+      first_tab(tab)
       user_name <- shiny::isolate(input$user_name) %||% user
       p <- tryCatch(
         open_project(path, user = user_name, read_only = read_only, force = force),
@@ -124,7 +127,8 @@ app_server <- function(initial_project = NULL, user = default_user()) {
     }
 
     output$main <- shiny::renderUI({
-      if (is.null(open_path())) start_screen_ui(user, recent_projects()) else workspace_page_ui()
+      if (is.null(open_path())) start_screen_ui(user, recent_projects())
+      else workspace_page_ui(selected = shiny::isolate(first_tab()))
     })
 
     # ---- start screen ----
@@ -148,7 +152,7 @@ app_server <- function(initial_project = NULL, user = default_user()) {
                                      import_preset = input$create_preset %||% DEFAULT_PRESET))
       if (!is.null(p)) {
         close_project(p)
-        do_open(p$path)
+        do_open(p$path, tab = "Project settings")
       }
     })
 
@@ -249,16 +253,17 @@ start_screen_ui <- function(user, recent) {
   )
 }
 
-workspace_page_ui <- function() {
+workspace_page_ui <- function(selected = "Workspace") {
   bslib::navset_bar(
     id = "page",
+    selected = selected,
     title = shiny::span("IsoFishR ", shiny::uiOutput("project_title", inline = TRUE)),
     fillable = "Workspace",
     padding = 0,
     bslib::nav_panel("Workspace", workspace_ui("ws")),
+    bslib::nav_panel("Project settings", project_settings_ui("settings")),
     bslib::nav_panel("Calibration", calibration_ui("calibration")),
     bslib::nav_panel("Export", export_ui("export")),
-    bslib::nav_panel("Project settings", project_settings_ui("settings")),
     bslib::nav_panel("Change log", log_ui("log")),
     bslib::nav_spacer(),
     bslib::nav_item(shiny::actionButton("close_project", "Close project", class = "btn-sm")),

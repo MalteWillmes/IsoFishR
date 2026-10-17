@@ -260,6 +260,7 @@ test_that("creating a project from the start screen opens it", {
                       create_preset = "Nu_UCDavis", create = 1)
     expect_equal(project()$meta$name, "New")
     expect_equal(nrow(project()$samples), 0)
+    expect_equal(first_tab(), "Project settings")  # new projects start on their settings
     close_project(project())
   })
   shiny::testServer(calibration_server,
