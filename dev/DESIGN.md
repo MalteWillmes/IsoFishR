@@ -42,6 +42,7 @@ Trims and regions are stored in **seconds of analysis time** and shown as distan
 | `set_regions(p, id, regions)` | Replace a sample's regions |
 | `update_project_settings(p, overrides)` | Change the project defaults |
 | `project_data(p)` / `project_regions(p)` | Cached reduction with each sample's own settings and edits applied |
+| `remove_samples(p, ids)` | Remove samples with their regions and cache. The runfile moves to `raw/removed/` (never deleted) and the removal is logged. To keep a sample but leave it out of exports, set its status to `excluded` instead |
 | `read_log(p)` | The change log |
 
 Every change is written to disk immediately, and every changed value is logged with its old and new value. Each function returns the updated project object, which the Shiny app will keep in a reactive value.
@@ -77,7 +78,7 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 | `data.csv` | Optional: every reduced point |
 | `export_info.yml` | Project, date, user, IsoFishR version, options |
 
-Statistics come from the individual points (outliers removed), not the smoothed values. v1 used the smoothed values, whose SE understates the uncertainty because neighbouring values are autocorrelated. Values are rounded on export (means 6 decimals, SD/SE 7, distances/times 0.1). Excluded samples are left out unless requested.
+Statistics come from the individual points (outliers removed), not the smoothed values. v1 used the smoothed values, whose SE understates the uncertainty because neighbouring values are autocorrelated. The app's selection summary and region table use the same calculation, so what you see matches the export. Values are rounded on export (means 6 decimals, SD/SE 7, distances/times 0.1). Excluded samples are left out unless requested.
 
 ## Package layout
 | File | Contents |
@@ -119,5 +120,5 @@ Run `Rscript dev/compare_v1.R`. Where v1 and v2 produce the same integrated cycl
 ## Next steps
 1. ~~Project folder functions~~ (done).
 2. ~~Shiny workspace~~ (first version done).
-3. ~~Exports~~ (done; no PDFs and no v1 project importer, by decision). Removing samples is not supported yet.
+3. ~~Exports~~ (done; no PDFs and no v1 project importer, by decision). ~~Removing samples~~ (done).
 4. App polish once used with real data: keyboard shortcuts, a whole-project overview plot, layout on small screens.

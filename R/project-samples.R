@@ -212,6 +212,48 @@ update_project_settings <- function(project, overrides) {
   project
 }
 
+#' Remove samples from a project
+#'
+#' Removes samples, their regions and cached results from the project. The
+#' raw runfile is not deleted but moved to `raw/removed/`, so a removed
+#' sample can be recovered and the same file can be added again later. To
+#' keep a sample but leave it out of exports, set its status to
+#' `"excluded"` with [update_sample()] instead.
+#'
+#' @param project A project from [open_project()].
+#' @param sample_ids Samples to remove.
+#' @return The updated project.
+#' @export
+remove_samples <- function(project, sample_ids) {
+  check_writable(project)
+  purrr::walk(sample_ids, \(id) sample_index(project, id))
+
+  removed_dir <- project_file(project$path, "raw", "removed")
+  dir.create(removed_dir, recursive = TRUE, showWarnings = FALSE)
+  stamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+  rows <- dplyr::filter(project$samples, .data$sample_id %in% sample_ids)
+
+  moved_to <- file.path("raw", "removed", paste0(stamp, "_", basename(rows$runfile)))
+  for (i in seq_len(nrow(rows))) {
+    from <- project_file(project$path, rows$runfile[i])
+    if (file.exists(from) && !file.rename(from, project_file(project$path, moved_to[i]))) {
+      stop("Could not move '", rows$runfile[i], "'. Is it open in another program?", call. = FALSE)
+    }
+    cache <- list.files(project_file(project$path, "cache"),
+                        pattern = paste0("^", rlang::hash(rows$sample_id[i]), "_"), full.names = TRUE)
+    unlink(cache)
+  }
+
+  project$samples <- dplyr::filter(project$samples, !.data$sample_id %in% sample_ids)
+  project$regions <- dplyr::filter(project$regions, !.data$sample_id %in% sample_ids)
+  write_table_file(project$samples, project_file(project$path, "samples.csv"))
+  write_table_file(project$regions, project_file(project$path, "regions.csv"))
+  append_log(project_file(project$path, "log.csv"),
+             log_entry(project$user, "remove_sample", rows$sample_id, "runfile",
+                       old = rows$runfile, new = moved_to))
+  project
+}
+
 # ---- helpers ---------------------------------------------------------------------
 
 sample_index <- function(project, sample_id) {

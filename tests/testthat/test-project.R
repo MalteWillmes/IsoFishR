@@ -204,3 +204,34 @@ test_that("project_regions summarises the stored regions", {
   expect_true(all(r$mean > 0.703 & r$mean < 0.712))
   expect_true(all(r$n > 10))
 })
+
+test_that("removing a sample drops its rows, regions and cache but keeps the runfile", {
+  p <- add_runfiles(new_project(), salmon(2))
+  ids <- p$samples$sample_id
+  p <- set_regions(p, ids[1], data.frame(region = "core", start_s = 200, end_s = 260))
+  p <- set_regions(p, ids[2], data.frame(region = "core", start_s = 200, end_s = 260))
+  project_data(p)
+  runfile <- p$samples$runfile[1]
+
+  p <- remove_samples(p, ids[1])
+  expect_equal(p$samples$sample_id, ids[2])
+  expect_equal(p$regions$sample_id, ids[2])
+  expect_false(file.exists(file.path(p$path, runfile)))
+  kept <- list.files(file.path(p$path, "raw", "removed"))
+  expect_length(kept, 1)
+  expect_match(kept, basename(runfile), fixed = TRUE)
+  expect_length(list.files(file.path(p$path, "cache")), 1)
+
+  log <- dplyr::filter(read_log(p), action == "remove_sample")
+  expect_equal(log$sample_id, ids[1])
+  expect_equal(log$new, file.path("raw", "removed", kept))
+
+  # Survives reopening, and the same file can be added again
+  close_project(p)
+  p2 <- open_project(p$path, user = "tester")
+  on.exit(close_project(p2))
+  expect_equal(p2$samples$sample_id, ids[2])
+  p2 <- add_runfiles(p2, salmon(1))
+  expect_equal(p2$samples$sample_id, c(ids[2], ids[1]))
+  expect_error(remove_samples(p2, "nope"), "Unknown sample")
+})

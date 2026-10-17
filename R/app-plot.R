@@ -36,28 +36,31 @@ profile_plot <- function(data, regions = NULL,
                                 line = list(width = 0), fillcolor = "rgba(31,111,139,0.18)",
                                 hoverinfo = "skip")
   }
-  # Always added (hidden if unticked) so the panel keeps its axes.
-  main <- plotly::add_markers(main, y = ~sr87_sr86, name = "Data",
+  # Always added (hidden if unticked) so the panel keeps its axes. Points
+  # are filtered so plotly doesn't warn about the gaps left by outliers.
+  main <- plotly::add_markers(main, data = dplyr::filter(data, !is.na(sr87_sr86)),
+                              y = ~sr87_sr86, name = "Data",
                               visible = if ("points" %in% show) TRUE else "legendonly",
                               marker = list(color = "rgba(60,60,60,0.55)", size = 5),
                               hovertemplate = "%{x:.0f} \u00b5m<br>%{y:.5f}<extra></extra>")
   if ("outliers" %in% show && any(!is.na(data$sr87_sr86_outlier))) {
-    main <- plotly::add_markers(main, y = ~sr87_sr86_outlier, name = "Outliers",
+    main <- plotly::add_markers(main, data = dplyr::filter(data, !is.na(sr87_sr86_outlier)),
+                                y = ~sr87_sr86_outlier, name = "Outliers",
                                 marker = list(color = "#d62728", size = 6, symbol = "circle-open"),
                                 hovertemplate = "Outlier<br>%{x:.0f} \u00b5m<br>%{y:.5f}<extra></extra>")
   }
   if ("smooth" %in% show && !value_is_raw) {
-    main <- plotly::add_lines(main, y = ~sr87_sr86_value, name = smooth_label,
+    main <- plotly::add_lines(main, data = data, y = ~sr87_sr86_value, name = smooth_label,
                               line = list(color = "#1f6f8b", width = 2),
                               hovertemplate = "%{x:.0f} \u00b5m<br>%{y:.5f}<extra></extra>")
   }
   if ("cp_mean" %in% names(data) && any(!is.na(data$cp_mean))) {
-    main <- plotly::add_lines(main, y = ~cp_mean, name = "Changepoint means",
+    main <- plotly::add_lines(main, data = data, y = ~cp_mean, name = "Changepoint means",
                               line = list(color = "#d62728", width = 2, shape = "hv"),
                               hovertemplate = "Segment mean %{y:.5f}<extra></extra>")
   }
   if ("seawater" %in% show) {
-    main <- plotly::add_lines(main, y = SEAWATER_SR, name = "Seawater",
+    main <- plotly::add_lines(main, data = data, y = SEAWATER_SR, name = "Seawater",
                               line = list(color = "#2ca02c", dash = "dash", width = 1),
                               hoverinfo = "skip")
   }

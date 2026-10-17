@@ -88,3 +88,28 @@ test_that("export page writes an export and previews the summaries", {
     expect_true(file.exists(file.path(last_dir(), "regions.csv")))
   })
 })
+
+test_that("removing a sample in the app selects a neighbouring sample", {
+  p <- app_project()
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    session$setInputs(samples_rows_selected = 1)
+    session$setInputs(remove = 1, remove_confirm = 1)
+    expect_equal(rv()$samples$sample_id, "PC_2016_01_A3_6R")
+    expect_equal(current(), "PC_2016_01_A3_6R")
+    session$setInputs(remove_confirm = 2)
+    expect_equal(nrow(rv()$samples), 0)
+    expect_null(current())
+  })
+})
+
+test_that("smoothed line uses every point even when outliers were rejected", {
+  # Regression: a filtered `data =` on the outlier trace leaked into later traces.
+  d <- reduce_runs(read_runfiles(salmon_files(2)[2]))$data
+  expect_gt(sum(d$is_outlier), 0)
+  b <- plotly::plotly_build(profile_plot(d))
+  traces <- rlang::set_names(b$x$data, vapply(b$x$data, \(t) t$name %||% "", ""))
+  expect_length(traces[["Moving average"]]$y, nrow(d))
+  expect_length(traces[["Data"]]$y, sum(!is.na(d$sr87_sr86)))
+  expect_length(traces[["Outliers"]]$y, sum(d$is_outlier))
+})

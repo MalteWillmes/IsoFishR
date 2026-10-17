@@ -118,7 +118,10 @@ notes_panel_ui <- function(ns) {
     shiny::h6("Sample details"),
     shiny::tableOutput(ns("sample_info")),
     shiny::h6("History"),
-    shiny::tableOutput(ns("sample_log"))
+    shiny::tableOutput(ns("sample_log")),
+    shiny::hr(),
+    shiny::actionButton(ns("remove"), "Remove sample from project\u2026",
+                        class = "btn-outline-danger btn-sm")
   )
 }
 
@@ -173,6 +176,9 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(table_data(), {
       DT::replaceData(table_proxy, table_data(), rownames = FALSE, resetPaging = FALSE,
                       clearSelection = "none")
+      # Rows may have been added or removed, so re-select by sample ID.
+      i <- match(shiny::isolate(current()) %||% NA_character_, table_data()$Sample)
+      DT::selectRows(table_proxy, if (is.na(i)) NULL else i)
     }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$samples_rows_selected, {
@@ -268,8 +274,8 @@ workspace_server <- function(id, project) {
       d <- sample_data()
       pts <- d[d$distance_um >= s[1] & d$distance_um <= s[2], ]
       sprintf("Selected %.0f\u2013%.0f \u00b5m: %d points, mean %.5f \u00b1 %.5f (2 SE)",
-              s[1], s[2], nrow(pts), mean(pts$sr87_sr86_value, na.rm = TRUE),
-              2 * stats::sd(pts$sr87_sr86_value, na.rm = TRUE) / sqrt(sum(!is.na(pts$sr87_sr86_value))))
+              s[1], s[2], sum(!is.na(pts$sr87_sr86)), mean(pts$sr87_sr86, na.rm = TRUE),
+              2 * stats::sd(pts$sr87_sr86, na.rm = TRUE) / sqrt(sum(!is.na(pts$sr87_sr86))))
     })
 
     # Analysis-time range of the points inside the selected distance range.
@@ -348,7 +354,7 @@ workspace_server <- function(id, project) {
     output$regions <- shiny::renderTable({
       r <- sample_regions()
       if (nrow(r) == 0) return(data.frame(Note = "No regions yet"))
-      summarise_regions(sample_data(), r) |>
+      summarise_regions(sample_data(), r, value = "sr87_sr86") |>
         dplyr::right_join(dplyr::select(r, "region"), by = "region") |>
         dplyr::transmute(
           Region = .data$region,
@@ -445,6 +451,33 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(input$reviewed_next, {
       change(update_sample, current(), status = "reviewed")
       step_sample(1)
+    })
+
+    shiny::observeEvent(input$remove, {
+      shiny::showModal(shiny::modalDialog(
+        title = paste("Remove", current(), "?"),
+        shiny::p("The sample, its regions and its edits are removed from the project. ",
+                 "The runfile is kept in the project's raw/removed folder, and the removal ",
+                 "is recorded in the change log."),
+        shiny::p("To keep the sample but leave it out of exports, set its status to ",
+                 shiny::strong("Excluded"), " instead."),
+        footer = shiny::tagList(
+          shiny::modalButton("Cancel"),
+          shiny::actionButton(ns("remove_confirm"), "Remove sample", class = "btn-danger")
+        )
+      ))
+    })
+
+    shiny::observeEvent(input$remove_confirm, {
+      shiny::removeModal()
+      id <- current()
+      ids <- project()$samples$sample_id
+      i <- match(id, ids)
+      neighbour <- c(ids[-i])[min(i, length(ids) - 1)]
+      if (!is.null(change(remove_samples, id))) {
+        shiny::showNotification(paste("Removed", id), type = "message")
+        current(if (length(neighbour) == 1 && !is.na(neighbour)) neighbour else NULL)
+      }
     })
 
     output$sample_info <- shiny::renderTable({
