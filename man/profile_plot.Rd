@@ -16,17 +16,23 @@ profile_plot(
 
 \item{regions}{Regions of the sample (\code{region}, \code{start_s}, \code{end_s}).}
 
-\item{show}{Elements to draw: any of \code{"points"}, \code{"outliers"}, \code{"smooth"},
-\code{"band"}, \code{"seawater"}, \code{"strips"}.}
+\item{show}{Elements to show: any of \code{"points"}, \code{"outliers"}, \code{"smooth"},
+\code{"band"}, \code{"seawater"}, \code{"strips"}. All traces except the strips are
+always included; those not in \code{show} start hidden (\code{"legendonly"}) so
+they can be switched on without rebuilding the plot.}
 
 \item{source}{plotly event source ID.}
 }
 \value{
-A plotly object.
+A built plotly object (see \code{\link[plotly:plotly_build]{plotly::plotly_build()}}).
 }
 \description{
 The 87Sr/86Sr profile of one sample against distance, with the smoothed
 line and its uncertainty band, rejected outliers, regions and changepoint
 means, plus strips for total Sr, 83Kr and 85Rb/88Sr below it. Drag along
 the x axis to select a range.
+}
+\details{
+Point traces are drawn with WebGL and values are rounded to the precision
+shown, which keeps redraws fast for long profiles.
 }

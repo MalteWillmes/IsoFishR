@@ -13,5 +13,5 @@ utils::globalVariables(c(
   "sr87_sr86_ma_n", "sr87_sr86_spline", "sr87_sr86_spline_se", "sr87_sr86_value",
   "is_outlier", "trim_start_s", "trim_end_s", "reverse", "rezero",
   "region", "start_s", "end_s", "cp_segment", "cp_mean", "sr84_sr86", "sd", "n",
-  "n_points", "segment"
+  "n_points", "segment", "y", "outlier"
 ))

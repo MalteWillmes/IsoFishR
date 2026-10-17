@@ -66,6 +66,13 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - Edits save immediately. Text and number fields save when they lose focus, and a field is only written if its value differs from the stored one, so switching samples never writes anything.
 - Each open project has its own lock token, so several browser tabs in one R process can't release each other's lock. The app stops once no tab has been connected for 5 seconds (a page reload does not stop it).
 
+### Plot performance
+- **Redraws only when needed:** the plot rebuilds only when its data (sample, raw file, settings, edits), its regions or the signal-strips option change. Comments, flags, status changes and the other display checkboxes don't rebuild it. The checkboxes switch traces in the browser through `plotlyProxy` (restyle `visible`). The deduplicated keys are reactiveVals, which ignore identical values.
+- **WebGL:** all traces are `scattergl`. They have to be all or nothing, because WebGL traces are drawn above SVG ones.
+- **Smaller payload:** values are rounded to the precision shown, hover templates are sent once per trace instead of per point, and unevaluated plot attributes are dropped. For a 1,182-point sample this is 130 KB per redraw instead of 540 KB (`Rscript dev/bench_plot.R`).
+- **Not done:** plotly's partial bundles (they need to be downloaded at run time, and the app runs locally anyway).
+- **Don't pre-serialise data arrays as JSON:** Shiny sends them as a single string and plotly draws one point.
+
 ## Instrument import presets
 A preset is a named runfile layout: header/footer lines, separator, and which column holds each mass and the time.
 - **Built-in:** `Nu_UCDavis` (`inst/presets/Nu_UCDavis.yml`) is the default and matches `default_settings()$import`. Built-in presets cannot be overwritten or deleted.

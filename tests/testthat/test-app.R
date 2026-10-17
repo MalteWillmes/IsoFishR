@@ -109,9 +109,10 @@ test_that("smoothed line uses every point even when outliers were rejected", {
   expect_gt(sum(d$is_outlier), 0)
   b <- plotly::plotly_build(profile_plot(d))
   traces <- rlang::set_names(b$x$data, vapply(b$x$data, \(t) t$name %||% "", ""))
-  expect_length(traces[["Moving average"]]$y, nrow(d))
-  expect_length(traces[["Data"]]$y, sum(!is.na(d$sr87_sr86)))
-  expect_length(traces[["Outliers"]]$y, sum(d$is_outlier))
+  n_values <- length
+  expect_equal(n_values(traces[["Moving average"]]$y), nrow(d))
+  expect_equal(n_values(traces[["Data"]]$y), sum(!is.na(d$sr87_sr86)))
+  expect_equal(n_values(traces[["Outliers"]]$y), sum(d$is_outlier))
 })
 
 test_that("settings page loads presets, saves new ones and checks a runfile", {
@@ -161,4 +162,48 @@ test_that("the example button opens a temporary project without adding it to rec
   })
   after <- if (file.exists(recent_file)) readLines(recent_file) else character()
   expect_equal(after, before)
+})
+
+test_that("the plot is only rebuilt when what it shows changes", {
+  p <- app_project()
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    session$setInputs(samples_rows_selected = 1,
+                      show = c("points", "outliers", "smooth", "band", "strips"))
+    output$plot
+    n <- plot_renders()
+    expect_gte(n, 1)
+
+    # Notes and display toggles: no rebuild
+    session$setInputs(comment = "looks fine", flag = TRUE, status = "reviewed")
+    output$plot
+    session$setInputs(show = c("points", "smooth", "strips"))
+    output$plot
+    expect_equal(plot_renders(), n)
+    expect_true(all(c("points", "smooth", "band", "seawater") %in% names(toggle_idx())))
+
+    # Things that change the plot: rebuild
+    session$setInputs(trim_start_um = 50)
+    output$plot
+    expect_equal(plot_renders(), n + 1)
+    session$setInputs(show = c("points", "smooth"))
+    output$plot
+    expect_equal(plot_renders(), n + 2)
+    session$setInputs(next_sample = 1)
+    output$plot
+    expect_equal(plot_renders(), n + 3)
+  })
+})
+
+test_that("plot data is slimmed for the browser", {
+  d <- reduce_runs(read_runfiles(salmon_files(1)))$data
+  p <- profile_plot(d)
+  expect_null(p$x$attrs)
+  expect_true(all(vapply(p$x$data, \(t) length(t$hovertemplate) <= 1, logical(1))))
+  pts <- p$x$data[[which(vapply(p$x$data, \(t) identical(t$name, "Data"), logical(1)))]]
+  expect_equal(pts$type, "scattergl")
+  json <- htmlwidgets:::toJSON(p$x)
+  expect_lt(nchar(json, type = "bytes"), 250 * 1024)  # 540 KB before slimming
+  # Arrays must reach plotly as numbers (pre-serialised JSON arrived as one string)
+  expect_true(all(vapply(p$x$data, \(t) is.numeric(t$y), logical(1))))
 })

@@ -218,24 +218,44 @@ workspace_server <- function(id, project) {
     })
 
     # ---- data for the selected sample ----
-    sample_data <- shiny::reactive({
+    # The project object changes with every edit (a comment, a flag), but the
+    # plot only depends on a few of its values. These keys change only when
+    # those values do, so unrelated edits don't recompute or redraw the plot.
+    # (A reactiveVal ignores being set to an identical value.)
+    data_key <- shiny::reactiveVal(NULL)
+    shiny::observe({
       p <- project()
       row <- sample_row()
+      s <- sample_settings(p, row$sample_id)
+      data_key(list(
+        sample_id = row$sample_id, md5 = row$md5,
+        import = import_values(s$import), reduction = s$reduction,
+        run_speed = s$sample$run_speed_um_s,
+        edits = as.list(row[c("trim_start_s", "trim_end_s", "reverse", "rezero",
+                              "cp_enabled", "cp_method", "cp_penalty")])
+      ))
+    })
+    regions_key <- shiny::reactiveVal(NULL)
+    shiny::observe({
+      p <- project()
+      id <- current()
+      shiny::req(p, id)
+      regions_key(dplyr::filter(p$regions, .data$sample_id == !!id))
+    })
+
+    sample_data <- shiny::reactive({
+      key <- shiny::req(data_key())
+      p <- shiny::isolate(project())
       shiny::withProgress(message = "Reducing", value = 0.5, {
-        data <- project_data(p, row$sample_id)
+        data <- project_data(p, key$sample_id)
       })
-      if (row$cp_enabled && nrow(data) > 2) {
-        data <- try_notify(find_changepoints(data, row$cp_method, row$cp_penalty)) %||% data
+      if (key$edits$cp_enabled && nrow(data) > 2) {
+        data <- try_notify(find_changepoints(data, key$edits$cp_method, key$edits$cp_penalty)) %||% data
       }
       data
     })
 
-    sample_regions <- shiny::reactive({
-      p <- project()
-      id <- current()
-      shiny::req(p, id)
-      dplyr::filter(p$regions, .data$sample_id == !!id)
-    })
+    sample_regions <- shiny::reactive(shiny::req(regions_key()))
 
     run_speed <- shiny::reactive({
       shiny::req(project(), current())
@@ -250,11 +270,29 @@ workspace_server <- function(id, project) {
     # Selection events can only be read once the plot exists (plotly warns
     # otherwise), so note when it has been drawn.
     plot_ready <- shiny::reactiveVal(FALSE)
+    # Only the signal strips change the plot layout; the other display
+    # options are switched in the browser (see below) without a rebuild.
+    show_strips <- shiny::reactiveVal(TRUE)
+    shiny::observe(show_strips("strips" %in% input$show))
+    toggle_idx <- shiny::reactiveVal(integer())
+    plot_renders <- shiny::reactiveVal(0L)  # counted for tests
+
     output$plot <- plotly::renderPlotly({
-      p <- profile_plot(sample_data(), sample_regions(), show = input$show, source = ns("profile"))
+      show <- union(setdiff(shiny::isolate(input$show), "strips"), if (show_strips()) "strips")
+      p <- profile_plot(sample_data(), sample_regions(), show = show, source = ns("profile"))
+      toggle_idx(toggle_trace_indices(p))
+      plot_renders(shiny::isolate(plot_renders()) + 1L)
       plot_ready(TRUE)
       p
     })
+
+    shiny::observeEvent(input$show, {
+      idx <- toggle_idx()
+      if (length(idx) == 0) return()
+      visible <- lapply(names(idx), \(option) if (option %in% input$show) TRUE else "legendonly")
+      plotly::plotlyProxy("plot", session) |>
+        plotly::plotlyProxyInvoke("restyle", list(visible = visible), unname(idx))
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
 
     output$reduction_warnings <- shiny::renderUI({
       w <- attr(sample_data(), "warnings")
