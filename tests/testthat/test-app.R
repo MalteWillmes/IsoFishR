@@ -207,3 +207,47 @@ test_that("plot data is slimmed for the browser", {
   # Arrays must reach plotly as numbers (pre-serialised JSON arrived as one string)
   expect_true(all(vapply(p$x$data, \(t) is.numeric(t$y), logical(1))))
 })
+
+test_that("calibration page assigns run types and sets up the correction", {
+  runs <- data.frame(id = c("RM1", "fish1", "RM2"), minute = c(0, 20, 40),
+                     ratio = c(0.70918 * 1.0002, 0.7105, 0.70918 * 1.0004))
+  p <- synthetic_project(runs)
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(calibration_server, args = list(project = rv), {
+    session$setInputs(rm_name = "MMC", rm_value = 0.70918, rm_unc = 0.00002, rm_note = "", rm_save = 1)
+    expect_equal(rv()$reference_materials$name, "MMC")
+
+    # Rows 1 and 3 in acquisition order are the standards
+    session$setInputs(runs_rows_selected = c(1, 3), assign_type = "rm:MMC", assign = 1)
+    expect_equal(rv()$samples$run_type, c("reference", "sample", "reference"))
+
+    session$setInputs(primary = "MMC")
+    expect_equal(rv()$settings$calibration$primary, "MMC")
+    session$setInputs(fit = "step")
+    expect_equal(rv()$settings$calibration$fit, "step")
+    expect_equal(nrow(model()$points), 2)
+
+    session$setInputs(runs_rows_selected = 2, session_name = "Afternoon", session_set = 1)
+    expect_equal(rv()$samples$session[2], "Afternoon")
+    session$setInputs(session_auto = 1)
+    expect_equal(rv()$samples$session[2], "")
+  })
+  d <- project_data(shiny::isolate(rv()))
+  expect_equal(unique(d$correction_status[d$sample_id == "fish1"]), "corrected")
+})
+
+test_that("the workspace plot follows changes to the calibration", {
+  runs <- data.frame(id = c("RM1", "fish1"), minute = c(0, 20), ratio = c(0.70918 * 1.001, 0.71))
+  p <- synthetic_project(runs)
+  p <- set_reference_material(p, "MMC", 0.70918)
+  p <- set_run_type(p, "RM1", "reference", "MMC")
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    session$setInputs(samples_rows_selected = 2, show = c("points", "smooth", "strips"))
+    before <- mean(sample_data()$sr87_sr86, na.rm = TRUE)
+    expect_equal(before, 0.71, tolerance = 1e-9)
+    rv(update_project_settings(rv(), list(calibration = list(primary = "MMC"))))
+    session$flushReact()
+    expect_equal(mean(sample_data()$sr87_sr86, na.rm = TRUE), 0.71 / 1.001, tolerance = 1e-7)
+  })
+})

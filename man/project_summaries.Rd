@@ -46,4 +46,9 @@ individual 87Sr/86Sr points (outliers removed). Smoothed values are
 autocorrelated, so their standard error would understate the
 uncertainty; the mean of the smoothed values is reported alongside as
 \code{mean_smoothed}.
+
+When a primary reference material is set (see \code{\link[=calibration_model]{calibration_model()}}),
+all 87Sr/86Sr values are corrected, and the tables add
+\code{mean_uncorrected}, \code{correction_factor}, \code{correction_status} and
+\code{se_combined}: the SE combined with the uncertainty of the correction.
 }

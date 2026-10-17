@@ -150,6 +150,9 @@ workspace_server <- function(id, project) {
       s <- shiny::req(project())$samples
       tibble::tibble(
         Sample = s$sample_id,
+        Type = dplyr::case_when(s$run_type == "baseline" ~ "Baseline",
+                                s$run_type == "reference" ~ s$reference_material,
+                                .default = ""),
         Status = unname(STATUS_LABELS[s$status]),
         Flag = ifelse(s$flag, "\u2691", ""),
         Comment = substr(s$comment, 1, 40)
@@ -232,7 +235,8 @@ workspace_server <- function(id, project) {
         import = import_values(s$import), reduction = s$reduction,
         run_speed = s$sample$run_speed_um_s,
         edits = as.list(row[c("trim_start_s", "trim_end_s", "reverse", "rezero",
-                              "cp_enabled", "cp_method", "cp_penalty")])
+                              "cp_enabled", "cp_method", "cp_penalty")]),
+        calibration = calibration_inputs(p)
       ))
     })
     regions_key <- shiny::reactiveVal(NULL)
@@ -279,7 +283,16 @@ workspace_server <- function(id, project) {
 
     output$plot <- plotly::renderPlotly({
       show <- union(setdiff(shiny::isolate(input$show), "strips"), if (show_strips()) "strips")
-      p <- profile_plot(sample_data(), sample_regions(), show = show, source = ns("profile"))
+      d <- sample_data()
+      shiny::validate(shiny::need(
+        nrow(d) > 0,
+        if (shiny::isolate(sample_row())$run_type == "baseline") {
+          "This is a baseline run: it is used for blank correction and has no 87Sr/86Sr profile."
+        } else {
+          "No data points pass the 88Sr thresholds; check the reduction settings."
+        }
+      ))
+      p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"))
       toggle_idx(toggle_trace_indices(p))
       plot_renders(shiny::isolate(plot_renders()) + 1L)
       plot_ready(TRUE)
@@ -525,9 +538,15 @@ workspace_server <- function(id, project) {
 
     output$sample_info <- shiny::renderTable({
       row <- sample_row()
+      runs <- project_runs(project())
+      run <- runs[runs$sample_id == row$sample_id, ]
+      type <- switch(row$run_type, baseline = "Baseline",
+                     reference = paste0(row$reference_material, " (", run$rm_role, ")"), "Sample")
       data.frame(
-        Field = c("Original file", "Added", "Added by", "Stored as", "MD5"),
-        Value = c(row$source, row$added, row$added_by, row$runfile, substr(row$md5, 1, 12))
+        Field = c("Type", "Acquired", "Session", "Original file", "Added", "Added by",
+                  "Stored as", "MD5"),
+        Value = c(type, row$acquired, run$session, row$source, row$added, row$added_by,
+                  row$runfile, substr(row$md5, 1, 12))
       )
     }, colnames = FALSE, width = "100%", spacing = "xs")
 

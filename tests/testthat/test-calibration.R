@@ -63,6 +63,9 @@ test_that("secondary reference materials report their accuracy", {
 
   s <- summarise_reference_materials(p)
   expect_equal(s$runs[s$reference_material == "MMC"], 3)
+  r_mmc <- r$mean[r$reference_material == "MMC"]
+  expect_equal(s$sd2[s$reference_material == "MMC"], 2 * stats::sd(r_mmc))
+  expect_false(is.na(s$sd2[s$reference_material == "MMC"]))
   expect_equal(s$role[s$reference_material == "SEC"], "secondary")
 })
 
@@ -160,4 +163,38 @@ test_that("reference materials are validated and logged", {
   expect_match(log$new[2], "0.709175")
   rt <- dplyr::filter(read_log(p), action == "run_type")
   expect_setequal(rt$sample_id, c("RM1", "RM2", "RM3", "SEC1"))
+})
+
+test_that("exports carry corrected values, the correction and the QC tables", {
+  p <- bracketed_project()
+  p <- set_regions(p, "fish2", data.frame(region = "all", start_s = 0, end_s = 100))
+  dir <- export_project(p)
+  files <- list.files(dir)
+  expect_true(all(c("runs.csv", "reference_materials.csv", "reference_material_summary.csv")
+                  %in% files))
+  read <- function(f) readr::read_csv(file.path(dir, f), show_col_types = FALSE, guess_max = Inf)
+
+  s <- read("samples.csv")
+  fish2 <- s[s$sample_id == "fish2", ]
+  expect_equal(fish2$mean, 0.705, tolerance = 1e-6)
+  expect_equal(fish2$mean_uncorrected, drifted(0.705, 55), tolerance = 1e-6)
+  expect_equal(fish2$correction_status, "corrected")
+  expect_gt(fish2$se_combined, fish2$se)
+  expect_equal(fish2$session, "S1 2024-05-02")
+  expect_equal(s$run_type[s$sample_id == "RM1"], "reference")
+
+  r <- read("regions.csv")
+  expect_equal(r$mean, 0.705, tolerance = 1e-6)
+  expect_true(all(c("mean_uncorrected", "se_combined", "correction_factor") %in% names(r)))
+
+  pr <- read("profiles.csv")
+  expect_true(all(c("sr87_sr86_uncorrected", "correction_factor") %in% names(pr)))
+
+  runs <- read("runs.csv")
+  expect_equal(runs$sample_id, c("RM1", "fish1", "SEC1", "RM2", "fish2", "RM3"))
+
+  qc <- read("reference_materials.csv")
+  expect_true(qc$within_uncertainty[qc$sample_id == "SEC1"])
+  settings <- read("settings.csv")
+  expect_equal(unique(settings$calibration.primary), "MMC")
 })

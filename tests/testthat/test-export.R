@@ -61,7 +61,7 @@ test_that("export_project writes the summaries to a new folder and logs it", {
   p <- export_fixture()
   dir <- export_project(p)
   expect_setequal(list.files(dir),
-                  c("samples.csv", "regions.csv", "changepoints.csv", "settings.csv", "profiles.csv",
+                  c("samples.csv", "regions.csv", "changepoints.csv", "settings.csv", "profiles.csv", "runs.csv",
                     "export_info.yml"))
   info <- yaml::read_yaml(file.path(dir, "export_info.yml"))
   expect_equal(info$exported_by, "tester")

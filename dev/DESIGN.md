@@ -73,6 +73,25 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - **Not done:** plotly's partial bundles (they need to be downloaded at run time, and the app runs locally anyway).
 - **Don't pre-serialise data arrays as JSON:** Shiny sends them as a single string and plotly draws one point.
 
+## Reference material correction (Iolite-style)
+- **Sequence:** acquisition time per run, read from the runfile header (import `timestamp_line` and `timestamp_format`; Nu_UCDavis: line 45, `%m/%d/%Y %I:%M:%S %p`). Parsed in the C locale and treated as UTC, so DST never reorders runs. Stored in `samples.csv` as `acquired`, and re-read when the timestamp settings change.
+- **Run types** (`samples.csv`): `run_type` is `sample`, `baseline` or `reference`, plus `reference_material`. Reference materials are listed in `reference_materials.csv` (name, value, uncertainty_2s, note). `calibration.primary` names the primary; all others are secondary.
+- **Sessions:** a new session starts after a gap of more than `calibration.session_gap_h` (default 6 h). `samples.csv$session` overrides this per run. Baselines and corrections are never interpolated across sessions.
+- **Baseline:** `calibration.baseline` is `per_run` (the run's own blank, as before) or `baseline_runs`. In the latter, the blank is the mean voltages of the session's baseline runs (after trims), interpolated linearly to each run's start time and held constant outside the bracketing runs. Without baseline runs in the session, the run falls back to its own blank with a warning.
+- **Correction:** each primary run gives measured = mean of its points (trims applied, outliers removed, uncorrected) at its midpoint time, and factor = accepted / measured. The factor is fitted per session with `calibration.fit`:
+  - `linear`: approx, held constant at the ends.
+  - `spline`: smooth.spline, needs 4 or more runs, otherwise linear with a note.
+  - `step`: the previous primary run.
+  - `mean`: the session mean.
+
+  The factor is evaluated at every point's own time (acquired + time_s) and multiplies all 87Sr/86Sr columns. Uncorrected values stay in `sr87_sr86_uncorrected`.
+- **Uncertainty** (relative, 1σ): the primary runs' SE/mean propagated through the interpolation weights (`linear`), that of the run used (`step`), sd/√n (`mean`), or residual-based (`spline`). The accepted value's uncertainty is added in quadrature. Reported as `correction_u_rel` (data) and `se_combined` = √(se² + (mean·u)²) (summaries).
+- **QC:** `reference_material_results()` gives each standard run's measured and corrected mean and deviation in ppm. Within uncertainty means |dev| ≤ √((2·se_combined)² + accepted_2s²). `summarise_reference_materials()` gives per RM and session the runs, mean, 2 SD and deviation.
+- **Off by default:** with no primary set and per-run baselines, `project_data()` returns exactly the previous columns.
+- **App:**
+  - **Calibration page:** reference material editor; primary, fit, baseline and session-gap settings; the Runs table (multi-select, set type or session; the selection clears after each change because row clicks toggle); the correction plot; and the results tables.
+  - **Workspace:** the plot's data key includes `calibration_inputs()`, so the plot follows calibration changes without recomputing on unrelated edits.
+
 ## Instrument import presets
 A preset is a named runfile layout: header/footer lines, separator, and which column holds each mass and the time.
 - **Built-in:** `Nu_UCDavis` (`inst/presets/Nu_UCDavis.yml`) is the default and matches `default_settings()$import`. Built-in presets cannot be overwritten or deleted.
@@ -119,6 +138,9 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 | `R/app-utils.R` | Folder dialog, recent projects, error notifications |
 | `R/export.R` | Summary tables and `export_project()` |
 | `R/app-export.R` | Export page |
+| `R/runs.R` | Run sequence, sessions, run types, reference material table, acquisition times |
+| `R/calibration.R` | Baseline runs, correction model and application, reference material results |
+| `R/app-calibration.R` | Calibration page and `correction_plot()` |
 | `R/presets.R` | Instrument import presets (`inst/presets/` holds the built-in ones) |
 
 ## v1 bugs fixed (each has a regression test)

@@ -169,6 +169,27 @@ correction_at <- function(model, session, t) {
   list(factor = f, u_rel = sqrt(u^2 + u_rm^2), status = status)
 }
 
+# Everything the correction or baseline of any run depends on, without
+# computing it: used by the app to tell when a plotted run needs to be
+# recomputed. NULL when neither a primary reference material nor baseline
+# runs are in use.
+calibration_inputs <- function(project) {
+  cal <- project$settings$calibration
+  if (!nzchar(cal$primary) && cal$baseline == "per_run") return(NULL)
+  runs <- project_runs(project)
+  standards <- runs$sample_id[runs$run_type %in% c("reference", "baseline")]
+  list(
+    calibration = cal,
+    reference_materials = project$reference_materials,
+    runs = runs[, c("sample_id", "run_type", "reference_material", "session", "acquired")],
+    standards = project$samples[project$samples$sample_id %in% standards,
+                                c("sample_id", "md5", "settings", "trim_start_s", "trim_end_s",
+                                  "status")],
+    reduction = project$settings$reduction,
+    import = import_values(project$settings$import)
+  )
+}
+
 # 87Sr/86Sr columns that the correction factor applies to.
 RATIO_COLUMNS <- c("sr87_sr86", "sr87_sr86_outlier", "sr87_sr86_value", "sr87_sr86_ma",
                    "sr87_sr86_ma_sd", "sr87_sr86_ma_se", "sr87_sr86_ma_ci95_low",
@@ -263,8 +284,9 @@ summarise_reference_materials <- function(project) {
     dplyr::summarise(
       role = dplyr::first(.data$role),
       runs = dplyr::n(),
-      mean = mean(.data$mean),
+      # Before `mean` is redefined below as the summary value
       sd2 = if (dplyr::n() > 1) 2 * stats::sd(.data$mean) else NA_real_,
+      mean = mean(.data$mean),
       accepted = dplyr::first(.data$accepted),
       deviation_ppm = (mean(.data$mean) / dplyr::first(.data$accepted) - 1) * 1e6,
       runs_within_uncertainty = sum(.data$within_uncertainty),

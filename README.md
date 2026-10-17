@@ -43,14 +43,35 @@ Everything is saved as you work. Close the app at any time, then reopen the proj
 3. **Set the reduction defaults** under **Project settings**: run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing.
 4. **Add runfiles** in the Workspace. You can add more at any time, for example after the next session at the instrument.
 
+### Reference materials and drift correction
+
+IsoFishR can correct samples to a reference material measured during the session, in the style of Iolite. Set this up on the **Calibration** page:
+
+1. **Define the reference materials** with their accepted <sup>87</sup>Sr/<sup>86</sup>Sr and ± 2σ.
+2. **Mark the runs.** The Runs tab lists all runs in acquisition order, read from the runfile timestamps. Select runs and set them to *Sample*, *Baseline* or a reference material.
+3. **Choose the primary reference material.** Its runs are used for the correction; all other reference materials are secondary and serve as accuracy checks.
+4. **Choose how the correction follows time:**
+   - linear between the bracketing standards (default)
+   - smoothing spline
+   - step forward
+   - session mean
+5. **Optionally use baseline runs** (gas blanks between analyses) instead of the blank at the start of each run. They are interpolated in time to each run.
+
+**How the correction is applied.** The factor *accepted / measured* of the primary runs is fitted through time within each analytical session. A session starts automatically after a gap of more than 6 hours, and runs can be moved to another session by hand. The factor is applied to every point of every sample at the time that point was measured.
+
+**What is reported.** Each sample keeps its own SE. The uncertainty of the correction, from the primary measurements and the accepted value's uncertainty, is reported separately and in a combined SE. The **Correction** tab plots the primary factors with the fitted curve and the secondary deviations in ppm. **Reference material results** lists every standard run with its deviation from the accepted value.
+
+Without a primary reference material, values are left uncorrected, exactly as before.
+
 ### What is in a project folder
 
 ```
 MyProject/
   project.yml   project settings, including the import preset
   raw/          copies of the original runfiles (never changed)
-  samples.csv   per sample: status, flag, comment, trims, setting overrides
+  samples.csv   per run: type, acquisition time, session, status, flag, comment, trims, setting overrides
   regions.csv   regions per sample
+  reference_materials.csv   reference materials with accepted values
   log.csv       every change: when, who, what, old and new value
   cache/        reduced data (safe to delete; rebuilt automatically)
   exports/      one dated folder per export
@@ -65,10 +86,13 @@ Each export creates `exports/<date_time>/` containing:
 | File | Contents |
 |---|---|
 | `profiles.csv` | Every point of every profile in one table: distance, time, <sup>87</sup>Sr/<sup>86</sup>Sr, smoothed value and SE, region, changepoint segment, and signal intensities |
-| `samples.csv` | One row per sample: status, comment, edits, profile mean, SD and SE |
+| `samples.csv` | One row per sample: type, session, status, comment, edits, profile mean, SD and SE (and, when corrected, the uncorrected mean, correction factor and combined SE) |
 | `regions.csv` | One row per sample and region: mean, SD, n, SE, distance range |
 | `changepoints.csv` | One row per changepoint segment |
-| `settings.csv` | Every setting each sample was reduced with |
+| `runs.csv` | All runs in acquisition order with type and session |
+| `reference_materials.csv` | Every reference material run: measured and corrected mean, deviation from the accepted value (ppm), whether it is within uncertainty |
+| `reference_material_summary.csv` | Per reference material and session: runs, mean, 2 SD, deviation |
+| `settings.csv` | Every setting each sample was reduced with, including the calibration |
 | `export_info.yml` | Date, user, IsoFishR version |
 
 ## Using IsoFishR from R code

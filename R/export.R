@@ -16,6 +16,11 @@
 #' uncertainty; the mean of the smoothed values is reported alongside as
 #' `mean_smoothed`.
 #'
+#' When a primary reference material is set (see [calibration_model()]),
+#' all 87Sr/86Sr values are corrected, and the tables add
+#' `mean_uncorrected`, `correction_factor`, `correction_status` and
+#' `se_combined`: the SE combined with the uncertainty of the correction.
+#'
 #' @param project A project from [open_project()].
 #' @param data Reduced and edited data from [project_data()]; computed if
 #'   not supplied.
@@ -47,15 +52,20 @@ summarise_project_samples <- function(project, data = NULL, include_excluded = F
   cp <- summarise_project_changepoints(project, data, include_excluded) |>
     dplyr::count(sample_id, name = "n_cp_segments")
 
+  runs <- project_runs(project)
   samples |>
+    dplyr::left_join(dplyr::select(runs, "sample_id", "session", acquired_at = "acquired"),
+                     by = "sample_id") |>
     dplyr::transmute(
-      sample_id, source = .data$source, status = .data$status, flag = .data$flag,
+      sample_id, source = .data$source, run_type = .data$run_type,
+      reference_material = .data$reference_material, session = .data$session.y,
+      acquired = .data$acquired, status = .data$status, flag = .data$flag,
       comment = .data$comment, added = .data$added, added_by = .data$added_by,
       trim_start_um = .data$trim_start_s * speed, trim_end_um = .data$trim_end_s * speed,
       reverse = .data$reverse,
       setting_overrides = .data$settings
     ) |>
-    dplyr::left_join(stats, by = "sample_id") |>
+    dplyr::left_join(add_correction(stats, data), by = "sample_id") |>
     dplyr::left_join(n_regions, by = "sample_id") |>
     dplyr::left_join(cp, by = "sample_id") |>
     dplyr::mutate(dplyr::across(c("n_regions", "n_cp_segments"), \(x) dplyr::coalesce(x, 0L))) |>
@@ -80,7 +90,7 @@ summarise_project_regions <- function(project, data = NULL, include_excluded = F
 
   regions |>
     dplyr::select("sample_id", "region", "start_s", "end_s") |>
-    dplyr::left_join(points, by = c("sample_id", "region")) |>
+    dplyr::left_join(add_correction(points, data), by = c("sample_id", "region")) |>
     dplyr::left_join(smoothed, by = c("sample_id", "region")) |>
     dplyr::relocate("start_s", "end_s", .after = dplyr::last_col()) |>
     dplyr::relocate("mean_smoothed", .after = "se")
@@ -112,6 +122,7 @@ summarise_project_changepoints <- function(project, data = NULL, include_exclude
         distance_max_um = max(distance_um),
         .by = c(sample_id, segment)
       ) |>
+      add_correction(d) |>
       dplyr::mutate(method = cp_method, penalty = cp_penalty)
   }) |>
     purrr::list_rbind() |>
@@ -124,7 +135,8 @@ project_settings_table <- function(project, include_excluded = FALSE) {
   samples <- export_samples(project, include_excluded)
   purrr::map(samples$sample_id, \(id) {
     s <- sample_settings(project, id)
-    flat <- flatten_settings(list(reduction = s$reduction, sample = s$sample, import = s$import))
+    flat <- flatten_settings(list(reduction = s$reduction, sample = s$sample, import = s$import,
+                                  calibration = s$calibration))
     tibble::tibble(sample_id = id, !!!as.list(flat))
   }) |>
     purrr::list_rbind()
@@ -177,7 +189,7 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
     dplyr::inner_join(regions, by = dplyr::join_by(sample_id, dplyr::between(time_s, start_s, end_s))) |>
     dplyr::summarise(region = paste(region, collapse = "; "), .by = c(sample_id, time_s))
 
-  data |>
+  out <- data |>
     dplyr::mutate(.spline_se = spline_se) |>
     dplyr::left_join(smoothing, by = "sample_id") |>
     dplyr::left_join(point_regions, by = c("sample_id", "time_s")) |>
@@ -203,6 +215,13 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
       rb85_sr88 = .data$rb85_sr88,
       sr84_sr86
     )
+  # The joins above keep the row order of `data`.
+  if ("correction_factor" %in% names(data)) {
+    out <- tibble::add_column(out, sr87_sr86_uncorrected = data$sr87_sr86_uncorrected,
+                              correction_factor = data$correction_factor,
+                              .after = "sr87_sr86_outlier")
+  }
+  out
 }
 
 #' Export project summaries
@@ -217,6 +236,11 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
 #' * `changepoints.csv`: [summarise_project_changepoints()]
 #' * `settings.csv`: [project_settings_table()]
 #' * `profiles.csv`: [project_profiles()], every point of every profile
+#' * `runs.csv`: [project_runs()], all runs in acquisition order with type
+#'   and session
+#' * `reference_materials.csv` and `reference_material_summary.csv` (when
+#'   the project has reference material runs):
+#'   [reference_material_results()] and [summarise_reference_materials()]
 #' * `data.csv` (only with `include_data = TRUE`): all reduction columns per
 #'   point (raw voltages, mass bias, intermediate ratios), for checking the
 #'   reduction itself.
@@ -240,8 +264,14 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
     regions = summarise_project_regions(project, data, include_excluded),
     changepoints = summarise_project_changepoints(project, data, include_excluded),
     settings = project_settings_table(project, include_excluded),
-    profiles = project_profiles(project, data, include_excluded)
+    profiles = project_profiles(project, data, include_excluded),
+    runs = dplyr::mutate(project_runs(project), acquired = format_time(.data$acquired))
   )
+  if (any(project$samples$run_type == "reference")) {
+    tables$reference_materials <- reference_material_results(project) |>
+      dplyr::mutate(acquired = format_time(.data$acquired))
+    tables$reference_material_summary <- summarise_reference_materials(project)
+  }
   tables <- purrr::map(tables, round_summary)
   if (include_data) tables$data <- data
   purrr::iwalk(tables, \(x, name) write_table_file(x, file.path(dir, paste0(name, ".csv"))))
@@ -268,16 +298,46 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
 round_summary <- function(x) {
   x |>
     dplyr::mutate(
-      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "sr87_sr86", "sr87_sr86_outlier",
-                                    "sr87_sr86_smoothed", "cp_mean", "sr84_sr86")), \(v) round(v, 6)),
-      dplyr::across(dplyr::any_of(c("sd", "se", "sr87_sr86_smoothed_se", "rb85_sr88", "kr83_v")),
+      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "mean_uncorrected", "sr87_sr86",
+                                    "sr87_sr86_outlier", "sr87_sr86_uncorrected",
+                                    "sr87_sr86_smoothed", "cp_mean", "sr84_sr86", "measured",
+                                    "accepted")), \(v) round(v, 6)),
+      dplyr::across(dplyr::any_of(c("sd", "sd2", "se", "se_combined", "sr87_sr86_smoothed_se",
+                                    "rb85_sr88", "kr83_v", "deviation", "accepted_2s")),
                     \(v) round(v, 7)),
+      dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),
+      dplyr::across(dplyr::any_of("deviation_ppm"), \(v) round(v, 1)),
       dplyr::across(dplyr::any_of("total_sr_v"), \(v) round(v, 5)),
       dplyr::across(dplyr::matches("_um$|_s$") & dplyr::where(is.double), \(v) round(v, 1))
     )
 }
 
+# Runs that have data to summarise: not baseline runs, and not excluded
+# unless asked for.
 export_samples <- function(project, include_excluded) {
-  s <- project$samples
+  s <- dplyr::filter(project$samples, .data$run_type != "baseline")
   if (include_excluded) s else dplyr::filter(s, .data$status != "excluded")
+}
+
+# Add the reference material correction to a per-sample summary table (with
+# `sample_id`, `mean` and `se`): the uncorrected mean, the mean correction
+# factor, its status, and the SE combined with the correction uncertainty.
+# Tables are returned unchanged when the correction is off.
+add_correction <- function(tbl, data) {
+  if (!"correction_factor" %in% names(data)) return(tbl)
+  info <- data |>
+    dplyr::summarise(
+      correction_factor = mean(.data$correction_factor, na.rm = TRUE),
+      correction_u_rel = dplyr::first(.data$correction_u_rel),
+      correction_status = dplyr::first(.data$correction_status),
+      .by = sample_id
+    )
+  tbl |>
+    dplyr::left_join(info, by = "sample_id") |>
+    dplyr::mutate(
+      mean_uncorrected = .data$mean / dplyr::coalesce(.data$correction_factor, 1),
+      se_combined = sqrt(.data$se^2 + (.data$mean * dplyr::coalesce(.data$correction_u_rel, 0))^2),
+      .after = "se"
+    ) |>
+    dplyr::select(-"correction_u_rel")
 }

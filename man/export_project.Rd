@@ -29,6 +29,11 @@ Files written:
 \item \code{changepoints.csv}: \code{\link[=summarise_project_changepoints]{summarise_project_changepoints()}}
 \item \code{settings.csv}: \code{\link[=project_settings_table]{project_settings_table()}}
 \item \code{profiles.csv}: \code{\link[=project_profiles]{project_profiles()}}, every point of every profile
+\item \code{runs.csv}: \code{\link[=project_runs]{project_runs()}}, all runs in acquisition order with type
+and session
+\item \code{reference_materials.csv} and \code{reference_material_summary.csv} (when
+the project has reference material runs):
+\code{\link[=reference_material_results]{reference_material_results()}} and \code{\link[=summarise_reference_materials]{summarise_reference_materials()}}
 \item \code{data.csv} (only with \code{include_data = TRUE}): all reduction columns per
 point (raw voltages, mass bias, intermediate ratios), for checking the
 reduction itself.
