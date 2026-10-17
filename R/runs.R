@@ -28,12 +28,14 @@ project_runs <- function(project) {
     dplyr::mutate(sequence = dplyr::row_number(), .before = 1)
 
   t <- runs$acquired
-  gap <- c(TRUE, as.numeric(diff(t), units = "hours") > gap_h)
+  gap <- c(TRUE, as.numeric(diff(t), units = "hours") > gap_h)[seq_along(t)]
   gap[is.na(gap)] <- FALSE
   idx <- cumsum(gap)
   first <- t[match(idx, idx)]
-  runs$session_auto <- ifelse(is.na(t), "No timestamp",
-                              sprintf("S%d %s", idx, format(first, "%Y-%m-%d", tz = "UTC")))
+  # as.character(): for a project without runs ifelse() returns logical(0)
+  runs$session_auto <- as.character(ifelse(
+    is.na(t), "No timestamp", sprintf("S%d %s", idx, format(first, "%Y-%m-%d", tz = "UTC"))
+  ))
   runs |>
     dplyr::mutate(
       session = dplyr::if_else(nzchar(.data$session_override), .data$session_override,

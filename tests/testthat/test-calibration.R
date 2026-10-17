@@ -198,3 +198,20 @@ test_that("exports carry corrected values, the correction and the QC tables", {
   settings <- read("settings.csv")
   expect_equal(unique(settings$calibration.primary), "MMC")
 })
+
+test_that("a project without runs works with the calibration functions", {
+  # Regression: project_runs() failed on an empty project, which crashed the
+  # app right after creating a project.
+  path <- file.path(withr::local_tempdir(), "Empty")
+  p <- create_project(path, user = "tester")
+  on.exit(close_project(p))
+  runs <- project_runs(p)
+  expect_equal(nrow(runs), 0)
+  expect_type(runs$session, "character")
+  expect_equal(nrow(project_baselines(p)), 0)
+  expect_equal(nrow(reference_material_results(p)), 0)
+  p <- set_reference_material(p, "MMC", 0.70918)
+  p <- update_project_settings(p, list(calibration = list(primary = "MMC", baseline = "baseline_runs")))
+  expect_equal(nrow(calibration_model(p)$points), 0)
+  expect_equal(nrow(project_runs(p)), 0)
+})

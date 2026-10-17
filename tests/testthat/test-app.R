@@ -251,3 +251,22 @@ test_that("Quit releases the project lock and closes the project", {
     expect_false(file.exists(file.path(path, ".lock")))
   })
 })
+
+test_that("creating a project from the start screen opens it", {
+  # Regression: the new, empty project crashed the session (grey screen).
+  parent <- withr::local_tempdir()
+  shiny::testServer(app_server(user = "tester"), {
+    session$setInputs(user_name = "tester", create_parent = parent, create_name = "New",
+                      create_preset = "Nu_UCDavis", create = 1)
+    expect_equal(project()$meta$name, "New")
+    expect_equal(nrow(project()$samples), 0)
+    close_project(project())
+  })
+  shiny::testServer(calibration_server,
+                    args = list(project = shiny::reactiveVal(open_project(file.path(parent, "New"),
+                                                                          user = "tester"))), {
+    session$flushReact()
+    expect_equal(nrow(runs_table()), 0)
+    close_project(project())
+  })
+})
