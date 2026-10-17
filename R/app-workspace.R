@@ -247,8 +247,13 @@ workspace_server <- function(id, project) {
       paste0(row$sample_id, if (row$status == "excluded") " (excluded)")
     })
 
+    # Selection events can only be read once the plot exists (plotly warns
+    # otherwise), so note when it has been drawn.
+    plot_ready <- shiny::reactiveVal(FALSE)
     output$plot <- plotly::renderPlotly({
-      profile_plot(sample_data(), sample_regions(), show = input$show, source = ns("profile"))
+      p <- profile_plot(sample_data(), sample_regions(), show = input$show, source = ns("profile"))
+      plot_ready(TRUE)
+      p
     })
 
     output$reduction_warnings <- shiny::renderUI({
@@ -259,10 +264,10 @@ workspace_server <- function(id, project) {
 
     # ---- plot selection ----
     shiny::observeEvent(current(), selection(NULL))
-    # plotly warns if this runs before the plot exists; that is expected here.
-    brushed <- shiny::reactive(suppressWarnings(
+    brushed <- shiny::reactive({
+      shiny::req(plot_ready())
       plotly::event_data("plotly_brushed", source = ns("profile"))
-    ))
+    })
     shiny::observeEvent(brushed(), {
       b <- brushed()
       selection(if (is.null(b$x)) NULL else sort(b$x))

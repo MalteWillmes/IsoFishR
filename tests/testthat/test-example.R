@@ -1,0 +1,10 @@
+test_that("the example project contains all example runfiles and reduces", {
+  p <- create_example_project(user = "tester")
+  on.exit(close_project(p))
+  expect_equal(nrow(p$samples), 6)
+  expect_equal(p$settings$sample$run_speed_um_s, 5)
+  expect_equal(p$settings$import$preset, "Nu_UCDavis")
+  s <- summarise_project_samples(p)
+  expect_true(all(s$n_points > 100))
+  expect_true(startsWith(p$path, normalizePath(tempdir(), winslash = "/")))
+})

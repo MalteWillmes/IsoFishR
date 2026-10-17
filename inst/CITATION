@@ -1,0 +1,18 @@
+bibentry(
+  bibtype = "Article",
+  title = "IsoFishR: An application for reproducible data reduction and analysis of strontium isotope ratios (87Sr/86Sr) obtained via laser-ablation MC-ICP-MS",
+  author = c(
+    person("Malte", "Willmes"),
+    person(c("Katherine", "M."), "Ransom"),
+    person(c("Levi", "S."), "Lewis"),
+    person(c("Christian", "T."), "Denney"),
+    person(c("Justin", "J.", "G."), "Glessner"),
+    person(c("James", "A."), "Hobbs")
+  ),
+  journal = "PLOS ONE",
+  year = "2018",
+  volume = "13",
+  number = "9",
+  pages = "e0204519",
+  doi = "10.1371/journal.pone.0204519"
+)

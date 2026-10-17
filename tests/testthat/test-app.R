@@ -148,3 +148,17 @@ test_that("settings page loads presets, saves new ones and checks a runfile", {
     expect_equal(rv()$settings$import$preset, "Nu_UCDavis")
   })
 })
+
+test_that("the example button opens a temporary project without adding it to recent projects", {
+  withr::local_options(isofishr.preset_dir = withr::local_tempdir())
+  recent_file <- recent_projects_file()
+  before <- if (file.exists(recent_file)) readLines(recent_file) else character()
+  shiny::testServer(app_server(user = "tester"), {
+    session$setInputs(user_name = "tester", try_example = 1)
+    expect_equal(nrow(project()$samples), 6)
+    expect_false(is.null(open_path()))
+    close_project(project())
+  })
+  after <- if (file.exists(recent_file)) readLines(recent_file) else character()
+  expect_equal(after, before)
+})

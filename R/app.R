@@ -77,7 +77,8 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       }
       old <- shiny::isolate(project())
       if (!is.null(old)) close_project(old)
-      remember_project(p$path)
+      # Temporary (example) projects don't belong in the recent list.
+      if (!startsWith(p$path, normalizePath(tempdir(), winslash = "/"))) remember_project(p$path)
       project(p)
       open_path(p$path)
     }
@@ -113,6 +114,17 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       do_open(input$open_path)
     })
     shiny::observeEvent(input$open_recent, do_open(input$open_recent))
+    shiny::observeEvent(input$try_example, {
+      p <- shiny::withProgress(message = "Creating the example project",
+                               try_notify(create_example_project(user = input$user_name %||% user)))
+      if (!is.null(p)) {
+        close_project(p)
+        do_open(p$path)
+        shiny::showNotification(
+          "This example project is temporary and is deleted when R closes.",
+          type = "message", duration = 8)
+      }
+    })
     shiny::observeEvent(input$create, {
       shiny::req(nzchar(input$create_parent), nzchar(input$create_name))
       path <- file.path(input$create_parent, input$create_name)
@@ -165,6 +177,15 @@ start_screen_ui <- function(user, recent) {
              "Data reduction and analysis of laser-ablation 87Sr/86Sr profiles. ",
              "Projects are folders on your computer; all changes are saved as you work."),
     shiny::textInput("user_name", "Your name (recorded in the project log)", user),
+    shiny::div(
+      class = "alert alert-light border d-flex align-items-center gap-3 flex-wrap",
+      shiny::div(
+        class = "flex-grow-1",
+        shiny::strong("New to IsoFishR?"), " Open a temporary project with six example ",
+        "otolith profiles (Chinook salmon and white seabass) to see how it works."
+      ),
+      shiny::actionButton("try_example", "Try with example data", class = "btn-outline-primary")
+    ),
     bslib::layout_columns(
       col_widths = c(6, 6),
       bslib::card(
