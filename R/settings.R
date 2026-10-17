@@ -20,7 +20,9 @@ default_settings <- function() {
       fluence_j_cm2 = 1.85,
       laser_energy_pct = 55
     ),
+    # The values of the built-in "Nu_UCDavis" preset (inst/presets).
     import = list(
+      preset = "Nu_UCDavis",
       skip_header = 46L,
       skip_footer = 0L,
       sep = ",",
@@ -82,6 +84,7 @@ check_settings <- function(settings) {
     stop("reduction$outlier_sd must be a single number >= 0 (0 turns outlier rejection off).",
          call. = FALSE)
   }
+  check_import(settings$import)
   invisible(settings)
 }
 
@@ -141,6 +144,7 @@ import_v1_settings <- function(path) {
       laser_energy_pct = num(v1$energy)
     ),
     import = list(
+      preset = "",
       skip_header = int(v1$vskip),
       skip_footer = int(v1$fskip),
       sep = sep,

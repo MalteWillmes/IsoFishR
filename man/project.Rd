@@ -7,7 +7,12 @@
 \alias{close_project}
 \title{IsoFishR projects}
 \usage{
-create_project(path, settings = default_settings(), user = default_user())
+create_project(
+  path,
+  settings = default_settings(),
+  user = default_user(),
+  import_preset = NULL
+)
 
 open_project(path, user = default_user(), read_only = FALSE, force = FALSE)
 
@@ -19,6 +24,10 @@ close_project(project)
 \item{settings}{Project settings; defaults to \code{\link[=default_settings]{default_settings()}}.}
 
 \item{user}{Name recorded in the log and the lock file.}
+
+\item{import_preset}{Name of an import preset (see \code{\link[=list_import_presets]{list_import_presets()}})
+whose runfile layout replaces the one in \code{settings}. \code{NULL} keeps
+\code{settings$import} (by default the \code{"Nu_UCDavis"} preset).}
 
 \item{read_only}{Open without taking the lock; changes are refused.}
 

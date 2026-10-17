@@ -113,3 +113,38 @@ test_that("smoothed line uses every point even when outliers were rejected", {
   expect_length(traces[["Data"]]$y, sum(!is.na(d$sr87_sr86)))
   expect_length(traces[["Outliers"]]$y, sum(d$is_outlier))
 })
+
+test_that("settings page loads presets, saves new ones and checks a runfile", {
+  withr::local_options(isofishr.preset_dir = withr::local_tempdir())
+  p <- app_project()
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(project_settings_server, args = list(project = rv), {
+    # The form as rendered for a Nu_UCDavis project
+    s <- p$settings
+    inputs <- list(import_preset = "Nu_UCDavis",
+                   set_import_skip_header = 46, set_import_skip_footer = 0,
+                   set_import_sep = ",", set_import_header = FALSE)
+    for (k in names(s$import$columns)) inputs[[paste0("set_import_col_", k)]] <- s$import$columns[[k]]
+    do.call(session$setInputs, inputs)
+    shown_preset("Nu_UCDavis")
+    expect_true(import_matches_preset(form_import()))
+
+    # Change the layout and save it as a preset
+    session$setInputs(set_import_skip_header = 40, preset_name = "Lab_B",
+                      preset_description = "test", preset_save = 1)
+    expect_true("Lab_B" %in% list_import_presets()$name)
+    expect_equal(get_import_preset("Lab_B")$skip_header, 40L)
+
+    # A runfile that doesn't fit the 40-line header shows a warning or error
+    session$setInputs(check_file = data.frame(name = "a.run", datapath = example_runfiles()[1]))
+    expect_match(paste(as.character(output$check_result$html)), "alert-(warning|danger)")
+
+    # Back to the right layout: the check succeeds
+    session$setInputs(set_import_skip_header = 46)
+    expect_match(paste(as.character(output$check_result$html)), "read 6895 cycles")
+
+    # Saving the project records the preset name
+    session$setInputs(import_preset = "Nu_UCDavis", save = 1)
+    expect_equal(rv()$settings$import$preset, "Nu_UCDavis")
+  })
+})

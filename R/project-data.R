@@ -44,7 +44,7 @@ reduce_project_sample <- function(project, sample_id) {
   settings <- sample_settings(project, sample_id)
   key <- rlang::hash(list(
     md5 = project$samples$md5[i],
-    import = settings$import,
+    import = import_values(settings$import),  # the preset name alone doesn't matter
     reduction = settings$reduction,
     run_speed = settings$sample$run_speed_um_s,
     version = isofishr_version()

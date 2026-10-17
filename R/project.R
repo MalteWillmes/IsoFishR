@@ -27,6 +27,9 @@
 #' @param path Project folder.
 #' @param settings Project settings; defaults to [default_settings()].
 #' @param user Name recorded in the log and the lock file.
+#' @param import_preset Name of an import preset (see [list_import_presets()])
+#'   whose runfile layout replaces the one in `settings`. `NULL` keeps
+#'   `settings$import` (by default the `"Nu_UCDavis"` preset).
 #' @param read_only Open without taking the lock; changes are refused.
 #' @param force Take the lock even if someone else holds it (e.g. after their
 #'   session crashed).
@@ -37,7 +40,9 @@ NULL
 
 #' @rdname project
 #' @export
-create_project <- function(path, settings = default_settings(), user = default_user()) {
+create_project <- function(path, settings = default_settings(), user = default_user(),
+                           import_preset = NULL) {
+  if (!is.null(import_preset)) settings$import <- get_import_preset(import_preset)
   if (file.exists(project_file(path, "project.yml"))) {
     stop("'", path, "' already contains an IsoFishR project. Use open_project().", call. = FALSE)
   }

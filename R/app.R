@@ -116,7 +116,8 @@ app_server <- function(initial_project = NULL, user = default_user()) {
     shiny::observeEvent(input$create, {
       shiny::req(nzchar(input$create_parent), nzchar(input$create_name))
       path <- file.path(input$create_parent, input$create_name)
-      p <- try_notify(create_project(path, user = input$user_name %||% user))
+      p <- try_notify(create_project(path, user = input$user_name %||% user,
+                                     import_preset = input$create_preset %||% DEFAULT_PRESET))
       if (!is.null(p)) {
         close_project(p)
         do_open(p$path)
@@ -194,8 +195,10 @@ start_screen_ui <- function(user, recent) {
           shiny::div(class = "mb-3", shiny::actionButton("browse_parent", "Browse\u2026"))
         ),
         shiny::textInput("create_name", "Project name", placeholder = "e.g. Salmon_2024"),
+        shiny::selectInput("create_preset", "Instrument preset (runfile layout)",
+                           list_import_presets()$name, selected = DEFAULT_PRESET),
         shiny::p(class = "ifr-muted",
-                 "Set the runfile import and reduction settings under Project settings ",
+                 "Presets and reduction settings can be changed under Project settings ",
                  "before adding runfiles."),
         shiny::actionButton("create", "Create", class = "btn-primary")
       )

@@ -66,6 +66,17 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - Edits save immediately. Text and number fields save when they lose focus, and a field is only written if its value differs from the stored one, so switching samples never writes anything.
 - Each open project has its own lock token, so several browser tabs in one R process can't release each other's lock. The app stops once no tab has been connected for 5 seconds (a page reload does not stop it).
 
+## Instrument import presets
+A preset is a named runfile layout: header/footer lines, separator, and which column holds each mass and the time.
+- **Built-in:** `Nu_UCDavis` (`inst/presets/Nu_UCDavis.yml`) is the default and matches `default_settings()$import`. Built-in presets cannot be overwritten or deleted.
+- **User presets:** saved as YAML files in `import_preset_dir()`, which is the user's IsoFishR config folder, or the folder set by the `isofishr.preset_dir` option (e.g. a shared lab folder). They are shared by copying the file.
+- **Functions:** `list_import_presets()`, `get_import_preset()`, `save_import_preset()`, `delete_import_preset()`, and `create_project(..., import_preset = )`.
+- **In projects:** a project stores the preset name in `import.preset` plus a full copy of the values, so it still works on a computer without that preset, or after the preset is deleted. Changing only the preset name does not invalidate the cache.
+- **In the app:**
+  - **Start screen:** choose a preset when creating a project.
+  - **Project settings > Runfile import:** choose a preset (loads its values into the form), see whether the form still matches it, save the current layout as a new preset, or delete a user preset.
+  - **"Check the layout with a runfile":** reads a file with the unsaved layout and reports the cycle count, time range and maximum 88Sr. It warns if the time doesn't increase, 88Sr is near zero, or 86Sr/88Sr looks like swapped columns.
+
 ## Exports
 `export_project()` (and the app's Export page) writes summary tables to `exports/<date_time>/` and keeps earlier exports. Per-sample PDF plots are no longer produced.
 
@@ -100,6 +111,7 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 | `R/app-utils.R` | Folder dialog, recent projects, error notifications |
 | `R/export.R` | Summary tables and `export_project()` |
 | `R/app-export.R` | Export page |
+| `R/presets.R` | Instrument import presets (`inst/presets/` holds the built-in ones) |
 
 ## v1 bugs fixed (each has a regression test)
 - Integration blocks spanned two runfiles (`rollapply` ignored the sample grouping).

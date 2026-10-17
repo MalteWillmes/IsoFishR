@@ -1,0 +1,13 @@
+description: Nu Plasma MC-ICP-MS runfiles as exported at UC Davis (46 header lines, comma separated)
+skip_header: 46
+skip_footer: 0
+sep: ','
+header: no
+columns:
+  raw88: 1
+  raw87: 2
+  raw86: 3
+  raw85: 4
+  raw84: 5
+  raw83: 6
+  time_s: 8

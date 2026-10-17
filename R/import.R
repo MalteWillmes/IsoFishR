@@ -26,7 +26,10 @@ read_runfiles <- function(paths, import = default_settings()$import,
 
 read_runfile <- function(path, import, sample_id) {
   cols <- unlist(import$columns)
-  raw <- readr::read_delim(
+  # Lines of a different shape (e.g. header lines when the header length is
+  # wrong) make readr warn; rows that don't parse as numbers are dropped
+  # below, and callers check what was read.
+  raw <- suppressWarnings(readr::read_delim(
     path,
     delim = import$sep,
     skip = import$skip_header,
@@ -35,7 +38,7 @@ read_runfile <- function(path, import, sample_id) {
     name_repair = "minimal",
     trim_ws = TRUE,
     progress = FALSE
-  )
+  ))
   if (import$skip_footer > 0) {
     raw <- utils::head(raw, -import$skip_footer)
   }
