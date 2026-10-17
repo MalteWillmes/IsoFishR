@@ -1,0 +1,194 @@
+new_project <- function(env = parent.frame()) {
+  path <- withr::local_tempdir(.local_envir = env)
+  project_dir <- file.path(path, "MyProject")
+  p <- create_project(project_dir, user = "tester")
+  withr::defer(close_project(p), envir = env)
+  p
+}
+
+salmon <- function(n = 2) example_runfiles()[grepl("PC_2016", example_runfiles())][seq_len(n)]
+
+test_that("create_project builds the folder layout and opens the project", {
+  p <- new_project()
+  expect_s3_class(p, "isofishr_project")
+  expect_true(all(file.exists(file.path(p$path, c(
+    "project.yml", "samples.csv", "regions.csv", "log.csv", ".lock", "raw", "cache", "exports"
+  )))))
+  expect_equal(p$meta$name, "MyProject")
+  expect_equal(p$settings, default_settings())
+  expect_equal(nrow(p$samples), 0)
+  expect_error(create_project(p$path), "already contains")
+  expect_output(print(p), "Samples: 0")
+})
+
+test_that("create_project refuses a non-empty folder", {
+  path <- withr::local_tempdir()
+  writeLines("x", file.path(path, "notes.txt"))
+  expect_error(create_project(path), "not empty")
+})
+
+test_that("runfiles are copied, registered and logged", {
+  p <- add_runfiles(new_project(), salmon(2))
+  expect_equal(p$samples$sample_id, c("PC_2016_01_A2_4R", "PC_2016_01_A3_6R"))
+  expect_equal(p$samples$status, c("new", "new"))
+  expect_true(all(file.exists(file.path(p$path, p$samples$runfile))))
+  expect_equal(unname(tools::md5sum(file.path(p$path, p$samples$runfile))), p$samples$md5)
+
+  log <- read_log(p)
+  expect_equal(log$action, c("create_project", "add_sample", "add_sample"))
+  expect_equal(log$user, rep("tester", 3))
+})
+
+test_that("adding the same file twice is skipped; a clashing ID is an error", {
+  p <- add_runfiles(new_project(), salmon(1))
+  expect_message(p2 <- add_runfiles(p, salmon(1)), "already in the project")
+  expect_equal(nrow(p2$samples), 1)
+  expect_error(add_runfiles(p, salmon(2)[2], sample_ids = "PC_2016_01_A2_4R"), "already used")
+  expect_error(add_runfiles(p, salmon(2)[2], sample_ids = "a/b"), "cannot")
+})
+
+test_that("files that don't match the import settings are rejected before copying", {
+  p <- new_project()
+  bad <- withr::local_tempfile(fileext = ".run")
+  writeLines(c(rep("header", 46), "1,2,3"), bad)
+  expect_error(add_runfiles(p, bad), "column")
+  expect_length(list.files(file.path(p$path, "raw")), 0)
+})
+
+test_that("sample edits are saved, logged and survive reopening", {
+  p <- add_runfiles(new_project(), salmon(1))
+  id <- p$samples$sample_id
+  p <- update_sample(p, id, status = "reviewed", flag = TRUE, comment = "check edge",
+                     trim_start_s = 5, reverse = TRUE)
+  p <- update_sample(p, id, flag = TRUE)  # unchanged: not logged again
+
+  log <- dplyr::filter(read_log(p), action == "update_sample")
+  expect_equal(log$field, c("status", "flag", "comment", "trim_start_s", "reverse"))
+  expect_equal(log$old[1:2], c("new", "FALSE"))
+  expect_equal(log$new[1:2], c("reviewed", "TRUE"))
+
+  close_project(p)
+  p2 <- open_project(p$path, user = "tester")
+  on.exit(close_project(p2))
+  expect_equal(p2$samples, p$samples)
+  expect_error(update_sample(p2, id, status = "done"), "status must be")
+  expect_error(update_sample(p2, id, md5 = "x"), "Cannot change")
+  expect_error(update_sample(p2, "nope", flag = TRUE), "Unknown sample")
+})
+
+test_that("numeric-looking sample IDs stay text", {
+  p <- add_runfiles(new_project(), salmon(1), sample_ids = "007")
+  close_project(p)
+  p2 <- open_project(p$path, user = "tester")
+  on.exit(close_project(p2))
+  expect_identical(p2$samples$sample_id, "007")
+})
+
+test_that("per-sample settings override the project and can be reset", {
+  p <- add_runfiles(new_project(), salmon(2))
+  ids <- p$samples$sample_id
+  p <- set_sample_settings(p, ids[1], ma_window = 25, outlier_sd = 0)
+  expect_equal(p$samples$settings[1], "ma_window=25; outlier_sd=0")
+  expect_identical(sample_settings(p, ids[1])$reduction$ma_window, 25L)
+  expect_identical(sample_settings(p, ids[2])$reduction$ma_window, 10L)
+
+  p <- set_sample_settings(p, ids[1], ma_window = NULL)
+  expect_equal(p$samples$settings[1], "outlier_sd=0")
+  expect_error(set_sample_settings(p, ids[1], smoothing = "loess"), "smoothing")
+  expect_error(set_sample_settings(p, ids[1], speed = 3), "Unknown")
+
+  log <- dplyr::filter(read_log(p), action == "sample_setting")
+  expect_equal(log$field, c("ma_window", "outlier_sd", "ma_window"))
+  expect_equal(log$new[3], "(project: 10)")
+})
+
+test_that("regions are replaced per sample and logged", {
+  p <- add_runfiles(new_project(), salmon(2))
+  ids <- p$samples$sample_id
+  p <- set_regions(p, ids[1], data.frame(region = c("core", "edge"), start_s = c(40, 200),
+                                         end_s = c(80, 260)))
+  p <- set_regions(p, ids[2], data.frame(region = "core", start_s = 50, end_s = 90))
+  p <- set_regions(p, ids[1], data.frame(region = "core", start_s = 45, end_s = 80))
+  expect_equal(p$regions$sample_id, c(ids[2], ids[1]))
+  expect_equal(p$regions$start_s, c(50, 45))
+  expect_error(set_regions(p, ids[1], data.frame(region = "x", start_s = 5, end_s = 1)), "start")
+
+  log <- dplyr::filter(read_log(p), action == "set_regions")
+  expect_equal(nrow(log), 3)
+  expect_equal(log$old[3], "core: 40-80 s; edge: 200-260 s")
+})
+
+test_that("project settings changes are saved and logged per setting", {
+  p <- new_project()
+  p <- update_project_settings(p, list(reduction = list(ma_window = 15L),
+                                       sample = list(run_speed_um_s = 5)))
+  log <- dplyr::filter(read_log(p), action == "project_setting")
+  expect_setequal(log$field, c("reduction.ma_window", "sample.run_speed_um_s"))
+  close_project(p)
+  p2 <- open_project(p$path, user = "tester")
+  on.exit(close_project(p2))
+  expect_equal(p2$settings$reduction$ma_window, 15L)
+  expect_equal(p2$meta$name, "MyProject")
+})
+
+test_that("the lock stops a second user, allows read-only access and can be forced", {
+  p <- new_project()
+  expect_error(open_project(p$path, user = "someone_else"), "open for editing by tester")
+
+  ro <- open_project(p$path, user = "someone_else", read_only = TRUE)
+  expect_error(update_project_settings(ro, list(reduction = list(ma_window = 3L))), "read-only")
+  close_project(ro)
+  expect_true(file.exists(file.path(p$path, ".lock")))
+
+  forced <- open_project(p$path, user = "someone_else", force = TRUE)
+  expect_error(update_project_settings(p, list(reduction = list(ma_window = 3L))),
+               "no longer holds the project lock")
+  close_project(forced)
+  expect_false(file.exists(file.path(p$path, ".lock")))
+})
+
+test_that("project_data reduces with per-sample settings, applies edits and caches", {
+  p <- add_runfiles(new_project(), salmon(2))
+  ids <- p$samples$sample_id
+  d <- project_data(p)
+  expect_equal(unique(d$sample_id), ids)
+  expect_identical(
+    dplyr::filter(d, sample_id == ids[1]),
+    dplyr::filter(apply_edits(reduce_runs(read_runfiles(salmon(1)))$data), sample_id == ids[1])
+  )
+  cache_files <- function() list.files(file.path(p$path, "cache"))
+  expect_length(cache_files(), 2)
+  before <- file.mtime(file.path(p$path, "cache", cache_files()))
+
+  # Changing one sample's settings only re-reduces that sample
+  p <- set_sample_settings(p, ids[2], ma_window = 30)
+  d2 <- project_data(p)
+  after <- file.mtime(file.path(p$path, "cache", cache_files()))
+  expect_length(cache_files(), 2)
+  expect_equal(sum(before %in% after), 1)
+  expect_identical(dplyr::filter(d2, sample_id == ids[1]), dplyr::filter(d, sample_id == ids[1]))
+  expect_false(identical(dplyr::filter(d2, sample_id == ids[2])$sr87_sr86_ma,
+                         dplyr::filter(d, sample_id == ids[2])$sr87_sr86_ma))
+
+  # Edits are applied on top of the cached reduction
+  p <- update_sample(p, ids[1], trim_start_s = 20)
+  d3 <- project_data(p, ids[1])
+  expect_equal(min(d3$time_s), min(dplyr::filter(d, sample_id == ids[1])$time_s) + 20,
+               tolerance = 0.5)
+  expect_equal(min(d3$distance_um), 0)
+
+  # Excluded samples are left out by default
+  p <- update_sample(p, ids[2], status = "excluded")
+  expect_equal(unique(project_data(p)$sample_id), ids[1])
+})
+
+test_that("project_regions summarises the stored regions", {
+  p <- add_runfiles(new_project(), salmon(1))
+  id <- p$samples$sample_id
+  p <- set_regions(p, id, data.frame(region = c("core", "edge"), start_s = c(200, 1000),
+                                     end_s = c(260, 1100)))
+  r <- project_regions(p)
+  expect_equal(r$region, c("core", "edge"))
+  expect_true(all(r$mean > 0.703 & r$mean < 0.712))
+  expect_true(all(r$n > 10))
+})

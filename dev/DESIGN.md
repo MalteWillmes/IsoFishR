@@ -32,6 +32,26 @@ MyProject/
 ```
 Trims and regions are stored in **seconds of analysis time** and shown as distance, so they stay in the right place if the run speed is corrected later.
 
+### Project API (implemented)
+| Function | What it does |
+|---|---|
+| `create_project(path)` / `open_project(path)` / `close_project(p)` | Create or open a folder; opening takes the lock (`read_only = TRUE` skips it, `force = TRUE` takes it over) |
+| `add_runfiles(p, paths)` | Check the files against the import settings, copy them to `raw/` and register them. Identical files are skipped; clashing IDs are an error |
+| `update_sample(p, id, ...)` | status (`new` / `reviewed` / `excluded`), flag, comment, trims, reverse, rezero, changepoint settings |
+| `set_sample_settings(p, id, ...)` | Per-sample reduction overrides (`NULL` resets to the project value) |
+| `set_regions(p, id, regions)` | Replace a sample's regions |
+| `update_project_settings(p, overrides)` | Change the project defaults |
+| `project_data(p)` / `project_regions(p)` | Cached reduction with each sample's own settings and edits applied |
+| `read_log(p)` | The change log |
+
+Every change is written to disk immediately, and every changed value is logged with its old and new value. Each function returns the updated project object, which the Shiny app will keep in a reactive value.
+
+`samples.csv` columns: `sample_id, runfile, source, md5, added, added_by, status, flag, comment, trim_start_s, trim_end_s, reverse, rezero, cp_enabled, cp_method, cp_penalty, settings`. The `settings` column holds overrides as `key=value; key=value`.
+
+Cache files are named `<hash of sample ID>_<hash of md5 + import + reduction settings + run speed + IsoFishR version>.rds`. Changing one sample's settings re-reduces only that sample.
+
+The lock is advisory: Dropbox sync is not instant, so two people opening the same project within seconds of each other can still clash. A session whose lock was taken over refuses further writes.
+
 ## Package layout
 | File | Contents |
 |---|---|
@@ -40,6 +60,10 @@ Trims and regions are stored in **seconds of analysis time** and shown as distan
 | `R/reduce.R` | `reduce_runs()`: integration → blank → thresholds → distance → Rb and mass bias correction → outliers → smoothing |
 | `R/roll.R` | O(n) rolling mean, SD and median |
 | `R/edits.R` | `apply_edits()` (trim, reverse), `summarise_regions()`, `find_changepoints()` |
+| `R/project.R` | Create/open/close, lock, log |
+| `R/project-samples.R` | Add runfiles, sample edits, per-sample settings, regions, project settings |
+| `R/project-data.R` | Cached per-sample reduction, `project_data()`, `project_regions()` |
+| `R/project-io.R` | CSV/YAML reading and writing (fixed column types, atomic writes) |
 
 ## v1 bugs fixed (each has a regression test)
 - Integration blocks spanned two runfiles (`rollapply` ignored the sample grouping).
@@ -58,6 +82,6 @@ Trims and regions are stored in **seconds of analysis time** and shown as distan
 Run `Rscript dev/compare_v1.R`. Where v1 and v2 produce the same integrated cycle, the ratios are identical to floating-point precision. Sample means differ slightly (about 5–15 ppm for the salmon profiles, about 80 ppm for the short seabass profile) because v1 groups the cycles into integration blocks at different boundaries, which changes which edge blocks pass the 88Sr threshold.
 
 ## Next steps
-1. Project folder functions: create/open, add runfiles, sample registry, log, cache, lock.
+1. ~~Project folder functions~~ (done).
 2. Shiny workspace (sample table, plots, Reduction / Edit / Notes panels), with autosave.
-3. Exports and a v1 project importer.
+3. Exports and a v1 project importer. Also removing samples, which is not supported yet.
