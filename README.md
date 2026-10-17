@@ -26,7 +26,7 @@ The app opens in your web browser. To stop it, close the browser tab, or press E
 
 ## A five-minute tour
 
-1. **Try the example data.** On the start screen, click **Try with example data**. This opens a temporary project with five Chinook salmon otoliths and one white seabass otolith.
+1. **Create a project and add runfiles.** On the start screen, create a project in a new folder, then click **Add runfiles…** in the Workspace. To try IsoFishR without your own data, use the example runfiles that come with it (five Chinook salmon otoliths and one white seabass otolith). Find their folder with `system.file("extdata", "runfiles", package = "IsoFishR")`.
 2. **Workspace.** Pick a sample on the left to see its <sup>87</sup>Sr/<sup>86</sup>Sr profile, with total Sr, <sup>83</sup>Kr and <sup>85</sup>Rb/<sup>88</sup>Sr below it.
    - Drag across the plot to select a range. The footer shows its mean ± 2 SE.
    - **Edit:** keep only the selected range (trim), add it as a named region, reverse the profile, or detect changepoints.
