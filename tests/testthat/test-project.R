@@ -39,11 +39,12 @@ test_that("runfiles are copied, registered and logged", {
   expect_equal(log$user, rep("tester", 3))
 })
 
-test_that("adding the same file twice is skipped; a clashing ID is an error", {
+test_that("adding the same file twice or a clashing name is skipped", {
   p <- add_runfiles(new_project(), salmon(1))
   expect_message(p2 <- add_runfiles(p, salmon(1)), "already in the project")
   expect_equal(nrow(p2$samples), 1)
-  expect_error(add_runfiles(p, salmon(2)[2], sample_ids = "PC_2016_01_A2_4R"), "already used")
+  expect_message(p3 <- add_runfiles(p, salmon(2)[2], sample_ids = "PC_2016_01_A2_4R"), "choose Replace")
+  expect_equal(nrow(p3$samples), 1)
   expect_error(add_runfiles(p, salmon(2)[2], sample_ids = "a/b"), "cannot")
 })
 
@@ -234,4 +235,38 @@ test_that("removing a sample drops its rows, regions and cache but keeps the run
   p2 <- add_runfiles(p2, salmon(1))
   expect_equal(p2$samples$sample_id, c(ids[2], ids[1]))
   expect_error(remove_samples(p2, "nope"), "Unknown sample")
+})
+
+test_that("runfiles can be added in batches, skipping or replacing same-name runs", {
+  p <- add_runfiles(new_project(), salmon(2))
+  ids <- p$samples$sample_id
+  p <- update_sample(p, ids[1], comment = "keep me", trim_start_s = 5)
+  p <- set_regions(p, ids[1], data.frame(region = "core", start_s = 200, end_s = 260))
+
+  # A second batch: one new file and a re-exported version of an existing run
+  dir <- withr::local_tempdir()
+  changed <- file.path(dir, paste0(ids[1], ".run"))
+  file.copy(salmon(1), changed)
+  cat("\n", file = changed, append = TRUE)  # different content, same name
+  batch <- c(changed, salmon(3)[3])
+
+  expect_message(p2 <- add_runfiles(p, batch), "Added 1 run")
+  expect_equal(nrow(p2$samples), 3)
+  expect_equal(p2$samples$md5[1], p$samples$md5[1])  # kept
+
+  expect_message(p3 <- add_runfiles(p2, batch, mode = "replace"), "Replaced 1 run")
+  expect_equal(nrow(p3$samples), 3)
+  row <- p3$samples[p3$samples$sample_id == ids[1], ]
+  expect_equal(row$md5, unname(tools::md5sum(changed)))
+  expect_equal(row$comment, "keep me")              # edits are kept
+  expect_equal(row$trim_start_s, 5)
+  expect_equal(nrow(p3$regions), 1)
+  expect_length(list.files(file.path(p3$path, "raw", "removed")), 1)
+  expect_true("replace_runfile" %in% read_log(p3)$action)
+  expect_gt(nrow(project_data(p3, ids[1])), 100)    # reduced from the new file
+
+  # Replacing with the identical file again changes nothing
+  expect_message(p4 <- add_runfiles(p3, changed, mode = "replace"), "identical file")
+  expect_equal(p4$samples, p3$samples)
+  expect_error(add_runfiles(p3, c(salmon(1), salmon(1)), sample_ids = c("x", "x")), "more than one")
 })

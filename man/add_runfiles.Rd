@@ -4,7 +4,13 @@
 \alias{add_runfiles}
 \title{Add runfiles to a project}
 \usage{
-add_runfiles(project, paths, sample_ids = NULL, source_names = basename(paths))
+add_runfiles(
+  project,
+  paths,
+  sample_ids = NULL,
+  source_names = basename(paths),
+  mode = c("add", "replace")
+)
 }
 \arguments{
 \item{project}{A project from \code{\link[=open_project]{open_project()}}.}
@@ -15,13 +21,27 @@ add_runfiles(project, paths, sample_ids = NULL, source_names = basename(paths))
 
 \item{source_names}{Original file names to record (useful when \code{paths}
 are temporary upload paths).}
+
+\item{mode}{\code{"add"} or \code{"replace"}, see above.}
 }
 \value{
-The updated project.
+The updated project. A message summarises what was added,
+replaced and skipped.
 }
 \description{
 Copies runfiles into the project's \verb{raw/} folder and registers them as new
-samples. Each file is read first with the project's import settings, so a
-wrong layout is caught before anything is copied. Files whose contents are
-already in the project are skipped.
+runs, so a project can be built up batch by batch. Each file is read first
+with the project's import settings, so a wrong layout is caught before
+anything is copied.
+}
+\details{
+Files identical to one already in the project are always skipped. For a
+file whose name matches a run already in the project but whose content
+differs (e.g. a re-exported runfile):
+\itemize{
+\item \code{mode = "add"} skips it and reports it;
+\item \code{mode = "replace"} gives that run the new file. Its edits, regions,
+comment and settings are kept; the previous file is moved to
+\verb{raw/removed/} and the replacement is logged.
+}
 }

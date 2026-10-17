@@ -41,7 +41,7 @@ Everything is saved as you work. Close the app at any time, then reopen the proj
 1. **Create a project** on the start screen. A project is a folder you choose, e.g. in Dropbox or on a shared drive, and it holds everything about a set of samples.
 2. **Choose the instrument preset** describing your runfile layout. `Nu_UCDavis` (Nu Plasma, the default) is built in. For another layout, set it under **Project settings > Runfile import**, check it with **Check the layout with a runfile**, and **save it as a preset** to reuse it in other projects.
 3. **Set the reduction defaults** under **Project settings**: run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing.
-4. **Add runfiles** in the Workspace. You can add more at any time, for example after the next session at the instrument.
+4. **Add runfiles** in the Workspace. You can add more batches at any time, for example after the next session at the instrument. If a file has the same name as a run already in the project, choose whether to keep the existing run or replace it with the new file (replaced runs keep their edits, regions and notes).
 
 ### Reference materials and drift correction
 

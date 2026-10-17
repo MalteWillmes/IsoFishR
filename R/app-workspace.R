@@ -12,6 +12,13 @@ workspace_ui <- function(id) {
       title = "Samples",
       shiny::fileInput(ns("add_files"), NULL, multiple = TRUE,
                        buttonLabel = "Add runfiles\u2026", placeholder = "No files added"),
+      shiny::radioButtons(
+        ns("add_mode"), "If a run with the same name is already in the project",
+        c("Keep it (skip the new file)" = "add", "Replace it with the new file" = "replace"),
+        selected = "add"
+      ),
+      shiny::p(class = "ifr-muted small",
+               "Replaced runs keep their edits, regions and notes; the old file is kept in raw/removed."),
       shiny::div(class = "ifr-sample-table", DT::DTOutput(ns("samples"))),
       shiny::div(
         class = "d-flex gap-2",
@@ -211,13 +218,11 @@ workspace_server <- function(id, project) {
       f <- input$add_files
       before <- project()$samples$sample_id
       shiny::withProgress(message = "Adding runfiles", {
-        change(add_runfiles, f$datapath, source_names = f$name)
+        # add_runfiles() reports what was added, replaced or skipped.
+        change(add_runfiles, f$datapath, source_names = f$name, mode = input$add_mode %||% "add")
       })
       added <- setdiff(project()$samples$sample_id, before)
-      if (length(added) > 0) {
-        shiny::showNotification(sprintf("Added %d sample(s).", length(added)), type = "message")
-        select_sample(added[1])
-      }
+      if (length(added) > 0) select_sample(added[1])
     })
 
     # ---- data for the selected sample ----

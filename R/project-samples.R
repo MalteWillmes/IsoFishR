@@ -1,19 +1,32 @@
 #' Add runfiles to a project
 #'
 #' Copies runfiles into the project's `raw/` folder and registers them as new
-#' samples. Each file is read first with the project's import settings, so a
-#' wrong layout is caught before anything is copied. Files whose contents are
-#' already in the project are skipped.
+#' runs, so a project can be built up batch by batch. Each file is read first
+#' with the project's import settings, so a wrong layout is caught before
+#' anything is copied.
+#'
+#' Files identical to one already in the project are always skipped. For a
+#' file whose name matches a run already in the project but whose content
+#' differs (e.g. a re-exported runfile):
+#'
+#' * `mode = "add"` skips it and reports it;
+#' * `mode = "replace"` gives that run the new file. Its edits, regions,
+#'   comment and settings are kept; the previous file is moved to
+#'   `raw/removed/` and the replacement is logged.
 #'
 #' @param project A project from [open_project()].
 #' @param paths Paths to runfiles.
 #' @param sample_ids Sample IDs; default to the file names without extension.
 #' @param source_names Original file names to record (useful when `paths`
 #'   are temporary upload paths).
-#' @return The updated project.
+#' @param mode `"add"` or `"replace"`, see above.
+#' @return The updated project. A message summarises what was added,
+#'   replaced and skipped.
 #' @export
-add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basename(paths)) {
+add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basename(paths),
+                         mode = c("add", "replace")) {
   check_writable(project)
+  mode <- match.arg(mode)
   if (is.null(sample_ids)) sample_ids <- tools::file_path_sans_ext(source_names)
   stopifnot(length(sample_ids) == length(paths), length(source_names) == length(paths))
 
@@ -22,43 +35,83 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
     stop("Sample IDs cannot be empty or contain \\ / : * ? \" < > |: ",
          paste(sample_ids[bad], collapse = ", "), call. = FALSE)
   }
+  if (anyDuplicated(sample_ids)) {
+    stop("The batch contains more than one file named: ",
+         paste(unique(sample_ids[duplicated(sample_ids)]), collapse = ", "), call. = FALSE)
+  }
 
   md5 <- unname(tools::md5sum(paths))
-  known <- md5 %in% project$samples$md5 | duplicated(md5)
-  if (any(known)) {
-    message("Skipped (already in the project): ", paste(source_names[known], collapse = ", "))
-  }
-  paths <- paths[!known]
-  sample_ids <- sample_ids[!known]
-  source_names <- source_names[!known]
-  md5 <- md5[!known]
-  if (length(paths) == 0) return(project)
+  identical_file <- md5 %in% project$samples$md5 | duplicated(md5)
+  existing <- match(sample_ids, project$samples$sample_id)
+  name_taken <- !is.na(existing) & !identical_file
+  is_new <- is.na(existing) & !identical_file
+  replace <- name_taken & mode == "replace"
+  todo <- is_new | replace
 
-  taken <- sample_ids %in% project$samples$sample_id | duplicated(sample_ids)
-  if (any(taken)) {
-    stop("Sample ID(s) already used in this project: ",
-         paste(unique(sample_ids[taken]), collapse = ", "),
-         ". Rename the files or pass different `sample_ids`.", call. = FALSE)
+  notes <- c(
+    if (any(identical_file)) paste0("Skipped (identical file already in the project): ",
+                                    paste(source_names[identical_file], collapse = ", ")),
+    if (any(name_taken & !replace)) paste0(
+      "Skipped (a run with this name is already in the project; choose Replace to update it): ",
+      paste(source_names[name_taken & !replace], collapse = ", "))
+  )
+  if (!any(todo)) {
+    if (length(notes)) message(paste(notes, collapse = "\n"))
+    return(project)
   }
 
   # Fails with a clear message if the files don't match the import settings.
-  read_runfiles(paths, project$settings$import, sample_ids)
-
+  read_runfiles(paths[todo], project$settings$import, sample_ids[todo])
+  acquired <- format_time(read_acquisition_times(paths, project$settings$import))
   runfiles <- file.path("raw", paste0(sample_ids, tolower(file_ext_dot(source_names))))
-  ok <- file.copy(paths, project_file(project$path, runfiles), overwrite = FALSE)
-  if (!all(ok)) {
-    stop("Could not copy: ", paste(source_names[!ok], collapse = ", "), call. = FALSE)
+
+  # Replace: move the old file aside, then copy in the new one.
+  if (any(replace)) {
+    removed_dir <- project_file(project$path, "raw", "removed")
+    dir.create(removed_dir, recursive = TRUE, showWarnings = FALSE)
+    stamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+    for (i in which(replace)) {
+      j <- existing[i]
+      old <- project$samples[j, ]
+      moved <- file.path("raw", "removed", paste0(stamp, "_", basename(old$runfile)))
+      if (file.exists(project_file(project$path, old$runfile)) &&
+          !file.rename(project_file(project$path, old$runfile), project_file(project$path, moved))) {
+        stop("Could not move '", old$runfile, "'. Is it open in another program?", call. = FALSE)
+      }
+      if (!file.copy(paths[i], project_file(project$path, runfiles[i]), overwrite = FALSE)) {
+        stop("Could not copy ", source_names[i], ".", call. = FALSE)
+      }
+      project$samples$runfile[j] <- runfiles[i]
+      project$samples$source[j] <- source_names[i]
+      project$samples$md5[j] <- md5[i]
+      project$samples$acquired[j] <- acquired[i]
+      append_log(project_file(project$path, "log.csv"),
+                 log_entry(project$user, "replace_runfile", old$sample_id, "runfile",
+                           paste0(old$source, " (", moved, ")"), source_names[i]))
+    }
   }
 
-  new_rows <- tibble::tibble(
-    sample_id = sample_ids, runfile = runfiles, source = source_names, md5 = md5,
-    added = timestamp_now(), added_by = project$user, !!!sample_defaults()
-  )
-  new_rows$acquired <- format_time(read_acquisition_times(paths, project$settings$import))
-  project$samples <- dplyr::bind_rows(project$samples, new_rows)
+  if (any(is_new)) {
+    ok <- file.copy(paths[is_new], project_file(project$path, runfiles[is_new]), overwrite = FALSE)
+    if (!all(ok)) {
+      stop("Could not copy: ", paste(source_names[is_new][!ok], collapse = ", "), call. = FALSE)
+    }
+    new_rows <- tibble::tibble(
+      sample_id = sample_ids[is_new], runfile = runfiles[is_new], source = source_names[is_new],
+      md5 = md5[is_new], added = timestamp_now(), added_by = project$user, !!!sample_defaults()
+    )
+    new_rows$acquired <- acquired[is_new]
+    project$samples <- dplyr::bind_rows(project$samples, new_rows)
+    append_log(project_file(project$path, "log.csv"),
+               log_entry(project$user, "add_sample", sample_ids[is_new], new = source_names[is_new]))
+  }
   write_table_file(project$samples, project_file(project$path, "samples.csv"))
-  append_log(project_file(project$path, "log.csv"),
-             log_entry(project$user, "add_sample", sample_ids, new = source_names))
+
+  summary <- paste0(
+    c(if (any(is_new)) paste("Added", sum(is_new), "run(s)."),
+      if (any(replace)) paste("Replaced", sum(replace), "run(s):", paste(sample_ids[replace], collapse = ", "))),
+    collapse = " ")
+  message(paste(c(summary, notes), collapse = "\n"))
   project
 }
 

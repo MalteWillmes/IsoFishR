@@ -271,3 +271,22 @@ test_that("creating a project from the start screen opens it", {
     close_project(project())
   })
 })
+
+test_that("the Add runfiles toggle skips or replaces same-name runs", {
+  p <- app_project()
+  rv <- shiny::reactiveVal(p)
+  dir <- withr::local_tempdir()
+  changed <- file.path(dir, "upload0.run")
+  file.copy(salmon_files(1), changed)
+  cat("\n", file = changed, append = TRUE)
+  upload <- data.frame(name = "PC_2016_01_A2_4R.run", datapath = changed)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    old_md5 <- rv()$samples$md5[1]
+    session$setInputs(add_mode = "add", add_files = upload)
+    expect_equal(rv()$samples$md5[1], old_md5)
+    session$setInputs(add_mode = "replace", add_files = upload)
+    expect_equal(rv()$samples$md5[1], unname(tools::md5sum(changed)))
+    expect_equal(rv()$samples$source[1], "PC_2016_01_A2_4R.run")
+    expect_equal(nrow(rv()$samples), 2)
+  })
+})
