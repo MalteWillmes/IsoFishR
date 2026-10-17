@@ -24,10 +24,37 @@ app_ui <- function(request) {
     theme = bslib::bs_theme(version = 5, preset = "shiny", primary = "#1f6f8b"),
     padding = 0,
     gap = 0,
-    shiny::tags$head(shiny::tags$style(shiny::HTML(app_css))),
+    shiny::tags$head(shiny::tags$style(shiny::HTML(app_css)),
+                     shiny::tags$script(shiny::HTML(app_js))),
     shiny::uiOutput("main", fill = TRUE)
   )
 }
+
+# After Quit: replace the page with a short message (instead of Shiny's
+# greyed-out "disconnected" screen) and try to close the tab. Browsers only
+# let a page close tabs it opened itself, so the message stays if not.
+app_js <- "
+  // Ask before the tab is closed or reloaded by accident: closing it stops
+  // the app (work is saved, but the app has to be started again). Quit
+  // switches this off.
+  window.ifrConfirmLeave = true;
+  window.addEventListener('beforeunload', function(e) {
+    if (!window.ifrConfirmLeave) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  Shiny.addCustomMessageHandler('ifr-quit', function(message) {
+    window.ifrConfirmLeave = false;
+    document.body.innerHTML =
+      '<style>#shiny-disconnected-overlay{display:none!important}</style>' +
+      '<div style=\"max-width:640px;margin:4rem auto;padding:0 1rem;font-family:sans-serif\">' +
+      '<h2>IsoFishR has stopped</h2>' +
+      '<p>Everything was saved. You can close this tab.</p>' +
+      '<p style=\"color:#666\">To start again, run <code>IsoFishR::run_app()</code> in R.</p></div>';
+    window.close();
+  });
+"
 
 app_css <- "
   .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.25rem; }
@@ -147,6 +174,16 @@ app_server <- function(initial_project = NULL, user = default_user()) {
     project_settings_server("settings", project)
     log_server("log", project)
 
+    # Quit: release the lock, tell the page, then stop the app (which frees
+    # the R console). The short delay lets the message reach the browser.
+    shiny::observeEvent(input$quit, {
+      p <- project()
+      if (!is.null(p)) close_project(p)
+      project(NULL)
+      session$sendCustomMessage("ifr-quit", list())
+      later::later(function() shiny::stopApp(), delay = 0.5)
+    })
+
     # Release the lock when the tab closes. Stop the app (freeing the R
     # console) once no browser tab is left, after a grace period so that
     # reloading the page does not stop it.
@@ -162,7 +199,11 @@ app_server <- function(initial_project = NULL, user = default_user()) {
 start_screen_ui <- function(user, recent) {
   shiny::div(
     class = "ifr-start",
-    shiny::h2("IsoFishR"),
+    shiny::div(
+      class = "d-flex align-items-center",
+      shiny::h2("IsoFishR", class = "me-auto"),
+      shiny::actionButton("quit", "Quit IsoFishR", class = "btn-sm btn-outline-secondary")
+    ),
     shiny::p(class = "ifr-muted",
              "Data reduction and analysis of laser-ablation 87Sr/86Sr profiles. ",
              "Projects are folders on your computer; all changes are saved as you work."),
@@ -220,7 +261,8 @@ workspace_page_ui <- function() {
     bslib::nav_panel("Project settings", project_settings_ui("settings")),
     bslib::nav_panel("Change log", log_ui("log")),
     bslib::nav_spacer(),
-    bslib::nav_item(shiny::actionButton("close_project", "Close project", class = "btn-sm"))
+    bslib::nav_item(shiny::actionButton("close_project", "Close project", class = "btn-sm")),
+    bslib::nav_item(shiny::actionButton("quit", "Quit", class = "btn-sm btn-outline-secondary"))
   )
 }
 

@@ -424,9 +424,10 @@ workspace_server <- function(id, project) {
     }, width = "100%", spacing = "xs")
 
     shiny::observe({
+      p <- shiny::req(project())  # NULL right after the project is closed
       r <- sample_regions()
       shiny::updateSelectInput(session, "region_remove_name", choices = r$region)
-      labels <- project()$settings$regions$default_labels
+      labels <- p$settings$regions$default_labels
       next_label <- setdiff(labels, r$region)[1]
       if (is.na(next_label)) next_label <- paste("Region", nrow(r) + 1)
       shiny::updateTextInput(session, "region_name", value = next_label)

@@ -22,7 +22,7 @@ Run the same line again to update. No extra build tools are needed on Windows, m
 IsoFishR::run_app()
 ```
 
-The app opens in your web browser. To stop it, close the browser tab, or press Esc in R.
+The app opens in your web browser. To stop it, click **Quit** (top right). If you close or reload the tab instead, the browser asks first; a closed tab stops the app after a few seconds.
 
 ## A five-minute tour
 

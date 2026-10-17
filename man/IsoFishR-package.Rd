@@ -6,6 +6,8 @@
 \alias{IsoFishR-package}
 \title{IsoFishR: Data Reduction and Analysis of Laser-Ablation Strontium Isotope Profiles}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 Reduces 87Sr/86Sr isotope ratios measured by laser-ablation multi-collector ICP-MS (blank correction, Rb interference and mass bias correction, outlier rejection, smoothing) and supports profile analysis (trimming, regions, changepoints). Version 2 development; the original application is preserved under the v1.1 tag.
 }
 \seealso{

@@ -237,3 +237,17 @@ test_that("the workspace plot follows changes to the calibration", {
     expect_equal(mean(sample_data()$sr87_sr86, na.rm = TRUE), 0.71 / 1.001, tolerance = 1e-7)
   })
 })
+
+test_that("Quit releases the project lock and closes the project", {
+  p <- app_project()
+  path <- p$path
+  close_project(p)
+  shiny::testServer(app_server(initial_project = path, user = "tester"), {
+    session$flushReact()
+    expect_false(is.null(project()))
+    expect_true(file.exists(file.path(path, ".lock")))
+    session$setInputs(quit = 1)
+    expect_null(project())
+    expect_false(file.exists(file.path(path, ".lock")))
+  })
+})
