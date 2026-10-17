@@ -64,6 +64,7 @@ create_project <- function(path, settings = default_settings(), user = default_u
   write_yaml_file(c(list(project = meta), settings), project_file(path, "project.yml"))
   write_table_file(samples_template(), project_file(path, "samples.csv"))
   write_table_file(regions_template(), project_file(path, "regions.csv"))
+  write_table_file(reference_materials_template(), project_file(path, "reference_materials.csv"))
   append_log(project_file(path, "log.csv"),
              log_entry(user, "create_project", new = meta$name))
 
@@ -96,12 +97,15 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
       samples = read_table_file(project_file(path, "samples.csv"), samples_template(),
                                 sample_defaults()),
       regions = read_table_file(project_file(path, "regions.csv"), regions_template()),
+      reference_materials = read_table_file(project_file(path, "reference_materials.csv"),
+                                            reference_materials_template()),
       user = user,
       read_only = read_only,
       lock_token = if (read_only) NA_character_ else token
     ),
     class = "isofishr_project"
-  )
+  ) |>
+    fill_acquisition_times()
 }
 
 #' @rdname project

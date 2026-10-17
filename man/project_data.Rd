@@ -4,15 +4,21 @@
 \alias{project_data}
 \title{Reduced data for project samples}
 \usage{
-project_data(project, sample_ids = NULL, edited = TRUE)
+project_data(project, sample_ids = NULL, edited = TRUE, calibrate = TRUE)
 }
 \arguments{
 \item{project}{A project from \code{\link[=open_project]{open_project()}}.}
 
-\item{sample_ids}{Samples to return; defaults to all samples that are not
-excluded.}
+\item{sample_ids}{Samples to return; defaults to all runs that are not
+excluded or baseline runs.}
 
 \item{edited}{Apply trims, reversal and re-zeroing from \code{samples.csv}.}
+
+\item{calibrate}{Apply the reference material correction (see
+\code{\link[=calibration_model]{calibration_model()}}). The 87Sr/86Sr columns are then corrected, and
+\code{sr87_sr86_uncorrected}, \code{correction_factor}, \code{correction_u_rel} and
+\code{correction_status} are added. Without a primary reference material the
+values are unchanged and the factor is \code{NA}.}
 }
 \value{
 A tibble of reduced data. Any warnings raised during reduction

@@ -8,21 +8,39 @@
 #' not reprocess the others.
 #'
 #' @param project A project from [open_project()].
-#' @param sample_ids Samples to return; defaults to all samples that are not
-#'   excluded.
+#' @param sample_ids Samples to return; defaults to all runs that are not
+#'   excluded or baseline runs.
 #' @param edited Apply trims, reversal and re-zeroing from `samples.csv`.
+#' @param calibrate Apply the reference material correction (see
+#'   [calibration_model()]). The 87Sr/86Sr columns are then corrected, and
+#'   `sr87_sr86_uncorrected`, `correction_factor`, `correction_u_rel` and
+#'   `correction_status` are added. Without a primary reference material the
+#'   values are unchanged and the factor is `NA`.
 #' @return A tibble of reduced data. Any warnings raised during reduction
 #'   (e.g. no blank cycles) are attached as the `"warnings"` attribute, a
 #'   character vector named by sample.
 #' @export
-project_data <- function(project, sample_ids = NULL, edited = TRUE) {
+project_data <- function(project, sample_ids = NULL, edited = TRUE, calibrate = TRUE) {
   if (is.null(sample_ids)) {
-    sample_ids <- project$samples$sample_id[project$samples$status != "excluded"]
+    s <- project$samples
+    sample_ids <- s$sample_id[s$status != "excluded" & s$run_type != "baseline"]
   }
-  results <- purrr::map(sample_ids, \(id) reduce_project_sample(project, id))
+  baseline_mode <- project$settings$calibration$baseline == "baseline_runs"
+  runs <- if (baseline_mode) project_runs(project)
+  baselines <- if (baseline_mode) project_baselines(project)
+
+  results <- purrr::map(sample_ids, \(id) {
+    if (!baseline_mode) return(reduce_project_sample(project, id))
+    run <- runs[runs$sample_id == id, ]
+    b <- interpolate_baseline(baselines, run$session, run$acquired, id)
+    res <- reduce_project_sample(project, id, blank = b$blank)
+    res$warnings <- c(res$warnings, b$note)
+    res
+  })
   data <- purrr::list_rbind(purrr::map(results, "data"))
   if (nrow(data) == 0) return(data)
   if (edited) data <- apply_edits(data, project$samples)
+  if (calibrate) data <- apply_calibration(data, project, calibration_model(project))
 
   warns <- purrr::map(results, "warnings") |> rlang::set_names(sample_ids) |> unlist()
   if (length(warns) > 0) attr(data, "warnings") <- warns
@@ -39,7 +57,7 @@ project_regions <- function(project, sample_ids = NULL) {
   summarise_regions(data, project$regions)
 }
 
-reduce_project_sample <- function(project, sample_id) {
+reduce_project_sample <- function(project, sample_id, blank = NULL) {
   i <- sample_index(project, sample_id)
   settings <- sample_settings(project, sample_id)
   key <- rlang::hash(list(
@@ -47,6 +65,7 @@ reduce_project_sample <- function(project, sample_id) {
     import = import_values(settings$import),  # the preset name alone doesn't matter
     reduction = settings$reduction,
     run_speed = settings$sample$run_speed_um_s,
+    blank = blank,
     version = isofishr_version()
   ))
   prefix <- paste0(rlang::hash(sample_id), "_")
@@ -62,7 +81,7 @@ reduce_project_sample <- function(project, sample_id) {
   result <- withCallingHandlers({
     raw <- read_runfiles(project_file(project$path, project$samples$runfile[i]),
                          settings$import, sample_id)
-    reduce_runs(raw, settings)
+    reduce_runs(raw, settings, blank = blank)
   }, warning = function(w) {
     warnings <<- c(warnings, conditionMessage(w))
     invokeRestart("muffleWarning")

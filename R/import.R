@@ -24,6 +24,36 @@ read_runfiles <- function(paths, import = default_settings()$import,
     purrr::list_rbind()
 }
 
+#' Read the acquisition time of runfiles
+#'
+#' Reads the date and time a run was started from its header, using the
+#' `timestamp_line` and `timestamp_format` of the import settings (for Nu
+#' Plasma files: line 45, e.g. `"08/12/2017","04:31:02 PM"`). Quotes are
+#' removed and commas or tabs between the date and time become spaces before
+#' the line is parsed with [base::strptime()] `format`. Times are treated as
+#' the instrument clock and returned in UTC, so daylight saving changes never
+#' reorder runs.
+#'
+#' @param paths Paths to runfiles.
+#' @param import The `import` section of a settings list.
+#' @return A POSIXct vector (`NA` where there is no timestamp line or it
+#'   could not be parsed).
+#' @export
+read_acquisition_times <- function(paths, import = default_settings()$import) {
+  line_no <- as.integer(import$timestamp_line %||% 0L)
+  if (is.na(line_no) || line_no < 1) return(as.POSIXct(rep(NA_real_, length(paths)), tz = "UTC"))
+  text <- vapply(paths, \(p) {
+    x <- readLines(p, n = line_no, warn = FALSE)
+    if (length(x) < line_no) NA_character_ else x[[line_no]]
+  }, character(1), USE.NAMES = FALSE)
+  text <- trimws(gsub("[,\t]+", " ", gsub("\"", "", text)))
+  # Parse in the C locale so "AM"/"PM" and month names work on any system.
+  old <- Sys.getlocale("LC_TIME")
+  on.exit(Sys.setlocale("LC_TIME", old), add = TRUE)
+  Sys.setlocale("LC_TIME", "C")
+  as.POSIXct(strptime(text, import$timestamp_format, tz = "UTC"))
+}
+
 read_runfile <- function(path, import, sample_id) {
   cols <- unlist(import$columns)
   # Lines of a different shape (e.g. header lines when the header length is

@@ -4,12 +4,18 @@
 \alias{reduce_runs}
 \title{Reduce laser-ablation Sr isotope data}
 \usage{
-reduce_runs(raw, settings = default_settings())
+reduce_runs(raw, settings = default_settings(), blank = NULL)
 }
 \arguments{
 \item{raw}{Raw cycle data from \code{\link[=read_runfiles]{read_runfiles()}}.}
 
 \item{settings}{A settings list (see \code{\link[=default_settings]{default_settings()}}).}
+
+\item{blank}{Optional blank voltages to subtract instead of each run's own
+blank: a data frame with \code{sample_id} and \code{blk88} to \code{blk83}, e.g.
+interpolated from baseline runs (see \code{\link[=project_baselines]{project_baselines()}}). When given,
+the start of each run is not treated as blank; laser-off cycles are
+removed by the 88Sr threshold.}
 }
 \value{
 A list with \code{data} (one row per integrated cycle) and \code{blank}

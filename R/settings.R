@@ -28,7 +28,9 @@ default_settings <- function() {
       sep = ",",
       header = FALSE,
       columns = list(raw88 = 1L, raw87 = 2L, raw86 = 3L, raw85 = 4L,
-                     raw84 = 5L, raw83 = 6L, time_s = 8L)
+                     raw84 = 5L, raw83 = 6L, time_s = 8L),
+      timestamp_line = 45L,
+      timestamp_format = "%m/%d/%Y %I:%M:%S %p"
     ),
     reduction = list(
       integration = 5L,
@@ -46,9 +48,20 @@ default_settings <- function() {
     ),
     regions = list(
       default_labels = paste("Region", 1:8)
+    ),
+    # Reference material correction (see calibrate_project()). It is off
+    # until a primary reference material is chosen.
+    calibration = list(
+      baseline = "per_run",
+      primary = "",
+      fit = "linear",
+      session_gap_h = 6
     )
   )
 }
+
+CALIBRATION_FITS <- c("linear", "spline", "step", "mean")
+BASELINE_MODES <- c("per_run", "baseline_runs")
 
 #' Combine settings with overrides
 #'
@@ -85,6 +98,17 @@ check_settings <- function(settings) {
          call. = FALSE)
   }
   check_import(settings$import)
+  cal <- settings$calibration
+  if (!cal$baseline %in% BASELINE_MODES) {
+    stop("calibration$baseline must be 'per_run' or 'baseline_runs'.", call. = FALSE)
+  }
+  if (!cal$fit %in% CALIBRATION_FITS) {
+    stop("calibration$fit must be one of: ", paste(CALIBRATION_FITS, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  if (!is.numeric(cal$session_gap_h) || length(cal$session_gap_h) != 1 || cal$session_gap_h <= 0) {
+    stop("calibration$session_gap_h must be a positive number of hours.", call. = FALSE)
+  }
   invisible(settings)
 }
 
@@ -152,7 +176,9 @@ import_v1_settings <- function(path) {
       columns = list(raw88 = int(v1$raw88), raw87 = int(v1$raw87),
                      raw86 = int(v1$raw86), raw85 = int(v1$raw85),
                      raw84 = int(v1$raw84), raw83 = int(v1$raw83),
-                     time_s = int(v1$cyclesec))
+                     time_s = int(v1$cyclesec)),
+      timestamp_line = 0L,
+      timestamp_format = default_settings()$import$timestamp_format
     ),
     reduction = list(
       integration = int(v1$integration),

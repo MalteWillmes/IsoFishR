@@ -9,8 +9,8 @@ project_regions(project, sample_ids = NULL)
 \arguments{
 \item{project}{A project from \code{\link[=open_project]{open_project()}}.}
 
-\item{sample_ids}{Samples to return; defaults to all samples that are not
-excluded.}
+\item{sample_ids}{Samples to return; defaults to all runs that are not
+excluded or baseline runs.}
 }
 \value{
 One row per sample and region; see \code{\link[=summarise_regions]{summarise_regions()}}.

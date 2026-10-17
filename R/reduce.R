@@ -17,17 +17,23 @@ MASS <- c(
 #'
 #' @param raw Raw cycle data from [read_runfiles()].
 #' @param settings A settings list (see [default_settings()]).
+#' @param blank Optional blank voltages to subtract instead of each run's own
+#'   blank: a data frame with `sample_id` and `blk88` to `blk83`, e.g.
+#'   interpolated from baseline runs (see [project_baselines()]). When given,
+#'   the start of each run is not treated as blank; laser-off cycles are
+#'   removed by the 88Sr threshold.
 #' @return A list with `data` (one row per integrated cycle) and `blank`
 #'   (mean blank voltages per sample, or `NULL` without blank correction).
 #' @export
-reduce_runs <- function(raw, settings = default_settings()) {
+reduce_runs <- function(raw, settings = default_settings(), blank = NULL) {
   check_settings(settings)
   r <- settings$reduction
 
   data <- integrate_cycles(raw, r$integration)
 
-  blank <- NULL
-  if (isTRUE(r$blank_correction)) {
+  if (!is.null(blank)) {
+    blank <- dplyr::mutate(blank, n_blank = blank$n_blank %||% NA_integer_)
+  } else if (isTRUE(r$blank_correction)) {
     blank <- summarise_blank(data, r$blank_time_s, r$raw88_min_v)
     data <- dplyr::filter(data, time_s > r$blank_time_s)
   }

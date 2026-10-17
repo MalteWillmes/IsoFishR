@@ -54,6 +54,7 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
     sample_id = sample_ids, runfile = runfiles, source = source_names, md5 = md5,
     added = timestamp_now(), added_by = project$user, !!!sample_defaults()
   )
+  new_rows$acquired <- format_time(read_acquisition_times(paths, project$settings$import))
   project$samples <- dplyr::bind_rows(project$samples, new_rows)
   write_table_file(project$samples, project_file(project$path, "samples.csv"))
   append_log(project_file(project$path, "log.csv"),
@@ -198,6 +199,11 @@ set_regions <- function(project, sample_id, regions) {
 update_project_settings <- function(project, overrides) {
   check_writable(project)
   new <- merge_settings(project$settings, overrides)
+  primary <- new$calibration$primary
+  if (nzchar(primary) && !primary %in% project$reference_materials$name) {
+    stop("The primary reference material '", primary, "' is not defined in this project.",
+         call. = FALSE)
+  }
   old_flat <- flatten_settings(project$settings)
   new_flat <- flatten_settings(new)
   keys <- union(names(old_flat), names(new_flat))
@@ -209,6 +215,9 @@ update_project_settings <- function(project, overrides) {
   append_log(project_file(project$path, "log.csv"),
              log_entry(project$user, "project_setting", "", changed,
                        old_flat[changed], new_flat[changed]))
+  if (any(grepl("^import\\.timestamp_", changed))) {
+    project <- fill_acquisition_times(project, force = TRUE)
+  }
   project
 }
 

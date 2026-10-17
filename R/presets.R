@@ -112,6 +112,7 @@ import_values <- function(import) {
   import$columns <- lapply(import$columns, as.integer)
   import$skip_header <- as.integer(import$skip_header)
   import$skip_footer <- as.integer(import$skip_footer)
+  import$timestamp_line <- as.integer(import$timestamp_line %||% 0L)
   import
 }
 
@@ -137,6 +138,14 @@ check_import <- function(import) {
   }
   if (!is.character(import$sep) || length(import$sep) != 1 || nchar(import$sep) != 1) {
     stop("import$sep must be a single character, such as \",\" or \"\\t\".", call. = FALSE)
+  }
+  line <- import$timestamp_line %||% 0
+  if (!is.numeric(line) || length(line) != 1 || is.na(line) || line < 0) {
+    stop("import$timestamp_line must be a line number, or 0 if the files have no timestamp.",
+         call. = FALSE)
+  }
+  if (line > 0 && (!is.character(import$timestamp_format) || !nzchar(import$timestamp_format))) {
+    stop("import$timestamp_format is needed to read the timestamp line.", call. = FALSE)
   }
   invisible(import)
 }

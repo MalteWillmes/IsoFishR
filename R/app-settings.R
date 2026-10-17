@@ -31,7 +31,9 @@ settings_spec <- function() {
     "import",    "skip_footer",      "Footer lines to skip",              "integer", NULL,
     "import",    "sep",              "Separator",                         "choice",
       c("Comma" = ",", "Tab" = "\t", "Semicolon" = ";"),
-    "import",    "header",           "Data has column headings",          "logical", NULL
+    "import",    "header",           "Data has column headings",          "logical", NULL,
+    "import",    "timestamp_line",   "Line with the acquisition date/time (0 = none)", "integer", NULL,
+    "import",    "timestamp_format", "Date/time format (R strptime)",     "text",    NULL
   )
 }
 

@@ -28,7 +28,11 @@ samples_template <- function() {
     cp_enabled = logical(),
     cp_method = character(),
     cp_penalty = double(),
-    settings = character()
+    settings = character(),
+    acquired = character(),
+    run_type = character(),
+    reference_material = character(),
+    session = character()
   )
 }
 
@@ -37,12 +41,19 @@ samples_template <- function() {
 sample_defaults <- function() {
   list(status = "new", flag = FALSE, comment = "", trim_start_s = 0, trim_end_s = 0,
        reverse = FALSE, rezero = TRUE, cp_enabled = FALSE, cp_method = "PELT",
-       cp_penalty = 5e-5, settings = "")
+       cp_penalty = 5e-5, settings = "", acquired = "", run_type = "sample",
+       reference_material = "", session = "")
 }
 
 SAMPLE_STATUS <- c("new", "reviewed", "excluded")
+RUN_TYPES <- c("sample", "baseline", "reference")
 EDITABLE_SAMPLE_FIELDS <- c("status", "flag", "comment", "trim_start_s", "trim_end_s",
                             "reverse", "rezero", "cp_enabled", "cp_method", "cp_penalty")
+
+reference_materials_template <- function() {
+  tibble::tibble(name = character(), value = double(), uncertainty_2s = double(),
+                 note = character())
+}
 
 regions_template <- function() {
   tibble::tibble(sample_id = character(), region = character(),
