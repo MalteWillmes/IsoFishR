@@ -1,0 +1,37 @@
+Package: IsoFishR
+Title: Data Reduction and Analysis of Laser-Ablation Strontium Isotope Profiles
+Version: 1.99.0.9000
+Authors@R: c(
+    person("Malte", "Willmes", , "malte.willmes@gmail.com", role = c("aut", "cre")),
+    person("Katherine", "Ransom", role = "aut"),
+    person("James", "Hobbs", role = "aut")
+  )
+Description: Reduces 87Sr/86Sr isotope ratios measured by laser-ablation
+    multi-collector ICP-MS (blank correction, Rb interference and mass bias
+    correction, outlier rejection, smoothing) and supports profile analysis
+    (trimming, regions, changepoints). Version 2 development; the original
+    application is preserved under the v1.1 tag.
+License: MIT + file LICENSE
+URL: https://github.com/MalteWillmes/IsoFishR
+BugReports: https://github.com/MalteWillmes/IsoFishR/issues
+Depends:
+    R (>= 4.1)
+Imports:
+    changepoint,
+    dplyr (>= 1.1.0),
+    mgcv,
+    purrr,
+    readr,
+    rlang,
+    stats,
+    tibble,
+    tidyr,
+    utils,
+    yaml
+Suggests:
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3

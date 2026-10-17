@@ -299,3 +299,9 @@ Projects/Feather_archaeology/Data/Feather_archaeology_04_analyzed_data.csv
 Projects/Feather_archaeology/Data/Feather_archaeology_03_reduced_data.csv
 Projects/Feather_archaeology/Data/Feather_archaeology_02_background_data.csv
 Projects/Feather_archaeology/Data/Feather_archaeology_01_raw_data.csv
+
+# v2: R session files and user project data (only the Default example project is tracked)
+.Rhistory
+.Rproj.user/
+/Projects/*
+!/Projects/Default/

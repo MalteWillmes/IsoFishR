@@ -1,0 +1,13 @@
+^\.Rhistory$
+^\.RData$
+^\.Rproj\.user$
+^.*\.Rproj$
+^LICENSE\.md$
+^README\.md$
+^_config\.yml$
+^dev$
+# v1 application files, kept on this branch for reference until the v2 app replaces them
+^IsoFishR\.R$
+^Projects$
+^www$
+^metadata\.csv$
