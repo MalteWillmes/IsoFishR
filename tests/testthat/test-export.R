@@ -61,7 +61,8 @@ test_that("export_project writes the summaries to a new folder and logs it", {
   p <- export_fixture()
   dir <- export_project(p)
   expect_setequal(list.files(dir),
-                  c("samples.csv", "regions.csv", "changepoints.csv", "settings.csv", "export_info.yml"))
+                  c("samples.csv", "regions.csv", "changepoints.csv", "settings.csv", "profiles.csv",
+                    "export_info.yml"))
   info <- yaml::read_yaml(file.path(dir, "export_info.yml"))
   expect_equal(info$exported_by, "tester")
   expect_equal(info$samples, 2)
@@ -81,4 +82,52 @@ test_that("a project without samples cannot be exported", {
   p <- create_project(path, user = "tester")
   on.exit(close_project(p))
   expect_error(export_project(p), "no samples")
+})
+
+test_that("profiles hold every point of every included sample, after edits", {
+  p <- export_fixture()
+  ids <- p$samples$sample_id
+  pr <- project_profiles(p)
+  d <- project_data(p, ids[1:2])
+
+  expect_equal(unique(pr$sample_id), ids[1:2])          # excluded sample left out
+  expect_equal(nrow(pr), nrow(d))                         # one row per point
+  expect_equal(pr$distance_um, d$distance_um)
+  expect_equal(min(pr$distance_um[pr$sample_id == ids[1]]), 0)   # trimmed and re-zeroed
+  expect_equal(pr$sr87_sr86, d$sr87_sr86)
+  expect_equal(pr$sr87_sr86_smoothed, d$sr87_sr86_ma)
+  expect_equal(pr$sr87_sr86_smoothed_se, d$sr87_sr86_ma_se)
+  expect_equal(unique(pr$smoothing), "ma")
+
+  # Region labels per point match the region definitions
+  core <- pr$sample_id == ids[1] & pr$time_s >= 200 & pr$time_s <= 260
+  expect_true(all(pr$region[core] == "core"))
+  expect_true(all(pr$region[pr$sample_id == ids[2]] == ""))
+
+  # Changepoints only for the sample that has them enabled
+  expect_false(anyNA(pr$cp_segment[pr$sample_id == ids[1] & !is.na(pr$sr87_sr86)]))
+  expect_true(all(is.na(pr$cp_segment[pr$sample_id == ids[2]])))
+
+  expect_equal(nrow(project_profiles(p, include_excluded = TRUE)),
+               nrow(project_data(p, ids)))
+})
+
+test_that("profiles report the spline and its SE for spline-smoothed samples", {
+  p <- export_fixture()
+  id <- p$samples$sample_id[2]
+  p <- set_sample_settings(p, id, smoothing = "spline")
+  pr <- dplyr::filter(project_profiles(p), sample_id == id)
+  d <- project_data(p, id)
+  expect_equal(unique(pr$smoothing), "spline")
+  expect_equal(pr$sr87_sr86_smoothed, d$sr87_sr86_spline)
+  expect_equal(pr$sr87_sr86_smoothed_se, d$sr87_sr86_spline_se)
+})
+
+test_that("profiles.csv is written with every point and rounded values", {
+  p <- export_fixture()
+  dir <- export_project(p)
+  pr <- readr::read_csv(file.path(dir, "profiles.csv"), show_col_types = FALSE)
+  expect_equal(nrow(pr), nrow(project_profiles(p)))
+  expect_equal(pr$sr87_sr86, round(project_profiles(p)$sr87_sr86, 6))
+  expect_true("profiles.csv" %in% yaml::read_yaml(file.path(dir, "export_info.yml"))$files)
 })

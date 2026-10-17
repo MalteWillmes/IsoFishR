@@ -12,14 +12,19 @@ export_ui <- function(id) {
                "Writes the tables to a new dated folder in the project's exports folder. ",
                "Earlier exports are kept."),
       shiny::checkboxInput(ns("include_excluded"), "Include excluded samples", FALSE),
-      shiny::checkboxInput(ns("include_data"), "Also export every data point (data.csv)", FALSE),
+      shiny::p(class = "ifr-muted small",
+               "Every export includes profiles.csv: all points of every profile in one table."),
+      shiny::checkboxInput(ns("include_data"),
+                           "Also export all reduction columns (data.csv, for checking the reduction)",
+                           FALSE),
       shiny::actionButton(ns("export"), "Export", class = "btn-primary"),
       shiny::uiOutput(ns("last_export"))
     ),
     bslib::navset_card_underline(
       bslib::nav_panel("Regions", DT::DTOutput(ns("regions"))),
       bslib::nav_panel("Samples", DT::DTOutput(ns("samples"))),
-      bslib::nav_panel("Changepoints", DT::DTOutput(ns("changepoints")))
+      bslib::nav_panel("Changepoints", DT::DTOutput(ns("changepoints"))),
+      bslib::nav_panel("Profiles", DT::DTOutput(ns("profiles")))
     )
   )
 }
@@ -56,6 +61,12 @@ export_server <- function(id, project) {
       x <- summarise_project_changepoints(project(), preview_data(), input$include_excluded)
       shiny::validate(shiny::need(nrow(x) > 0, "No samples have changepoint detection enabled."))
       preview_table(x)
+    })
+
+    output$profiles <- DT::renderDT({
+      x <- round_summary(project_profiles(project(), preview_data(), input$include_excluded))
+      DT::datatable(x, rownames = FALSE, filter = "top",
+                    options = list(pageLength = 25, dom = "tip", scrollX = TRUE))
     })
 
     shiny::observeEvent(input$export, {

@@ -11,7 +11,7 @@ export_project(project, include_excluded = FALSE, include_data = FALSE)
 
 \item{include_excluded}{Include samples with status \code{"excluded"}.}
 
-\item{include_data}{Also write the reduced data point by point.}
+\item{include_data}{Also write all reduction columns point by point.}
 }
 \value{
 The path of the export folder, invisibly.
@@ -28,6 +28,9 @@ Files written:
 \item \code{regions.csv}: \code{\link[=summarise_project_regions]{summarise_project_regions()}}
 \item \code{changepoints.csv}: \code{\link[=summarise_project_changepoints]{summarise_project_changepoints()}}
 \item \code{settings.csv}: \code{\link[=project_settings_table]{project_settings_table()}}
-\item \code{data.csv} (only with \code{include_data = TRUE}): every reduced point.
+\item \code{profiles.csv}: \code{\link[=project_profiles]{project_profiles()}}, every point of every profile
+\item \code{data.csv} (only with \code{include_data = TRUE}): all reduction columns per
+point (raw voltages, mass bias, intermediate ratios), for checking the
+reduction itself.
 }
 }

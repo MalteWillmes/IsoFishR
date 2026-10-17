@@ -86,7 +86,8 @@ A preset is a named runfile layout: header/footer lines, separator, and which co
 | `regions.csv` | One row per sample and region: mean, SD, n, SE, mean of smoothed values, distance range, start/end time |
 | `changepoints.csv` | One row per segment for samples with changepoints enabled: mean, SD, n, SE, distance range, method, penalty |
 | `settings.csv` | Every setting each sample was reduced with (project defaults plus overrides) |
-| `data.csv` | Optional: every reduced point |
+| `profiles.csv` | Always: every point of every profile in one table (after trims/reversal). Columns: distance, time, the point's 87Sr/86Sr (empty if rejected), the rejected value, the smoothed value and its SE for the sample's smoothing method, region name(s), changepoint segment and mean, total Sr, 83Kr, 85Rb/88Sr, 84Sr/86Sr |
+| `data.csv` | Optional: all reduction columns per point (raw voltages, mass bias, intermediate ratios), for checking the reduction itself |
 | `export_info.yml` | Project, date, user, IsoFishR version, options |
 
 Statistics come from the individual points (outliers removed), not the smoothed values. v1 used the smoothed values, whose SE understates the uncertainty because neighbouring values are autocorrelated. The app's selection summary and region table use the same calculation, so what you see matches the export. Values are rounded on export (means 6 decimals, SD/SE 7, distances/times 0.1). Excluded samples are left out unless requested.

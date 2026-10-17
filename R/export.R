@@ -130,6 +130,81 @@ project_settings_table <- function(project, include_excluded = FALSE) {
     purrr::list_rbind()
 }
 
+#' Full profiles of all samples
+#'
+#' One row per measurement point for every sample, after trims and reversal:
+#' the profile as plotted in the app, in a single table.
+#'
+#' Columns: `sample_id`, `distance_um`, `time_s`, `sr87_sr86` (the point,
+#' `NA` if rejected), `sr87_sr86_outlier` (rejected value), `sr87_sr86_smoothed`
+#' and `sr87_sr86_smoothed_se` (by the sample's smoothing method, named in
+#' `smoothing`; empty for `"none"`), `region` (region name(s) the point falls
+#' in, separated by `;`), `cp_segment` and `cp_mean` (for samples with
+#' changepoints enabled), and the signal columns `total_sr_v`, `kr83_v`,
+#' `rb85_sr88` and `sr84_sr86`.
+#'
+#' @inheritParams project_summaries
+#' @return A tibble.
+#' @export
+project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
+  samples <- export_samples(project, include_excluded)
+  if (nrow(samples) == 0) stop("The project has no samples to export.", call. = FALSE)
+  data <- data %||% project_data(project, samples$sample_id)
+  data <- dplyr::filter(data, sample_id %in% samples$sample_id)
+
+  smoothing <- tibble::tibble(
+    sample_id = samples$sample_id,
+    smoothing = purrr::map_chr(samples$sample_id, \(id) sample_settings(project, id)$reduction$smoothing)
+  )
+  spline_se <- if ("sr87_sr86_spline_se" %in% names(data)) data$sr87_sr86_spline_se else NA_real_
+
+  # Changepoint segments for samples that have them enabled
+  cp_samples <- dplyr::filter(samples, .data$cp_enabled)
+  cp <- purrr::pmap(cp_samples, \(sample_id, cp_method, cp_penalty, ...) {
+    d <- dplyr::filter(data, .data$sample_id == !!sample_id)
+    if (nrow(d) < 3) return(NULL)
+    find_changepoints(d, cp_method, cp_penalty) |>
+      dplyr::select("sample_id", "time_s", "cp_segment", "cp_mean")
+  }) |>
+    purrr::list_rbind() |>
+    dplyr::bind_rows(tibble::tibble(sample_id = character(), time_s = double(),
+                                    cp_segment = integer(), cp_mean = double()))
+
+  # Region name(s) per point
+  regions <- dplyr::filter(project$regions, sample_id %in% samples$sample_id)
+  point_regions <- data |>
+    dplyr::select("sample_id", "time_s") |>
+    dplyr::inner_join(regions, by = dplyr::join_by(sample_id, dplyr::between(time_s, start_s, end_s))) |>
+    dplyr::summarise(region = paste(region, collapse = "; "), .by = c(sample_id, time_s))
+
+  data |>
+    dplyr::mutate(.spline_se = spline_se) |>
+    dplyr::left_join(smoothing, by = "sample_id") |>
+    dplyr::left_join(point_regions, by = c("sample_id", "time_s")) |>
+    dplyr::left_join(cp, by = c("sample_id", "time_s")) |>
+    dplyr::transmute(
+      sample_id,
+      distance_um,
+      time_s,
+      sr87_sr86,
+      sr87_sr86_outlier,
+      sr87_sr86_smoothed = dplyr::if_else(.data$smoothing == "none", NA_real_, sr87_sr86_value),
+      sr87_sr86_smoothed_se = dplyr::case_when(
+        .data$smoothing == "ma" ~ sr87_sr86_ma_se,
+        .data$smoothing == "spline" ~ .data$.spline_se,
+        .default = NA_real_
+      ),
+      smoothing = .data$smoothing,
+      region = dplyr::coalesce(.data$region, ""),
+      cp_segment = .data$cp_segment,
+      cp_mean = .data$cp_mean,
+      total_sr_v = .data$total_sr,
+      kr83_v = raw83,
+      rb85_sr88 = .data$rb85_sr88,
+      sr84_sr86
+    )
+}
+
 #' Export project summaries
 #'
 #' Writes the summary tables to a new time-stamped folder in the project's
@@ -141,10 +216,13 @@ project_settings_table <- function(project, include_excluded = FALSE) {
 #' * `regions.csv`: [summarise_project_regions()]
 #' * `changepoints.csv`: [summarise_project_changepoints()]
 #' * `settings.csv`: [project_settings_table()]
-#' * `data.csv` (only with `include_data = TRUE`): every reduced point.
+#' * `profiles.csv`: [project_profiles()], every point of every profile
+#' * `data.csv` (only with `include_data = TRUE`): all reduction columns per
+#'   point (raw voltages, mass bias, intermediate ratios), for checking the
+#'   reduction itself.
 #'
 #' @inheritParams project_summaries
-#' @param include_data Also write the reduced data point by point.
+#' @param include_data Also write all reduction columns point by point.
 #' @return The path of the export folder, invisibly.
 #' @export
 export_project <- function(project, include_excluded = FALSE, include_data = FALSE) {
@@ -161,7 +239,8 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
     samples = summarise_project_samples(project, data, include_excluded),
     regions = summarise_project_regions(project, data, include_excluded),
     changepoints = summarise_project_changepoints(project, data, include_excluded),
-    settings = project_settings_table(project, include_excluded)
+    settings = project_settings_table(project, include_excluded),
+    profiles = project_profiles(project, data, include_excluded)
   )
   tables <- purrr::map(tables, round_summary)
   if (include_data) tables$data <- data
@@ -183,13 +262,17 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
   invisible(dir)
 }
 
-# Round summary columns to a sensible precision for the CSV files: ratio
-# means to 6 decimals, their spread to 7, distances and times to 0.1.
+# Round columns to a sensible precision for the CSV files: 87Sr/86Sr values
+# and means to 6 decimals, their spread and the small signal ratios to 7,
+# voltages to 5, distances and times to 0.1.
 round_summary <- function(x) {
   x |>
     dplyr::mutate(
-      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed")), \(v) round(v, 6)),
-      dplyr::across(dplyr::any_of(c("sd", "se")), \(v) round(v, 7)),
+      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "sr87_sr86", "sr87_sr86_outlier",
+                                    "sr87_sr86_smoothed", "cp_mean", "sr84_sr86")), \(v) round(v, 6)),
+      dplyr::across(dplyr::any_of(c("sd", "se", "sr87_sr86_smoothed_se", "rb85_sr88", "kr83_v")),
+                    \(v) round(v, 7)),
+      dplyr::across(dplyr::any_of("total_sr_v"), \(v) round(v, 5)),
       dplyr::across(dplyr::matches("_um$|_s$") & dplyr::where(is.double), \(v) round(v, 1))
     )
 }
