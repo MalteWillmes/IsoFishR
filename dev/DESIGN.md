@@ -52,6 +52,19 @@ Cache files are named `<hash of sample ID>_<hash of md5 + import + reduction set
 
 The lock is advisory: Dropbox sync is not instant, so two people opening the same project within seconds of each other can still clash. A session whose lock was taken over refuses further writes.
 
+## App (`run_app()`)
+- **Start screen:** open a project folder (Browse uses the native folder dialog; recent projects are listed) or create one, and enter the name recorded in the log. If another user holds the lock, the app offers read-only access or a takeover.
+- **Workspace:**
+  - **Left:** sample table with status and flag, search, Add runfiles, and previous/next buttons.
+  - **Centre:** interactive plotly profile with the smoothed line, uncertainty band, outliers, region shading, changepoint means, an optional seawater line, and total Sr, 83Kr and 85Rb/88Sr strips. Dragging selects a distance range and the footer shows its mean ± 2 SE.
+  - **Edit tab:** keep only the selected range (trim), trims in µm, rezero, reverse, add/remove regions from the selection with a region statistics table, and changepoints.
+  - **Reduction tab:** this sample's settings, with "Apply to this sample" and "Use project settings".
+  - **Notes tab:** status, flag, comment, "Mark reviewed and go to next", sample details and history.
+- **Project settings page:** reduction, sample/laser and runfile import defaults, plus default region names.
+- **Change log page:** filterable `log.csv`.
+- Edits save immediately. Text and number fields save when they lose focus, and a field is only written if its value differs from the stored one, so switching samples never writes anything.
+- Each open project has its own lock token, so several browser tabs in one R process can't release each other's lock. The app stops once no tab has been connected for 5 seconds (a page reload does not stop it).
+
 ## Package layout
 | File | Contents |
 |---|---|
@@ -64,6 +77,12 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 | `R/project-samples.R` | Add runfiles, sample edits, per-sample settings, regions, project settings |
 | `R/project-data.R` | Cached per-sample reduction, `project_data()`, `project_regions()` |
 | `R/project-io.R` | CSV/YAML reading and writing (fixed column types, atomic writes) |
+| `R/app.R` | `run_app()`, start screen, lock conflicts, session handling |
+| `R/app-workspace.R` | Workspace module (sample table, plot, Edit / Reduction / Notes) |
+| `R/app-plot.R` | `profile_plot()` |
+| `R/app-project.R` | Project settings and change log pages |
+| `R/app-settings.R` | Settings form definitions shared by the project and sample forms |
+| `R/app-utils.R` | Folder dialog, recent projects, error notifications |
 
 ## v1 bugs fixed (each has a regression test)
 - Integration blocks spanned two runfiles (`rollapply` ignored the sample grouping).
@@ -83,5 +102,6 @@ Run `Rscript dev/compare_v1.R`. Where v1 and v2 produce the same integrated cycl
 
 ## Next steps
 1. ~~Project folder functions~~ (done).
-2. Shiny workspace (sample table, plots, Reduction / Edit / Notes panels), with autosave.
-3. Exports and a v1 project importer. Also removing samples, which is not supported yet.
+2. ~~Shiny workspace~~ (first version done).
+3. Exports (summary table, per-sample data, PDF plots, settings used) and a v1 project importer. Also removing samples, which is not supported yet.
+4. App polish once used with real data: keyboard shortcuts, a whole-project overview plot, layout on small screens.

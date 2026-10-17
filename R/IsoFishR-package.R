@@ -1,6 +1,6 @@
 #' @keywords internal
 #' @importFrom mgcv s
-#' @importFrom rlang .data
+#' @importFrom rlang .data :=
 "_PACKAGE"
 
 # Column names used inside dplyr verbs (avoids R CMD check notes)

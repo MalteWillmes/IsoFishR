@@ -17,18 +17,25 @@ BugReports: https://github.com/MalteWillmes/IsoFishR/issues
 Depends:
     R (>= 4.1)
 Imports:
+    bslib (>= 0.6.0),
     changepoint,
     dplyr (>= 1.1.0),
+    DT,
+    later,
     mgcv,
+    plotly,
     purrr,
     readr,
-    rlang,
+    rlang (>= 1.1.0),
+    shiny (>= 1.8.1),
     stats,
     tibble,
     tidyr,
     utils,
     yaml
 Suggests:
+    rstudioapi,
+    tcltk,
     testthat (>= 3.0.0),
     withr
 Config/testthat/edition: 3

@@ -78,7 +78,10 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
          yml$project$isofishr_version, "). Please update IsoFishR.", call. = FALSE)
   }
   path <- normalizePath(path, winslash = "/")
-  if (!read_only) acquire_lock(path, user, force)
+  # Identifies this open project in the lock file (several app sessions can
+  # share one R process, so the process ID alone is not enough).
+  token <- rlang::hash(list(user, Sys.getpid(), Sys.time(), stats::runif(1)))
+  if (!read_only) acquire_lock(path, user, token, force)
 
   structure(
     list(
@@ -89,7 +92,8 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
                                 sample_defaults()),
       regions = read_table_file(project_file(path, "regions.csv"), regions_template()),
       user = user,
-      read_only = read_only
+      read_only = read_only,
+      lock_token = if (read_only) NA_character_ else token
     ),
     class = "isofishr_project"
   )
@@ -127,13 +131,14 @@ read_log <- function(project) {
 
 # ---- locking -----------------------------------------------------------------
 
-lock_info <- function(user) {
-  list(user = user, host = Sys.info()[["nodename"]], pid = Sys.getpid(), time = timestamp_now())
+lock_info <- function(user, token) {
+  list(user = user, host = Sys.info()[["nodename"]], pid = Sys.getpid(),
+       time = timestamp_now(), token = token)
 }
 
-acquire_lock <- function(path, user, force = FALSE) {
+acquire_lock <- function(path, user, token, force = FALSE) {
   lock_path <- project_file(path, ".lock")
-  me <- lock_info(user)
+  me <- lock_info(user, token)
   if (file.exists(lock_path) && !force) {
     other <- yaml::read_yaml(lock_path)
     # The same user on the same computer may take over (e.g. after a crash).
@@ -149,10 +154,8 @@ acquire_lock <- function(path, user, force = FALSE) {
 owns_lock <- function(project) {
   lock_path <- project_file(project$path, ".lock")
   if (!file.exists(lock_path)) return(FALSE)
-  lock <- yaml::read_yaml(lock_path)
-  identical(lock$user, project$user) &&
-    identical(lock$host, Sys.info()[["nodename"]]) &&
-    identical(as.integer(lock$pid), Sys.getpid())
+  lock <- tryCatch(yaml::read_yaml(lock_path), error = function(e) list())
+  identical(lock$token, project$lock_token)
 }
 
 check_writable <- function(project) {

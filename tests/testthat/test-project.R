@@ -147,6 +147,18 @@ test_that("the lock stops a second user, allows read-only access and can be forc
   expect_false(file.exists(file.path(p$path, ".lock")))
 })
 
+test_that("a taken-over session cannot release the new owner's lock", {
+  # Two app tabs run in the same R process, so the process ID is not enough
+  # to tell them apart.
+  p <- new_project()
+  second <- open_project(p$path, user = "tester")
+  close_project(p)
+  expect_true(file.exists(file.path(p$path, ".lock")))
+  expect_no_error(update_project_settings(second, list(reduction = list(ma_window = 3L))))
+  close_project(second)
+  expect_false(file.exists(file.path(p$path, ".lock")))
+})
+
 test_that("project_data reduces with per-sample settings, applies edits and caches", {
   p <- add_runfiles(new_project(), salmon(2))
   ids <- p$samples$sample_id
