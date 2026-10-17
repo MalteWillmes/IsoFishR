@@ -102,11 +102,11 @@ app_server <- function(initial_project = NULL, user = default_user()) {
 
     # ---- start screen ----
     shiny::observeEvent(input$browse_open, {
-      path <- choose_folder("Select an IsoFishR project folder")
+      path <- choose_folder("Select an IsoFishR project folder", input$open_path %||% "")
       if (!is.null(path)) shiny::updateTextInput(session, "open_path", value = path)
     })
     shiny::observeEvent(input$browse_parent, {
-      path <- choose_folder("Select where to create the project")
+      path <- choose_folder("Select where to create the project", input$create_parent %||% "")
       if (!is.null(path)) shiny::updateTextInput(session, "create_parent", value = path)
     })
     shiny::observeEvent(input$open, {
