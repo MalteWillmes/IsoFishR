@@ -140,6 +140,7 @@ app_server <- function(initial_project = NULL, user = default_user()) {
     })
 
     workspace_server("ws", project)
+    export_server("export", project)
     project_settings_server("settings", project)
     log_server("log", project)
 
@@ -209,6 +210,7 @@ workspace_page_ui <- function() {
     fillable = "Workspace",
     padding = 0,
     bslib::nav_panel("Workspace", workspace_ui("ws")),
+    bslib::nav_panel("Export", export_ui("export")),
     bslib::nav_panel("Project settings", project_settings_ui("settings")),
     bslib::nav_panel("Change log", log_ui("log")),
     bslib::nav_spacer(),

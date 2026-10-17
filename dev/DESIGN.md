@@ -65,6 +65,20 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - Edits save immediately. Text and number fields save when they lose focus, and a field is only written if its value differs from the stored one, so switching samples never writes anything.
 - Each open project has its own lock token, so several browser tabs in one R process can't release each other's lock. The app stops once no tab has been connected for 5 seconds (a page reload does not stop it).
 
+## Exports
+`export_project()` (and the app's Export page) writes summary tables to `exports/<date_time>/` and keeps earlier exports. Per-sample PDF plots are no longer produced.
+
+| File | Contents |
+|---|---|
+| `samples.csv` | One row per sample: source file, status, flag, comment, trims (µm), reverse, n points/outliers, profile mean/SD/SE, mean of smoothed values, number of regions and changepoint segments, setting overrides |
+| `regions.csv` | One row per sample and region: mean, SD, n, SE, mean of smoothed values, distance range, start/end time |
+| `changepoints.csv` | One row per segment for samples with changepoints enabled: mean, SD, n, SE, distance range, method, penalty |
+| `settings.csv` | Every setting each sample was reduced with (project defaults plus overrides) |
+| `data.csv` | Optional: every reduced point |
+| `export_info.yml` | Project, date, user, IsoFishR version, options |
+
+Statistics come from the individual points (outliers removed), not the smoothed values. v1 used the smoothed values, whose SE understates the uncertainty because neighbouring values are autocorrelated. Values are rounded on export (means 6 decimals, SD/SE 7, distances/times 0.1). Excluded samples are left out unless requested.
+
 ## Package layout
 | File | Contents |
 |---|---|
@@ -83,6 +97,8 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 | `R/app-project.R` | Project settings and change log pages |
 | `R/app-settings.R` | Settings form definitions shared by the project and sample forms |
 | `R/app-utils.R` | Folder dialog, recent projects, error notifications |
+| `R/export.R` | Summary tables and `export_project()` |
+| `R/app-export.R` | Export page |
 
 ## v1 bugs fixed (each has a regression test)
 - Integration blocks spanned two runfiles (`rollapply` ignored the sample grouping).
@@ -103,5 +119,5 @@ Run `Rscript dev/compare_v1.R`. Where v1 and v2 produce the same integrated cycl
 ## Next steps
 1. ~~Project folder functions~~ (done).
 2. ~~Shiny workspace~~ (first version done).
-3. Exports (summary table, per-sample data, PDF plots, settings used) and a v1 project importer. Also removing samples, which is not supported yet.
+3. ~~Exports~~ (done; no PDFs and no v1 project importer, by decision). Removing samples is not supported yet.
 4. App polish once used with real data: keyboard shortcuts, a whole-project overview plot, layout on small screens.

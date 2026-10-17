@@ -75,3 +75,16 @@ test_that("project settings page saves changed defaults", {
     expect_equal(rv()$settings$regions$default_labels, c("Core", "Edge"))
   })
 })
+
+test_that("export page writes an export and previews the summaries", {
+  p <- app_project()
+  p <- set_regions(p, p$samples$sample_id[1], data.frame(region = "core", start_s = 200, end_s = 260))
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(export_server, args = list(project = rv), {
+    session$setInputs(include_excluded = FALSE, include_data = FALSE)
+    expect_equal(nrow(preview_data()) > 0, TRUE)
+    session$setInputs(export = 1)
+    expect_true(dir.exists(last_dir()))
+    expect_true(file.exists(file.path(last_dir(), "regions.csv")))
+  })
+})
