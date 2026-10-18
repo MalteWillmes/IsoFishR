@@ -106,7 +106,7 @@ profile_plot <- function(data, regions = NULL,
       strip(~kr83, "<sup>83</sup>Kr (V)", "#2ca02c", ".5f"),
       strip(~rb85_sr88, "<sup>85</sup>Rb/<sup>88</sup>Sr", "#ff7f0e", ".5f")
     ))
-    heights <- c(0.58, 0.14, 0.14, 0.14)
+    heights <- c(0.4, 0.2, 0.2, 0.2)
   }
 
   p <- plotly::subplot(plots, nrows = length(plots), shareX = TRUE, titleY = TRUE,

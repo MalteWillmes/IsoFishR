@@ -81,7 +81,7 @@ test_that("export page writes an export and previews the summaries", {
   p <- set_regions(p, p$samples$sample_id[1], data.frame(region = "core", start_s = 200, end_s = 260))
   rv <- shiny::reactiveVal(p)
   shiny::testServer(export_server, args = list(project = rv), {
-    session$setInputs(include_excluded = FALSE, include_data = FALSE)
+    session$setInputs(files = c("samples", "regions"), include_excluded = FALSE)
     expect_equal(nrow(preview_data()) > 0, TRUE)
     session$setInputs(export = 1)
     expect_true(dir.exists(last_dir()))
@@ -260,7 +260,7 @@ test_that("creating a project from the start screen opens it", {
                       create_preset = "Nu_UCDavis", create = 1)
     expect_equal(project()$meta$name, "New")
     expect_equal(nrow(project()$samples), 0)
-    expect_equal(first_tab(), "Project settings")  # new projects start on their settings
+    expect_equal(opened_step(), "settings")  # new projects start on Settings
     close_project(project())
   })
   shiny::testServer(calibration_server,
@@ -272,7 +272,7 @@ test_that("creating a project from the start screen opens it", {
   })
 })
 
-test_that("the Add runfiles toggle skips or replaces same-name runs", {
+test_that("the Runfiles step skips or replaces same-name runs", {
   p <- app_project()
   rv <- shiny::reactiveVal(p)
   dir <- withr::local_tempdir()
@@ -280,7 +280,7 @@ test_that("the Add runfiles toggle skips or replaces same-name runs", {
   file.copy(salmon_files(1), changed)
   cat("\n", file = changed, append = TRUE)
   upload <- data.frame(name = "PC_2016_01_A2_4R.run", datapath = changed)
-  shiny::testServer(workspace_server, args = list(project = rv), {
+  shiny::testServer(runfiles_server, args = list(project = rv), {
     old_md5 <- rv()$samples$md5[1]
     session$setInputs(add_mode = "add", add_files = upload)
     expect_equal(rv()$samples$md5[1], old_md5)
@@ -289,4 +289,58 @@ test_that("the Add runfiles toggle skips or replaces same-name runs", {
     expect_equal(rv()$samples$source[1], "PC_2016_01_A2_4R.run")
     expect_equal(nrow(rv()$samples), 2)
   })
+})
+
+test_that("a project reopens on the step it was left on", {
+  p <- app_project()
+  path <- p$path
+  write_last_step(p, "calibration")
+  close_project(p)
+  shiny::testServer(app_server(initial_project = path, user = "tester"), {
+    session$flushReact()
+    expect_equal(opened_step(), "calibration")
+    session$setInputs(step = "export")
+    expect_equal(read_last_step(project()), "export")
+    session$setInputs(close_project = 1)
+    expect_null(project())
+  })
+})
+
+test_that("the Runfiles step adds a whole folder with subfolders", {
+  path <- file.path(withr::local_tempdir(), "P")
+  p <- create_project(path, user = "tester")
+  rv <- shiny::reactiveVal(p)
+  src <- withr::local_tempdir()
+  dir.create(file.path(src, "day1"))
+  dir.create(file.path(src, "day2"))
+  file.copy(salmon_files(2)[1], file.path(src, "day1"))
+  file.copy(salmon_files(2)[2], file.path(src, "day2"))
+  shiny::testServer(runfiles_server, args = list(project = rv), {
+    found(list(dir = src, files = find_runfiles(src, rv()$settings$import)))
+    session$setInputs(add_mode = "add", add_folder = 1)
+    expect_equal(nrow(rv()$samples), 2)
+    expect_null(found())
+    expect_equal(nrow(runs_table()), 2)
+    session$setInputs(runs_rows_selected = 1, remove = 1, remove_confirm = 1)
+    expect_equal(nrow(rv()$samples), 1)
+  })
+  close_project(shiny::isolate(rv()))
+})
+
+test_that("the Calibration step applies the SBO suggestion with the chosen value", {
+  runs <- data.frame(id = c("SBO_1", "fish", "SBO_2"), minute = c(0, 10, 20),
+                     ratio = c(0.70918, 0.7100, 0.70920))
+  p <- synthetic_project(runs)
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(calibration_server, args = list(project = rv), {
+    session$setInputs(sbo_value = 0.709175, sbo_apply = 1)
+    expect_equal(rv()$reference_materials$value[rv()$reference_materials$name == "SBO"], 0.709175)
+    expect_equal(rv()$settings$calibration$primary, "SBO")
+    expect_equal(sum(rv()$samples$run_type == "reference"), 2)
+    expect_equal(nrow(results()), 2)
+  })
+  b <- plotly::plotly_build(reference_material_plot(calibration_model(shiny::isolate(rv())),
+                                                    reference_material_results(shiny::isolate(rv()))))
+  names <- vapply(b$x$data, \(t) t$name %||% "", "")
+  expect_true(all(c("Uncorrected", "Corrected") %in% names))
 })

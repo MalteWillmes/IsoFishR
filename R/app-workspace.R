@@ -8,17 +8,9 @@ workspace_ui <- function(id) {
     fillable = TRUE,
     border = FALSE,
     sidebar = bslib::sidebar(
+      open = "always",  # set up while its step is hidden; would otherwise start collapsed
       width = 330,
       title = "Samples",
-      shiny::fileInput(ns("add_files"), NULL, multiple = TRUE,
-                       buttonLabel = "Add runfiles\u2026", placeholder = "No files added"),
-      shiny::radioButtons(
-        ns("add_mode"), "If a run with the same name is already in the project",
-        c("Keep it (skip the new file)" = "add", "Replace it with the new file" = "replace"),
-        selected = "add"
-      ),
-      shiny::p(class = "ifr-muted small",
-               "Replaced runs keep their edits, regions and notes; the old file is kept in raw/removed."),
       shiny::div(class = "ifr-sample-table", DT::DTOutput(ns("samples"))),
       shiny::div(
         class = "d-flex gap-2",
@@ -34,12 +26,13 @@ workspace_ui <- function(id) {
         bslib::card_header(
           class = "d-flex align-items-center gap-3 flex-wrap",
           shiny::textOutput(ns("sample_title"), inline = TRUE),
+          shiny::uiOutput(ns("calibration_badge"), inline = TRUE),
           shiny::div(
             class = "ms-auto",
             shiny::checkboxGroupInput(
               ns("show"), NULL, inline = TRUE,
               choices = c("Points" = "points", "Outliers" = "outliers", "Smoothed" = "smooth",
-                          "Uncertainty" = "band", "Seawater" = "seawater", "Signal strips" = "strips"),
+                          "Uncertainty" = "band", "Seawater" = "seawater", "Sr, Kr and Rb panels" = "strips"),
               selected = c("points", "outliers", "smooth", "band", "strips")
             )
           )
@@ -214,17 +207,6 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(input$prev, step_sample(-1))
     shiny::observeEvent(input$next_sample, step_sample(1))
 
-    shiny::observeEvent(input$add_files, {
-      f <- input$add_files
-      before <- project()$samples$sample_id
-      shiny::withProgress(message = "Adding runfiles", {
-        # add_runfiles() reports what was added, replaced or skipped.
-        change(add_runfiles, f$datapath, source_names = f$name, mode = input$add_mode %||% "add")
-      })
-      added <- setdiff(project()$samples$sample_id, before)
-      if (length(added) > 0) select_sample(added[1])
-    })
-
     # ---- data for the selected sample ----
     # The project object changes with every edit (a comment, a flag), but the
     # plot only depends on a few of its values. These keys change only when
@@ -274,6 +256,23 @@ workspace_server <- function(id, project) {
     output$sample_title <- shiny::renderText({
       row <- sample_row()
       paste0(row$sample_id, if (row$status == "excluded") " (excluded)")
+    })
+
+    # Whether the plotted 87Sr/86Sr is corrected to the primary reference
+    # material (step 4) or raw.
+    output$calibration_badge <- shiny::renderUI({
+      d <- sample_data()
+      cal <- shiny::isolate(project())$settings$calibration
+      if (!"correction_status" %in% names(d) || nrow(d) == 0) {
+        return(shiny::span(class = "badge text-bg-secondary", "Uncorrected (no calibration)"))
+      }
+      status <- d$correction_status[1]
+      if (startsWith(status, "corrected")) {
+        shiny::span(class = "badge text-bg-success",
+                    paste0("Corrected to ", cal$primary, " (", cal$fit, ")"))
+      } else {
+        shiny::span(class = "badge text-bg-warning", paste("Uncorrected:", status))
+      }
     })
 
     # Selection events can only be read once the plot exists (plotly warns

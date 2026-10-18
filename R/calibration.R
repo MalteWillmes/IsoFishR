@@ -266,6 +266,11 @@ reference_material_results <- function(project) {
                           role = character(), session = character()))
   }
   d <- project_data(project, runs$sample_id)
+  if (!"correction_factor" %in% names(d)) {
+    # No primary reference material yet: values are uncorrected.
+    d <- dplyr::mutate(d, sr87_sr86_uncorrected = sr87_sr86, correction_factor = NA_real_,
+                       correction_u_rel = NA_real_, correction_status = "off")
+  }
   d |>
     dplyr::summarise(
       n = sum(!is.na(sr87_sr86)),

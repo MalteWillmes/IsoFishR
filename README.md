@@ -22,46 +22,36 @@ Run the same line again to update. No extra build tools are needed on Windows, m
 IsoFishR::run_app()
 ```
 
-The app opens in your web browser. To stop it, click **Quit** (top right). If you close or reload the tab instead, the browser asks first; a closed tab stops the app after a few seconds.
+The app opens in your web browser. To stop it, click **Quit IsoFishR** (top right). If you close or reload the tab instead, the browser asks first; a closed tab stops the app after a few seconds.
 
-## A five-minute tour
+## The six steps
 
-1. **Create a project and add runfiles.** On the start screen, create a project in a new folder, then click **Add runfiles…** in the Workspace. To try IsoFishR without your own data, use the example runfiles that come with it (five Chinook salmon otoliths and one white seabass otolith). Find their folder with `system.file("extdata", "runfiles", package = "IsoFishR")`.
-2. **Workspace.** Pick a sample on the left to see its <sup>87</sup>Sr/<sup>86</sup>Sr profile, with total Sr, <sup>83</sup>Kr and <sup>85</sup>Rb/<sup>88</sup>Sr below it.
-   - Drag across the plot to select a range. The footer shows its mean ± 2 SE.
-   - **Edit:** keep only the selected range (trim), add it as a named region, reverse the profile, or detect changepoints.
-   - **Reduction:** change settings (e.g. blank time or smoothing) for this sample only.
-   - **Notes:** set the status (new, reviewed, excluded), flag the sample, and add a comment. "Mark reviewed and go to next" steps through samples quickly.
-3. **Export.** Writes summary tables and every profile point by point to a dated folder inside the project.
+The app guides you through a project from left to right. **Quit IsoFishR** and the **Change log** are always at the top right. Everything is saved as you work, and a project reopens on the step you last worked on.
 
-Everything is saved as you work. Close the app at any time, then reopen the project later to continue or add more samples.
+1. **Project.** Create a new project (a folder you choose, e.g. in Dropbox or on a shared drive) or open an existing one; recent projects are listed. Pick the instrument preset when creating a project.
+2. **Settings.** Check the runfile layout first.
+   - **Instrument preset:** `Nu_UCDavis` (Nu Plasma) is built in. For another instrument, set the layout, test it with **Check the layout with a runfile**, and save it as a preset to reuse it.
+   - **Reduction defaults:** run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing.
+3. **Runfiles.** Add runfiles as individual files, or choose a folder: all files with the preset's extension (`.run`) in it and its subfolders are found.
+   - **More batches:** you can add more at any time.
+   - **Same name as an existing run:** choose whether to keep the existing run or replace it with the new file. Replaced runs keep their edits, regions and notes.
+   - **Runs table:** lists all runs in acquisition order (read from the runfile timestamps), and lets you remove runs.
+4. **Calibration.** Correct the samples to a reference material measured in the same session, in the style of Iolite.
+   - **SBO suggestion:** runs with *SBO* in their name are suggested as the primary reference material, with an accepted value of 0.70918 that you can change.
+   - **Other reference materials:** add them with their accepted value and ± 2σ, then mark their runs under *Assign runs*. Runs can also be marked as baselines (gas blanks).
+   - **Primary vs secondary:** the primary reference material corrects the samples. By default this is a linear regression of its run means against time, within each analytical session. A new session starts after a gap of more than 6 hours, and runs can be moved between sessions. The correction is applied to every point at the time it was measured. Other fits are available under *Advanced*. All other reference materials are secondary: they are corrected like samples and reported per session as accuracy checks.
+   - **The plot:** each reference material's run means before and after correction, the regression line, the accepted values and the secondary session averages.
+   - **The table:** uncorrected and corrected mean and SD per reference material and session, with the deviation from the accepted value.
+5. **Workspace.** Large plots of <sup>87</sup>Sr/<sup>86</sup>Sr, total Sr, <sup>83</sup>Kr and <sup>85</sup>Rb/<sup>88</sup>Sr for each sample. A badge shows whether the values are corrected to the reference material or uncorrected. When the calibration changes, the plots update.
+   - **Selecting a range:** drag across the plot. The footer shows the range's mean ± 2 SE.
+   - **Edit:** trim, add the selection as a named region, reverse the profile, or detect changepoints.
+   - **Reduction:** change settings for one sample only.
+   - **Notes:** status, flag and comment. "Mark reviewed and go to next" steps through the samples.
+6. **Export.** Choose the files to write. They go to a new dated folder inside the project; earlier exports are kept.
 
-## Your own data
+Each sample keeps its own SE. The uncertainty of the correction, from the primary measurements and the accepted value, is reported separately and in a combined SE. Without a primary reference material, all values stay uncorrected.
 
-1. **Create a project** on the start screen. A project is a folder you choose, e.g. in Dropbox or on a shared drive, and it holds everything about a set of samples.
-2. **Choose the instrument preset** describing your runfile layout. `Nu_UCDavis` (Nu Plasma, the default) is built in. For another layout, set it under **Project settings > Runfile import**, check it with **Check the layout with a runfile**, and **save it as a preset** to reuse it in other projects.
-3. **Set the reduction defaults** under **Project settings**: run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing.
-4. **Add runfiles** in the Workspace. You can add more batches at any time, for example after the next session at the instrument. If a file has the same name as a run already in the project, choose whether to keep the existing run or replace it with the new file (replaced runs keep their edits, regions and notes).
-
-### Reference materials and drift correction
-
-IsoFishR can correct samples to a reference material measured during the session, in the style of Iolite. Set this up on the **Calibration** page:
-
-1. **Define the reference materials** with their accepted <sup>87</sup>Sr/<sup>86</sup>Sr and ± 2σ.
-2. **Mark the runs.** The Runs tab lists all runs in acquisition order, read from the runfile timestamps. Select runs and set them to *Sample*, *Baseline* or a reference material.
-3. **Choose the primary reference material.** Its runs are used for the correction; all other reference materials are secondary and serve as accuracy checks.
-4. **Choose how the correction follows time:**
-   - linear between the bracketing standards (default)
-   - smoothing spline
-   - step forward
-   - session mean
-5. **Optionally use baseline runs** (gas blanks between analyses) instead of the blank at the start of each run. They are interpolated in time to each run.
-
-**How the correction is applied.** The factor *accepted / measured* of the primary runs is fitted through time within each analytical session. A session starts automatically after a gap of more than 6 hours, and runs can be moved to another session by hand. The factor is applied to every point of every sample at the time that point was measured.
-
-**What is reported.** Each sample keeps its own SE. The uncertainty of the correction, from the primary measurements and the accepted value's uncertainty, is reported separately and in a combined SE. The **Correction** tab plots the primary factors with the fitted curve and the secondary deviations in ppm. **Reference material results** lists every standard run with its deviation from the accepted value.
-
-Without a primary reference material, values are left uncorrected, exactly as before.
+To try IsoFishR without your own data, add the example runfiles that come with it (five Chinook salmon otoliths and one white seabass otolith). Find their folder with `system.file("extdata", "runfiles", package = "IsoFishR")`.
 
 ### What is in a project folder
 
@@ -75,6 +65,7 @@ MyProject/
   log.csv       every change: when, who, what, old and new value
   cache/        reduced data (safe to delete; rebuilt automatically)
   exports/      one dated folder per export
+  app_state.yml the step the project was last worked on
 ```
 
 Projects can be shared by sharing the folder. Only one person can edit a project at a time; others can open it read-only.

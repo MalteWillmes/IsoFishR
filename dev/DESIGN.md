@@ -53,18 +53,23 @@ Cache files are named `<hash of sample ID>_<hash of md5 + import + reduction set
 
 The lock is advisory: Dropbox sync is not instant, so two people opening the same project within seconds of each other can still clash. A session whose lock was taken over refuses further writes.
 
-## App (`run_app()`)
-- **Start screen:** open a project folder (Browse uses the native folder dialog; recent projects are listed) or create one, and enter the name recorded in the log. If another user holds the lock, the app offers read-only access or a takeover.
-- **Workspace:**
-  - **Left:** sample table with status and flag, search, Add runfiles, and previous/next buttons.
-  - **Centre:** interactive plotly profile with the smoothed line, uncertainty band, outliers, region shading, changepoint means, an optional seawater line, and total Sr, 83Kr and 85Rb/88Sr strips. Dragging selects a distance range and the footer shows its mean ± 2 SE.
-  - **Edit tab:** keep only the selected range (trim), trims in µm, rezero, reverse, add/remove regions from the selection with a region statistics table, and changepoints.
-  - **Reduction tab:** this sample's settings, with "Apply to this sample" and "Use project settings".
-  - **Notes tab:** status, flag, comment, "Mark reviewed and go to next", sample details and history.
-- **Project settings page:** reduction, sample/laser and runfile import defaults, plus default region names.
-- **Change log page:** filterable `log.csv`.
-- Edits save immediately. Text and number fields save when they lose focus, and a field is only written if its value differs from the stored one, so switching samples never writes anything.
-- Each open project has its own lock token, so several browser tabs in one R process can't release each other's lock. The app stops once no tab has been connected for 5 seconds (a page reload does not stop it).
+## App (`run_app()`): six steps
+`app_ui` is a static `bslib::page_navbar(id = "step")` with one panel per step (`APP_STEPS`): `project`, `settings`, `runfiles`, `calibration`, `workspace`, `export`. **Change log** (a modal) and **Quit IsoFishR** sit on the right of the navigation bar on every step.
+- **Navigation:** steps 2–6 are hidden (`nav_hide`) until a project is open. On opening, the project goes to its last step (`read_last_step()`, `app_state.yml` in the project folder, written on every step change, not logged); a new project goes to *settings*. Closing a project hides the steps and returns to *project*.
+- **Sidebars:** the side panels use `open = "always"`. They are set up while their step is hidden, and would otherwise start collapsed.
+- **1 Project:** the open-project card (runs by type, "Continue to <last step>", Close), user name, open (Browse, recent projects), create (preset). If another user holds the lock, the app offers read-only access or a takeover.
+- **2 Settings:** reduction, sample/laser and runfile import defaults (preset, layout check, extension), default region names.
+- **3 Runfiles** (`runfiles_server`): keep/replace for same-name runs; file upload (`shiny.maxRequestSize` raised to 4 GB in `run_app()`); folder import (`choose_folder()` + `find_runfiles()`; same-name files in different subfolders are flagged and skipped); runs table in acquisition order with multi-select removal. After adding, it points to SBO-named runs.
+- **4 Calibration** (`calibration_server`):
+  - SBO suggestion banner (`apply_reference_suggestion()`, value editable, default 0.70918).
+  - Reference material editor; primary; fit (`FIT_CHOICES`, regression first); baseline mode; session gap.
+  - Tabs: *Reference materials* (`reference_material_plot()` + uncorrected/corrected summary), *Assign runs* (types and sessions; the selection clears after each change), *Run details*.
+- **5 Workspace** (`workspace_server`): sample table with type; plotly profile with Sr, Kr and Rb panels at 40/20/20/20 % height; a corrected/uncorrected badge; Edit / Reduction / Notes panels.
+  - Edits save immediately. A field is only written if its value differs from the stored one, so switching samples never writes anything.
+  - The plot's data key includes `calibration_inputs()`, so a changed calibration recalculates the plotted data.
+- **6 Export** (`export_server`): checkboxes per file (`EXPORT_FILE_CHOICES`), excluded samples, previews.
+- **Locks and stopping:** each open project has its own lock token. The app stops on Quit, or once no tab has been connected for 5 seconds; closing or reloading the tab asks first.
+- **Calibration speed:** `calibration_model()` is cached in memory (keyed by `calibration_inputs()`), so the many `project_data()` calls of the steps don't rebuild it.
 
 ### Plot performance
 - **Redraws only when needed:** the plot rebuilds only when its data (sample, raw file, settings, edits), its regions or the signal-strips option change. Comments, flags, status changes and the other display checkboxes don't rebuild it. The checkboxes switch traces in the browser through `plotlyProxy` (restyle `visible`). The deduplicated keys are reactiveVals, which ignore identical values.
@@ -140,7 +145,8 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 | `R/app-export.R` | Export page |
 | `R/runs.R` | Run sequence, sessions, run types, reference material table, acquisition times |
 | `R/calibration.R` | Baseline runs, correction model and application, reference material results |
-| `R/app-calibration.R` | Calibration page and `correction_plot()` |
+| `R/app-calibration.R` | Step 4, Calibration, and `reference_material_plot()` |
+| `R/app-runfiles.R` | Step 3, Runfiles |
 | `R/presets.R` | Instrument import presets (`inst/presets/` holds the built-in ones) |
 
 ## v1 bugs fixed (each has a regression test)

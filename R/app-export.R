@@ -6,17 +6,15 @@ export_ui <- function(id) {
   bslib::layout_sidebar(
     border = FALSE,
     sidebar = bslib::sidebar(
+      open = "always",  # set up while its step is hidden; would otherwise start collapsed
       width = 300,
       title = "Export summaries",
       shiny::p(class = "ifr-muted",
                "Writes the tables to a new dated folder in the project's exports folder. ",
                "Earlier exports are kept."),
+      shiny::checkboxGroupInput(ns("files"), "Files to export", EXPORT_FILE_CHOICES,
+                                selected = setdiff(EXPORT_FILES, "data")),
       shiny::checkboxInput(ns("include_excluded"), "Include excluded samples", FALSE),
-      shiny::p(class = "ifr-muted small",
-               "Every export includes profiles.csv: all points of every profile in one table."),
-      shiny::checkboxInput(ns("include_data"),
-                           "Also export all reduction columns (data.csv, for checking the reduction)",
-                           FALSE),
       shiny::actionButton(ns("export"), "Export", class = "btn-primary"),
       shiny::uiOutput(ns("last_export"))
     ),
@@ -71,8 +69,7 @@ export_server <- function(id, project) {
 
     shiny::observeEvent(input$export, {
       dir <- shiny::withProgress(message = "Exporting", try_notify(
-        export_project(project(),
-                       files = if (isTRUE(input$include_data)) EXPORT_FILES else setdiff(EXPORT_FILES, "data"),
+        export_project(project(), files = input$files,
                        include_excluded = isTRUE(input$include_excluded)),
         success = "Summaries exported."
       ))
@@ -103,3 +100,14 @@ open_folder <- function(path) {
     system2("xdg-open", shQuote(path), wait = FALSE)
   }
 }
+
+EXPORT_FILE_CHOICES <- c(
+  "Sample summaries (samples.csv)" = "samples",
+  "Regions (regions.csv)" = "regions",
+  "Changepoint segments (changepoints.csv)" = "changepoints",
+  "Full profiles, every point (profiles.csv)" = "profiles",
+  "Run sequence and sessions (runs.csv)" = "runs",
+  "Reference material results (reference_materials.csv, reference_material_summary.csv)" = "reference_materials",
+  "Settings used per sample (settings.csv)" = "settings",
+  "All reduction columns, for checking (data.csv)" = "data"
+)

@@ -1,8 +1,9 @@
 #' Run the IsoFishR app
 #'
-#' Opens the IsoFishR workspace in a browser. The app works on project
-#' folders (see [create_project()]); every change is saved immediately, so
-#' the app can be closed at any time and the project reopened later.
+#' Opens IsoFishR in a browser. The app walks through six steps: 1 Project
+#' (create or open), 2 Settings, 3 Runfiles, 4 Calibration, 5 Workspace and
+#' 6 Export. Every change is saved immediately, and a project reopens on the
+#' step it was last worked on.
 #'
 #' @param project Optional path of a project to open straight away.
 #' @param user Name recorded in the project log.
@@ -14,19 +15,34 @@ run_app <- function(project = NULL, user = default_user(), ...) {
   shiny::shinyApp(
     ui = app_ui,
     server = app_server(project, user),
+    # Uploads of many runfiles at once exceed Shiny's default 5 MB limit.
+    onStart = function() options(shiny.maxRequestSize = 4 * 1024^3),
     options = utils::modifyList(list(launch.browser = TRUE), list(...))
   )
 }
 
+# The steps of the app, in order: id = navigation value, label = tab title.
+APP_STEPS <- c(project = "1 Project", settings = "2 Settings", runfiles = "3 Runfiles",
+               calibration = "4 Calibration", workspace = "5 Workspace", export = "6 Export")
+
 app_ui <- function(request) {
-  bslib::page_fillable(
-    title = "IsoFishR",
+  bslib::page_navbar(
+    id = "step",
+    title = shiny::span("IsoFishR", shiny::uiOutput("project_title", inline = TRUE)),
+    window_title = "IsoFishR",
     theme = bslib::bs_theme(version = 5, preset = "shiny", primary = "#1f6f8b"),
-    padding = 0,
-    gap = 0,
-    shiny::tags$head(shiny::tags$style(shiny::HTML(app_css)),
-                     shiny::tags$script(shiny::HTML(app_js))),
-    shiny::uiOutput("main", fill = TRUE)
+    fillable = "workspace",
+    header = shiny::tags$head(shiny::tags$style(shiny::HTML(app_css)),
+                              shiny::tags$script(shiny::HTML(app_js))),
+    bslib::nav_panel(APP_STEPS[["project"]], value = "project", project_step_ui()),
+    bslib::nav_panel(APP_STEPS[["settings"]], value = "settings", project_settings_ui("settings")),
+    bslib::nav_panel(APP_STEPS[["runfiles"]], value = "runfiles", runfiles_ui("runfiles")),
+    bslib::nav_panel(APP_STEPS[["calibration"]], value = "calibration", calibration_ui("calibration")),
+    bslib::nav_panel(APP_STEPS[["workspace"]], value = "workspace", workspace_ui("ws")),
+    bslib::nav_panel(APP_STEPS[["export"]], value = "export", export_ui("export")),
+    bslib::nav_spacer(),
+    bslib::nav_item(shiny::actionLink("show_log", "Change log")),
+    bslib::nav_item(shiny::actionButton("quit", "Quit IsoFishR", class = "btn-sm btn-outline-secondary"))
   )
 }
 
@@ -57,13 +73,14 @@ app_js <- "
 "
 
 app_css <- "
-  .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.25rem; }
-  .ifr-start { max-width:980px; margin:2rem auto; padding:0 1rem; }
+  .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.5rem; }
+  .ifr-start { max-width:980px; margin:1.5rem auto; padding:0 1rem; }
   .ifr-recent a { display:block; padding:.15rem 0; word-break:break-all; }
   .ifr-muted { color:var(--bs-secondary-color); font-size:.875rem; }
   .ifr-sample-table table.dataTable tbody tr { cursor:pointer; }
   .ifr-panel .form-group { margin-bottom:.5rem; }
   .ifr-panel .shiny-input-container:not(.shiny-input-container-inline) { width:100%; }
+  .ifr-step { max-width:1400px; margin:0 auto; padding:1rem; }
 "
 
 app_server <- function(initial_project = NULL, user = default_user()) {
@@ -74,15 +91,19 @@ app_server <- function(initial_project = NULL, user = default_user()) {
   function(input, output, session) {
     sessions$n <- sessions$n + 1L
     project <- shiny::reactiveVal(NULL)
-    # Changes only when a project is opened or closed, so the layout is not
-    # rebuilt on every edit.
-    open_path <- shiny::reactiveVal(NULL)
     pending_open <- shiny::reactiveVal(NULL)
-    # Page shown when a project opens: a new project starts on its settings.
-    first_tab <- shiny::reactiveVal("Workspace")
+    # The step a project was opened on (also used by the tests).
+    opened_step <- shiny::reactiveVal(NULL)
 
-    do_open <- function(path, read_only = FALSE, force = FALSE, tab = "Workspace") {
-      first_tab(tab)
+    # Steps 2-6 are only shown while a project is open.
+    show_steps <- function(show) {
+      for (step in setdiff(names(APP_STEPS), "project")) {
+        if (show) bslib::nav_show("step", step) else bslib::nav_hide("step", step)
+      }
+    }
+    show_steps(FALSE)
+
+    do_open <- function(path, read_only = FALSE, force = FALSE, step = NULL) {
       user_name <- shiny::isolate(input$user_name) %||% user
       p <- tryCatch(
         open_project(path, user = user_name, read_only = read_only, force = force),
@@ -107,10 +128,22 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       }
       old <- shiny::isolate(project())
       if (!is.null(old)) close_project(old)
-      # Temporary (example) projects don't belong in the recent list.
       if (!startsWith(p$path, normalizePath(tempdir(), winslash = "/"))) remember_project(p$path)
       project(p)
-      open_path(p$path)
+      # Back to where the project was left; a new project starts on Settings.
+      step <- step %||% read_last_step(p) %||% "settings"
+      if (!step %in% names(APP_STEPS) || step == "project") step <- "settings"
+      opened_step(step)
+      show_steps(TRUE)
+      bslib::nav_select("step", step)
+    }
+
+    close_current <- function() {
+      p <- shiny::isolate(project())
+      if (!is.null(p)) close_project(p)
+      project(NULL)
+      show_steps(FALSE)
+      bslib::nav_select("step", "project")
     }
 
     shiny::observeEvent(input$open_read_only, {
@@ -121,17 +154,67 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       shiny::removeModal()
       do_open(pending_open(), force = TRUE)
     })
-
     if (!is.null(initial_project)) {
       shiny::observe(do_open(initial_project)) |> shiny::bindEvent(TRUE, once = TRUE)
     }
 
-    output$main <- shiny::renderUI({
-      if (is.null(open_path())) start_screen_ui(user, recent_projects())
-      else workspace_page_ui(selected = shiny::isolate(first_tab()))
+    # Remember the step the user is on (not the Project step itself).
+    shiny::observeEvent(input$step, {
+      p <- project()
+      if (!is.null(p) && input$step != "project") write_last_step(p, input$step)
+    }, ignoreInit = TRUE)
+
+    output$project_title <- shiny::renderUI({
+      p <- project()
+      if (is.null(p)) return(NULL)
+      shiny::tagList(
+        shiny::span(class = "ifr-project", p$meta$name),
+        if (p$read_only) shiny::span(class = "badge text-bg-warning ms-1", "Read-only")
+      )
     })
 
-    # ---- start screen ----
+    # ---- step 1: project ----
+    output$recent <- shiny::renderUI({
+      project()  # refresh after opening a project
+      recent <- recent_projects()
+      if (length(recent) == 0) return(NULL)
+      shiny::div(
+        class = "ifr-recent mt-3",
+        shiny::strong("Recent projects"),
+        purrr::map(recent, \(path) shiny::tags$a(
+          href = "#", path,
+          onclick = sprintf("Shiny.setInputValue('open_recent', %s, {priority: 'event'}); return false;",
+                            jsonlite_string(path))
+        ))
+      )
+    })
+
+    output$current_project <- shiny::renderUI({
+      p <- project()
+      if (is.null(p)) return(NULL)
+      runs <- p$samples
+      bslib::card(
+        class = "border-primary",
+        bslib::card_header(shiny::strong("Open project: ", p$meta$name)),
+        shiny::p(shiny::code(p$path)),
+        shiny::p(sprintf("%d run(s): %d sample(s), %d reference material run(s), %d baseline run(s).",
+                         nrow(runs), sum(runs$run_type == "sample"),
+                         sum(runs$run_type == "reference"), sum(runs$run_type == "baseline"))),
+        shiny::div(
+          class = "d-flex gap-2",
+          shiny::actionButton("continue", paste("Continue to", APP_STEPS[[read_last_step(p) %||% "settings"]]),
+                              class = "btn-primary"),
+          shiny::actionButton("close_project", "Close project")
+        )
+      )
+    })
+
+    shiny::observeEvent(input$continue, {
+      p <- shiny::req(project())
+      bslib::nav_select("step", read_last_step(p) %||% "settings")
+    })
+    shiny::observeEvent(input$close_project, close_current())
+
     shiny::observeEvent(input$browse_open, {
       path <- choose_folder("Select an IsoFishR project folder", input$open_path %||% "")
       if (!is.null(path)) shiny::updateTextInput(session, "open_path", value = path)
@@ -152,31 +235,25 @@ app_server <- function(initial_project = NULL, user = default_user()) {
                                      import_preset = input$create_preset %||% DEFAULT_PRESET))
       if (!is.null(p)) {
         close_project(p)
-        do_open(p$path, tab = "Project settings")
+        do_open(p$path, step = "settings")
       }
     })
 
-    # ---- workspace ----
-    output$project_title <- shiny::renderUI({
-      p <- project()
-      shiny::req(p)
-      shiny::tagList(
-        shiny::span(class = "ifr-project", p$meta$name),
-        if (p$read_only) shiny::span(class = "badge text-bg-warning", "Read-only")
-      )
-    })
-    shiny::observeEvent(input$close_project, {
-      p <- project()
-      if (!is.null(p)) close_project(p)
-      project(NULL)
-      open_path(NULL)
-    })
-
-    workspace_server("ws", project)
-    calibration_server("calibration", project)
-    export_server("export", project)
+    # ---- steps 2-6 ----
     project_settings_server("settings", project)
+    runfiles_server("runfiles", project)
+    calibration_server("calibration", project)
+    workspace_server("ws", project)
+    export_server("export", project)
     log_server("log", project)
+
+    shiny::observeEvent(input$show_log, {
+      shiny::showModal(shiny::modalDialog(
+        title = "Change log", size = "xl", easyClose = TRUE,
+        if (is.null(project())) "Open a project to see its change log." else log_ui("log"),
+        footer = shiny::modalButton("Close")
+      ))
+    })
 
     # Quit: release the lock, tell the page, then stop the app (which frees
     # the R console). The short delay lets the message reach the browser.
@@ -200,18 +277,15 @@ app_server <- function(initial_project = NULL, user = default_user()) {
   }
 }
 
-start_screen_ui <- function(user, recent) {
+project_step_ui <- function() {
   shiny::div(
     class = "ifr-start",
-    shiny::div(
-      class = "d-flex align-items-center",
-      shiny::h2("IsoFishR", class = "me-auto"),
-      shiny::actionButton("quit", "Quit IsoFishR", class = "btn-sm btn-outline-secondary")
-    ),
     shiny::p(class = "ifr-muted",
-             "Data reduction and analysis of laser-ablation 87Sr/86Sr profiles. ",
-             "Projects are folders on your computer; all changes are saved as you work."),
-    shiny::textInput("user_name", "Your name (recorded in the project log)", user),
+             "Data reduction and analysis of laser-ablation 87Sr/86Sr profiles. Projects are ",
+             "folders on your computer; all changes are saved as you work. Work through the ",
+             "steps from left to right; each project reopens on the step it was left on."),
+    shiny::uiOutput("current_project"),
+    shiny::textInput("user_name", "Your name (recorded in the project log)", default_user()),
     bslib::layout_columns(
       col_widths = c(6, 6),
       bslib::card(
@@ -223,15 +297,7 @@ start_screen_ui <- function(user, recent) {
           shiny::div(class = "mb-3", shiny::actionButton("browse_open", "Browse\u2026"))
         ),
         shiny::actionButton("open", "Open", class = "btn-primary"),
-        if (length(recent) > 0) shiny::div(
-          class = "ifr-recent mt-3",
-          shiny::strong("Recent projects"),
-          purrr::map(recent, \(path) shiny::tags$a(
-            href = "#", path,
-            onclick = sprintf("Shiny.setInputValue('open_recent', %s, {priority: 'event'}); return false;",
-                              jsonlite_string(path))
-          ))
-        )
+        shiny::uiOutput("recent")
       ),
       bslib::card(
         bslib::card_header("Create a project"),
@@ -244,30 +310,10 @@ start_screen_ui <- function(user, recent) {
         shiny::textInput("create_name", "Project name", placeholder = "e.g. Salmon_2024"),
         shiny::selectInput("create_preset", "Instrument preset (runfile layout)",
                            list_import_presets()$name, selected = DEFAULT_PRESET),
-        shiny::p(class = "ifr-muted",
-                 "Presets and reduction settings can be changed under Project settings ",
-                 "before adding runfiles."),
+        shiny::p(class = "ifr-muted", "The new project opens on step 2, Settings."),
         shiny::actionButton("create", "Create", class = "btn-primary")
       )
     )
-  )
-}
-
-workspace_page_ui <- function(selected = "Workspace") {
-  bslib::navset_bar(
-    id = "page",
-    selected = selected,
-    title = shiny::span("IsoFishR ", shiny::uiOutput("project_title", inline = TRUE)),
-    fillable = "Workspace",
-    padding = 0,
-    bslib::nav_panel("Workspace", workspace_ui("ws")),
-    bslib::nav_panel("Project settings", project_settings_ui("settings")),
-    bslib::nav_panel("Calibration", calibration_ui("calibration")),
-    bslib::nav_panel("Export", export_ui("export")),
-    bslib::nav_panel("Change log", log_ui("log")),
-    bslib::nav_spacer(),
-    bslib::nav_item(shiny::actionButton("close_project", "Close project", class = "btn-sm")),
-    bslib::nav_item(shiny::actionButton("quit", "Quit", class = "btn-sm btn-outline-secondary"))
   )
 }
 
