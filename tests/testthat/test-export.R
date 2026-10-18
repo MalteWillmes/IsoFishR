@@ -62,10 +62,10 @@ test_that("export_project writes the summaries to a new folder and logs it", {
   dir <- export_project(p)
   expect_setequal(list.files(dir),
                   c("samples.csv", "regions.csv", "changepoints.csv", "settings.csv", "profiles.csv", "runs.csv",
-                    "export_info.yml"))
-  info <- yaml::read_yaml(file.path(dir, "export_info.yml"))
-  expect_equal(info$exported_by, "tester")
-  expect_equal(info$samples, 2)
+                    "export_report.md"))
+  md <- readLines(file.path(dir, "export_report.md"))
+  expect_true(any(startsWith(md, "- **Exported:** ") & endsWith(md, " by tester")))
+  expect_true("- **Samples exported:** 2 (excluded samples left out)" %in% md)
   regions <- readr::read_csv(file.path(dir, "regions.csv"), show_col_types = FALSE)
   expect_equal(regions$region, c("core", "edge"))
   expect_equal(utils::tail(read_log(p)$action, 1), "export")
@@ -129,5 +129,5 @@ test_that("profiles.csv is written with every point and rounded values", {
   pr <- readr::read_csv(file.path(dir, "profiles.csv"), show_col_types = FALSE)
   expect_equal(nrow(pr), nrow(project_profiles(p)))
   expect_equal(pr$sr87_sr86, round(project_profiles(p)$sr87_sr86, 6))
-  expect_true("profiles.csv" %in% yaml::read_yaml(file.path(dir, "export_info.yml"))$files)
+  expect_true(any(grepl("`profiles.csv`", readLines(file.path(dir, "export_report.md")), fixed = TRUE)))
 })

@@ -85,8 +85,8 @@ print(as.data.frame(r[, c("reference_material", "role", "session", "runs", "mean
                           "mean_corrected", "sd_corrected", "accepted", "deviation_ppm")]),
       digits = 7, row.names = FALSE)
 if (identical(commandArgs(TRUE), "--report")) {
-  cat("\nexport_info.yml:\n")
-  writeLines(readLines(file.path(export_dir, "export_info.yml")))
+  cat("\nexport_report.md:\n")
+  writeLines(readLines(file.path(export_dir, "export_report.md"), encoding = "UTF-8"))
 }
 close_project(p)
 unlink(root, recursive = TRUE)

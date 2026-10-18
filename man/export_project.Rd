@@ -29,8 +29,8 @@ The path of the export folder, invisibly.
 }
 \description{
 Writes the summary tables to a new time-stamped folder in the project's
-\verb{exports/} folder, together with \code{export_info.yml} (IsoFishR version,
-date, user and options). Earlier exports are kept.
+\verb{exports/} folder, together with \code{export_report.md} (a record of the
+settings, calibration and reference materials). Earlier exports are kept.
 }
 \details{
 Files written:
@@ -45,7 +45,7 @@ and session
 \item \code{reference_materials.csv} and \code{reference_material_summary.csv} (when
 the project has reference material runs):
 \code{\link[=reference_material_results]{reference_material_results()}} and \code{\link[=summarise_reference_materials]{summarise_reference_materials()}}
-\item \code{export_info.yml} (always): \code{\link[=export_report]{export_report()}}, a record of the export:
+\item \code{export_report.md} (always): \code{\link[=export_report]{export_report()}} as Markdown, a record of the export:
 all project settings, the calibration method, the primary and secondary
 reference materials with their number of runs, mean and SD, the
 sessions, and per-sample setting overrides.

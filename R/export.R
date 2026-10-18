@@ -227,8 +227,8 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
 #' Export project summaries
 #'
 #' Writes the summary tables to a new time-stamped folder in the project's
-#' `exports/` folder, together with `export_info.yml` (IsoFishR version,
-#' date, user and options). Earlier exports are kept.
+#' `exports/` folder, together with `export_report.md` (a record of the
+#' settings, calibration and reference materials). Earlier exports are kept.
 #'
 #' Files written:
 #' * `samples.csv`: [summarise_project_samples()]
@@ -241,7 +241,7 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
 #' * `reference_materials.csv` and `reference_material_summary.csv` (when
 #'   the project has reference material runs):
 #'   [reference_material_results()] and [summarise_reference_materials()]
-#' * `export_info.yml` (always): [export_report()], a record of the export:
+#' * `export_report.md` (always): [export_report()] as Markdown, a record of the export:
 #'   all project settings, the calibration method, the primary and secondary
 #'   reference materials with their number of runs, mean and SD, the
 #'   sessions, and per-sample setting overrides.
@@ -289,10 +289,7 @@ export_project <- function(project, files = setdiff(EXPORT_FILES, "data"),
 
   report <- export_report(project, files = paste0(names(tables), ".csv"),
                           include_excluded = include_excluded, n_samples = nrow(samples))
-  # Missing values (e.g. no SD for a single run) as YAML's empty value ~
-  # rather than R's .na.real.
-  text <- gsub("[.]na([.](real|integer|character))?\\b", "~", yaml::as.yaml(report))
-  writeLines(text, file.path(dir, "export_info.yml"), useBytes = TRUE)
+  writeLines(enc2utf8(report_markdown(report)), file.path(dir, "export_report.md"), useBytes = TRUE)
 
   append_log(project_file(project$path, "log.csv"),
              log_entry(project$user, "export", new = file.path("exports", stamp)))
@@ -358,7 +355,7 @@ EXPORT_FILES <- c("samples", "regions", "changepoints", "profiles", "runs",
 #' Record of an export
 #'
 #' Everything needed to understand and reproduce the exported values, as
-#' written to `export_info.yml` by [export_project()]: the project, IsoFishR
+#' written to `export_report.md` by [export_project()]: the project, IsoFishR
 #' version and user; the runs and sessions; the calibration (method, baseline
 #' mode, session gap, and for the primary and each secondary reference
 #' material its accepted value, number of runs and the mean and SD of its run
@@ -417,7 +414,7 @@ export_report <- function(project, files = character(), include_excluded = FALSE
     exported = timestamp_now(),
     exported_by = project$user,
     isofishr_version = isofishr_version(),
-    files = c(files, "export_info.yml"),
+    files = c(files, "export_report.md"),
     include_excluded = include_excluded,
     samples = n_samples,
     runs = list(

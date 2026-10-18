@@ -261,13 +261,12 @@ test_that("SBO runs are suggested as the primary reference material with 0.70918
   expect_equal(p$reference_materials$value, 0.70917)
 })
 
-test_that("export_info.yml records the settings, calibration and reference materials", {
+test_that("the export record documents settings, calibration and reference materials", {
   p <- bracketed_project()
   p <- set_sample_settings(p, "fish1", ma_window = 15)
-  dir <- export_project(p, files = "samples")
-  info <- yaml::read_yaml(file.path(dir, "export_info.yml"))
+  info <- export_report(p, files = "samples.csv", n_samples = 2)
 
-  expect_equal(info$files, c("samples.csv", "export_info.yml"))
+  expect_equal(info$files, c("samples.csv", "export_report.md"))
   expect_equal(info$runs$reference_material_runs, 4)
   expect_equal(info$sessions[[1]]$runs, 6)
 
@@ -285,18 +284,50 @@ test_that("export_info.yml records the settings, calibration and reference mater
   expect_length(cal$secondary, 1)
   expect_equal(cal$secondary[[1]]$name, "SEC")
   expect_equal(cal$secondary[[1]]$runs, 1)
-  expect_null(cal$secondary[[1]]$sd_corrected)  # one run: no SD (written as ~)
+  expect_true(is.na(cal$secondary[[1]]$sd_corrected))  # one run: no SD
 
   expect_equal(info$settings$reduction$integration, 1)
   expect_equal(info$settings$import$preset, "Nu_UCDavis")
   expect_equal(info$sample_setting_overrides$fish1, "ma_window=15")
 })
 
-test_that("export_info.yml says when there is no calibration", {
+test_that("export_report.md presents the record as readable Markdown", {
+  p <- bracketed_project()
+  p <- set_sample_settings(p, "fish1", ma_window = 15)
+  dir <- export_project(p, files = "samples")
+  expect_setequal(list.files(dir), c("samples.csv", "export_report.md"))
+  md <- readLines(file.path(dir, "export_report.md"), encoding = "UTF-8")
+
+  expect_match(md[1], "^# IsoFishR export: P$")
+  expect_true(all(c("## Runs and sessions", "## Calibration", "### Reference materials",
+                    "### Per session", "## Settings", "### Data reduction",
+                    "## Samples with their own settings") %in% md))
+  expect_true(any(grepl("**Method:** Linear regression through the standards (drift) (`regression`)",
+                        md, fixed = TRUE)))
+  expect_true(any(grepl("**Primary reference material:** MMC", md, fixed = TRUE)))
+  expect_true(any(grepl("**Secondary reference materials:** SEC", md, fixed = TRUE)))
+  # Reference material rows: name, role, accepted, 2s, runs, ...
+  expect_true(any(grepl("^\\| MMC \\| primary \\| 0\\.709180 \\| 2e-05 \\| 3 \\|", md)))
+  expect_true(any(grepl("^\\| SEC \\| secondary \\| 0\\.710300 \\| 4e-05 \\| 1 \\|", md)))
+  expect_true(any(grepl("| Integration (cycles per point) | 1 |", md, fixed = TRUE)))
+  expect_true(any(grepl("| fish1 | ma_window=15 |", md, fixed = TRUE)))
+  # Every table row has the same number of cells as its header
+  tables <- split(md[grepl("^\\|", md)], cumsum(!grepl("^\\|", md))[grepl("^\\|", md)])
+  for (tb in tables) {
+    cells <- lengths(regmatches(tb, gregexpr("(?<!\\\\)\\|", tb, perl = TRUE)))
+    expect_equal(length(unique(cells)), 1)
+  }
+})
+
+test_that("the export record says when there is no calibration", {
   runs <- data.frame(id = c("a", "b"), minute = c(0, 10), ratio = 0.71)
   p <- synthetic_project(runs)
-  info <- yaml::read_yaml(file.path(export_project(p, files = "samples"), "export_info.yml"))
+  info <- export_report(p)
   expect_match(info$calibration$correction, "off")
   expect_null(info$calibration$primary)
   expect_length(info$calibration$secondary, 0)
+  md <- report_markdown(info)
+  expect_true(any(grepl("No reference materials are defined.", md, fixed = TRUE)))
+  expect_true(any(grepl("**Primary reference material:** none", md, fixed = TRUE)))
+  expect_true(any(grepl("None: all samples use the project settings.", md, fixed = TRUE)))
 })

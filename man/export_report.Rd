@@ -25,7 +25,7 @@ A nested list.
 }
 \description{
 Everything needed to understand and reproduce the exported values, as
-written to \code{export_info.yml} by \code{\link[=export_project]{export_project()}}: the project, IsoFishR
+written to \code{export_report.md} by \code{\link[=export_project]{export_project()}}: the project, IsoFishR
 version and user; the runs and sessions; the calibration (method, baseline
 mode, session gap, and for the primary and each secondary reference
 material its accepted value, number of runs and the mean and SD of its run

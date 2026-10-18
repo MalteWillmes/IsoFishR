@@ -84,7 +84,7 @@ Each export creates `exports/<date_time>/` containing:
 | `reference_materials.csv` | Every reference material run: measured and corrected mean, deviation from the accepted value (ppm), whether it is within uncertainty |
 | `reference_material_summary.csv` | Per reference material and session: runs, mean, 2 SD, deviation |
 | `settings.csv` | Every setting each sample was reduced with, including the calibration |
-| `export_info.yml` | Always written: a full record of the export. Date, user and IsoFishR version; runs and sessions; the calibration method and baseline mode; the primary and each secondary reference material with accepted value, number of runs and mean and SD before and after correction (overall and per session); all project settings; and per-sample setting overrides |
+| `export_report.md` | Always written: a readable record of the export (Markdown). Date, user and IsoFishR version; runs and sessions; the calibration method and baseline mode; the primary and each secondary reference material with accepted value, number of runs and mean and SD before and after correction (overall and per session); all project settings; and per-sample setting overrides |
 
 ## Using IsoFishR from R code
 

@@ -33,7 +33,7 @@ test_that("export writes only the chosen files", {
                     example_runfiles()[1:2])
   on.exit(close_project(p))
   dir <- export_project(p, files = c("samples", "profiles"))
-  expect_setequal(list.files(dir), c("samples.csv", "profiles.csv", "export_info.yml"))
+  expect_setequal(list.files(dir), c("samples.csv", "profiles.csv", "export_report.md"))
   expect_error(export_project(p, files = "nonsense"))
 })
 
