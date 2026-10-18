@@ -64,8 +64,9 @@ test_that("secondary reference materials report their accuracy", {
   s <- summarise_reference_materials(p)
   expect_equal(s$runs[s$reference_material == "MMC"], 3)
   r_mmc <- r$mean[r$reference_material == "MMC"]
-  expect_equal(s$sd2[s$reference_material == "MMC"], 2 * stats::sd(r_mmc))
-  expect_false(is.na(s$sd2[s$reference_material == "MMC"]))
+  expect_equal(s$sd_corrected[s$reference_material == "MMC"], stats::sd(r_mmc))
+  expect_false(is.na(s$sd_uncorrected[s$reference_material == "MMC"]))
+  expect_equal(s$mean_uncorrected[s$reference_material == "SEC"], drifted(SECONDARY, 25), tolerance = 1e-9)
   expect_equal(s$role[s$reference_material == "SEC"], "secondary")
 })
 
@@ -214,4 +215,48 @@ test_that("a project without runs works with the calibration functions", {
   p <- update_project_settings(p, list(calibration = list(primary = "MMC", baseline = "baseline_runs")))
   expect_equal(nrow(calibration_model(p)$points), 0)
   expect_equal(nrow(project_runs(p)), 0)
+})
+
+test_that("the default regression fit follows the least-squares drift line", {
+  # Primary runs with scatter around a linear drift: the regression line,
+  # not the individual runs, sets the correction.
+  set.seed(7)
+  minutes <- c(0, 20, 40, 60, 80)
+  runs <- data.frame(id = c(paste0("RM", 1:5), "fish"), minute = c(minutes, 50),
+                     ratio = c(drifted(PRIMARY, minutes) + c(2, -3, 1, 3, -2) * 1e-5,
+                               drifted(0.7100, 50)))
+  p <- synthetic_project(runs)
+  p <- set_reference_material(p, "MMC", PRIMARY)
+  p <- set_run_type(p, paste0("RM", 1:5), "reference", "MMC")
+  p <- update_project_settings(p, list(calibration = list(primary = "MMC")))
+  expect_equal(p$settings$calibration$fit, "regression")
+
+  model <- calibration_model(p)
+  line <- stats::lm(measured ~ time, data = model$points)
+  t_fish <- as.numeric(at_min(50)) + 35
+  expected_factor <- PRIMARY / stats::predict(line, data.frame(time = t_fish))
+  expect_equal(correction_at(model, model$points$session[1], t_fish)$factor,
+               unname(expected_factor), tolerance = 1e-9)
+  # The regression removes the drift on the sample within the scatter
+  d <- project_data(p, "fish")
+  expect_equal(mean(d$sr87_sr86), 0.7100, tolerance = 2e-5)
+  # The model is cached: a second call returns the identical object quickly
+  expect_identical(calibration_model(p), model)
+})
+
+test_that("SBO runs are suggested as the primary reference material with 0.70918", {
+  runs <- data.frame(id = c("SBO_1", "fish1", "sbo_2", "fish2"), minute = c(0, 10, 20, 30),
+                     ratio = c(0.70918, 0.71, 0.70918, 0.71))
+  p <- synthetic_project(runs)
+  expect_setequal(suggest_reference_runs(p), c("SBO_1", "sbo_2"))
+  p <- apply_reference_suggestion(p)
+  expect_equal(p$reference_materials$value[p$reference_materials$name == "SBO"], 0.70918)
+  expect_equal(p$settings$calibration$primary, "SBO")
+  expect_equal(p$samples$run_type, c("reference", "sample", "reference", "sample"))
+  expect_length(suggest_reference_runs(p), 0)
+
+  # A user-changed value is kept when the suggestion is applied again
+  p <- set_reference_material(p, "SBO", 0.70917)
+  p <- apply_reference_suggestion(p)
+  expect_equal(p$reference_materials$value, 0.70917)
 })

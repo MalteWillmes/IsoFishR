@@ -13,3 +13,4 @@ columns:
   time_s: 8
 timestamp_line: 45
 timestamp_format: '%m/%d/%Y %I:%M:%S %p'
+extension: .run

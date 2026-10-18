@@ -75,6 +75,10 @@ interpolate_baseline <- function(baselines, session, acquired, sample_id) {
 #' correction factor `accepted / measured` through time within each session,
 #' using `calibration$fit`:
 #'
+#' * `"regression"` (default): a least-squares line through the primary
+#'   runs' measured means against time (instrument drift); the factor is
+#'   `accepted / predicted`. Its uncertainty is the standard error of the
+#'   regression line at each time (with 2 runs, the runs' own SE).
 #' * `"linear"`: linear interpolation between the primary runs bracketing
 #'   each point (standard-sample bracketing); constant before the first and
 #'   after the last primary run of the session.
@@ -95,6 +99,19 @@ calibration_model <- function(project) {
   rm <- project$reference_materials[project$reference_materials$name == cal$primary, ]
   if (nrow(rm) == 0) return(NULL)
 
+  # The model is needed for every run that is shown or exported, so it is
+  # kept in memory, keyed by everything it depends on.
+  key <- rlang::hash(list(project$path, calibration_inputs(project), isofishr_version()))
+  if (!is.null(model_cache[[key]])) return(model_cache[[key]])
+  model <- build_calibration_model(project, cal, rm)
+  if (length(ls(model_cache)) > 20) rm(list = ls(model_cache), envir = model_cache)
+  assign(key, model, envir = model_cache)
+  model
+}
+
+model_cache <- new.env(parent = emptyenv())
+
+build_calibration_model <- function(project, cal, rm) {
   runs <- project_runs(project)
   prim <- dplyr::filter(runs, .data$rm_role == "primary", .data$status != "excluded",
                         !is.na(.data$acquired))
@@ -148,6 +165,13 @@ correction_at <- function(model, session, t) {
   if (n == 1) {
     f <- rep(fp, length(t))
     u <- rep(up, length(t))
+  } else if (fit == "regression") {
+    # Centre time first: seconds since 1970 are large numbers.
+    t0 <- mean(tp)
+    line <- stats::lm(measured ~ x, data = data.frame(measured = pts$measured, x = tp - t0))
+    pred <- stats::predict(line, newdata = data.frame(x = t - t0), se.fit = TRUE)
+    f <- model$accepted / unname(pred$fit)
+    u <- if (n > 2) unname(pred$se.fit / pred$fit) else rep(sqrt(mean(up^2)), length(t))
   } else if (fit == "linear") {
     f <- stats::approx(tp, fp, xout = t, rule = 2)$y
     i <- findInterval(t, tp, all.inside = TRUE)
@@ -274,19 +298,21 @@ reference_material_results <- function(project) {
 
 #' @rdname reference_material_results
 #' @return `summarise_reference_materials()`: one row per reference material
-#'   and session: number of runs, mean and 2 SD of the corrected run means,
-#'   accepted value and deviation in ppm.
+#'   and session: number of runs, mean and SD of the run means before and after
+#'   correction, accepted value and deviation in ppm (of the corrected mean).
 #' @export
 summarise_reference_materials <- function(project) {
   r <- reference_material_results(project)
   if (nrow(r) == 0) return(r)
+  sd_or_na <- function(x) if (length(x) > 1) stats::sd(x) else NA_real_
   r |>
     dplyr::summarise(
       role = dplyr::first(.data$role),
       runs = dplyr::n(),
-      # Before `mean` is redefined below as the summary value
-      sd2 = if (dplyr::n() > 1) 2 * stats::sd(.data$mean) else NA_real_,
-      mean = mean(.data$mean),
+      mean_uncorrected = mean(.data$measured),
+      sd_uncorrected = sd_or_na(.data$measured),
+      mean_corrected = mean(.data$mean),
+      sd_corrected = sd_or_na(.data$mean),
       accepted = dplyr::first(.data$accepted),
       deviation_ppm = (mean(.data$mean) / dplyr::first(.data$accepted) - 1) * 1e6,
       runs_within_uncertainty = sum(.data$within_uncertainty),

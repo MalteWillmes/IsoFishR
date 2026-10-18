@@ -30,7 +30,8 @@ default_settings <- function() {
       columns = list(raw88 = 1L, raw87 = 2L, raw86 = 3L, raw85 = 4L,
                      raw84 = 5L, raw83 = 6L, time_s = 8L),
       timestamp_line = 45L,
-      timestamp_format = "%m/%d/%Y %I:%M:%S %p"
+      timestamp_format = "%m/%d/%Y %I:%M:%S %p",
+      extension = ".run"
     ),
     reduction = list(
       integration = 5L,
@@ -54,13 +55,13 @@ default_settings <- function() {
     calibration = list(
       baseline = "per_run",
       primary = "",
-      fit = "linear",
+      fit = "regression",
       session_gap_h = 6
     )
   )
 }
 
-CALIBRATION_FITS <- c("linear", "spline", "step", "mean")
+CALIBRATION_FITS <- c("regression", "linear", "spline", "step", "mean")
 BASELINE_MODES <- c("per_run", "baseline_runs")
 
 #' Combine settings with overrides
@@ -178,7 +179,8 @@ import_v1_settings <- function(path) {
                      raw84 = int(v1$raw84), raw83 = int(v1$raw83),
                      time_s = int(v1$cyclesec)),
       timestamp_line = 0L,
-      timestamp_format = default_settings()$import$timestamp_format
+      timestamp_format = default_settings()$import$timestamp_format,
+      extension = ".run"
     ),
     reduction = list(
       integration = int(v1$integration),

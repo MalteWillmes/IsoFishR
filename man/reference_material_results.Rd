@@ -16,8 +16,8 @@ summarise_reference_materials(project)
 A tibble.
 
 \code{summarise_reference_materials()}: one row per reference material
-and session: number of runs, mean and 2 SD of the corrected run means,
-accepted value and deviation in ppm.
+and session: number of runs, mean and SD of the run means before and after
+correction, accepted value and deviation in ppm (of the corrected mean).
 }
 \description{
 One row per reference material run: the measured (uncorrected) and

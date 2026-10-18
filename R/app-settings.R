@@ -33,7 +33,8 @@ settings_spec <- function() {
       c("Comma" = ",", "Tab" = "\t", "Semicolon" = ";"),
     "import",    "header",           "Data has column headings",          "logical", NULL,
     "import",    "timestamp_line",   "Line with the acquisition date/time (0 = none)", "integer", NULL,
-    "import",    "timestamp_format", "Date/time format (R strptime)",     "text",    NULL
+    "import",    "timestamp_format", "Date/time format (R strptime)",     "text",    NULL,
+    "import",    "extension",        "Runfile extension (for folder import)", "text", NULL
   )
 }
 

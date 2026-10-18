@@ -23,6 +23,10 @@ using \code{calibration$fit}:
 }
 \details{
 \itemize{
+\item \code{"regression"} (default): a least-squares line through the primary
+runs' measured means against time (instrument drift); the factor is
+\code{accepted / predicted}. Its uncertainty is the standard error of the
+regression line at each time (with 2 runs, the runs' own SE).
 \item \code{"linear"}: linear interpolation between the primary runs bracketing
 each point (standard-sample bracketing); constant before the first and
 after the last primary run of the session.

@@ -241,15 +241,20 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
 #' * `reference_materials.csv` and `reference_material_summary.csv` (when
 #'   the project has reference material runs):
 #'   [reference_material_results()] and [summarise_reference_materials()]
-#' * `data.csv` (only with `include_data = TRUE`): all reduction columns per
-#'   point (raw voltages, mass bias, intermediate ratios), for checking the
-#'   reduction itself.
+#' * `data.csv` (not by default): all reduction columns per point (raw
+#'   voltages, mass bias, intermediate ratios), for checking the reduction
+#'   itself.
 #'
 #' @inheritParams project_summaries
-#' @param include_data Also write all reduction columns point by point.
+#' @param files Which files to write, any of `EXPORT_FILES`: `"samples"`,
+#'   `"regions"`, `"changepoints"`, `"profiles"`, `"runs"`,
+#'   `"reference_materials"`, `"settings"`, `"data"`. Defaults to all but
+#'   `"data"`.
 #' @return The path of the export folder, invisibly.
 #' @export
-export_project <- function(project, include_excluded = FALSE, include_data = FALSE) {
+export_project <- function(project, files = setdiff(EXPORT_FILES, "data"),
+                           include_excluded = FALSE) {
+  files <- match.arg(files, EXPORT_FILES, several.ok = TRUE)
   check_writable(project)
   samples <- export_samples(project, include_excluded)
   if (nrow(samples) == 0) stop("The project has no samples to export.", call. = FALSE)
@@ -259,21 +264,23 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
   dir <- project_file(project$path, "exports", stamp)
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
 
-  tables <- list(
-    samples = summarise_project_samples(project, data, include_excluded),
-    regions = summarise_project_regions(project, data, include_excluded),
-    changepoints = summarise_project_changepoints(project, data, include_excluded),
-    settings = project_settings_table(project, include_excluded),
-    profiles = project_profiles(project, data, include_excluded),
-    runs = dplyr::mutate(project_runs(project), acquired = format_time(.data$acquired))
+  # Only the chosen tables are computed.
+  build <- list(
+    samples = \() summarise_project_samples(project, data, include_excluded),
+    regions = \() summarise_project_regions(project, data, include_excluded),
+    changepoints = \() summarise_project_changepoints(project, data, include_excluded),
+    profiles = \() project_profiles(project, data, include_excluded),
+    runs = \() dplyr::mutate(project_runs(project), acquired = format_time(.data$acquired)),
+    settings = \() project_settings_table(project, include_excluded)
   )
-  if (any(project$samples$run_type == "reference")) {
+  tables <- purrr::map(build[intersect(names(build), files)], \(f) f())
+  if ("reference_materials" %in% files && any(project$samples$run_type == "reference")) {
     tables$reference_materials <- reference_material_results(project) |>
       dplyr::mutate(acquired = format_time(.data$acquired))
     tables$reference_material_summary <- summarise_reference_materials(project)
   }
   tables <- purrr::map(tables, round_summary)
-  if (include_data) tables$data <- data
+  if ("data" %in% files) tables$data <- data
   purrr::iwalk(tables, \(x, name) write_table_file(x, file.path(dir, paste0(name, ".csv"))))
 
   yaml::write_yaml(list(
@@ -282,7 +289,6 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
     exported_by = project$user,
     isofishr_version = isofishr_version(),
     include_excluded = include_excluded,
-    include_data = include_data,
     samples = nrow(samples),
     files = paste0(names(tables), ".csv")
   ), file.path(dir, "export_info.yml"))
@@ -298,11 +304,11 @@ export_project <- function(project, include_excluded = FALSE, include_data = FAL
 round_summary <- function(x) {
   x |>
     dplyr::mutate(
-      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "mean_uncorrected", "sr87_sr86",
+      dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "mean_uncorrected", "mean_corrected", "sr87_sr86",
                                     "sr87_sr86_outlier", "sr87_sr86_uncorrected",
                                     "sr87_sr86_smoothed", "cp_mean", "sr84_sr86", "measured",
                                     "accepted")), \(v) round(v, 6)),
-      dplyr::across(dplyr::any_of(c("sd", "sd2", "se", "se_combined", "sr87_sr86_smoothed_se",
+      dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_smoothed_se",
                                     "rb85_sr88", "kr83_v", "deviation", "accepted_2s")),
                     \(v) round(v, 7)),
       dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),
@@ -341,3 +347,9 @@ add_correction <- function(tbl, data) {
     ) |>
     dplyr::select(-"correction_u_rel")
 }
+
+#' @rdname export_project
+#' @format NULL
+#' @export
+EXPORT_FILES <- c("samples", "regions", "changepoints", "profiles", "runs",
+                  "reference_materials", "settings", "data")

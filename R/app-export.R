@@ -71,7 +71,9 @@ export_server <- function(id, project) {
 
     shiny::observeEvent(input$export, {
       dir <- shiny::withProgress(message = "Exporting", try_notify(
-        export_project(project(), input$include_excluded, input$include_data),
+        export_project(project(),
+                       files = if (isTRUE(input$include_data)) EXPORT_FILES else setdiff(EXPORT_FILES, "data"),
+                       include_excluded = isTRUE(input$include_excluded)),
         success = "Summaries exported."
       ))
       if (!is.null(dir)) last_dir(dir)

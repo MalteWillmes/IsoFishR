@@ -212,3 +212,84 @@ format_time <- function(t) ifelse(is.na(t), "", format(t, "%Y-%m-%d %H:%M:%S", t
 parse_time <- function(x) {
   as.POSIXct(ifelse(nzchar(x), x, NA_character_), format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
 }
+
+#' Suggest reference material runs from their names
+#'
+#' Finds runs whose name contains `pattern` (case-insensitive), e.g. "SBO"
+#' for the seabass otolith reference material run at UC Davis.
+#' `apply_reference_suggestion()` marks them as runs of that reference
+#' material, defines it with `value` if it isn't defined yet, and makes it the
+#' primary reference material if none is set.
+#'
+#' @param project A project from [open_project()].
+#' @param pattern Text to look for in run names.
+#' @param name Reference material name.
+#' @param value Accepted 87Sr/86Sr used when the reference material is not
+#'   yet defined (SBO: 0.70918).
+#' @return `suggest_reference_runs()`: sample IDs of matching runs that are
+#'   still samples. `apply_reference_suggestion()`: the updated project.
+#' @export
+suggest_reference_runs <- function(project, pattern = "SBO") {
+  s <- project$samples
+  s$sample_id[s$run_type == "sample" & grepl(pattern, s$sample_id, ignore.case = TRUE)]
+}
+
+#' @rdname suggest_reference_runs
+#' @export
+apply_reference_suggestion <- function(project, pattern = "SBO", name = "SBO", value = SBO_DEFAULT) {
+  ids <- suggest_reference_runs(project, pattern)
+  if (!name %in% project$reference_materials$name) {
+    project <- set_reference_material(project, name, value, note = "suggested default")
+  }
+  if (length(ids) > 0) project <- set_run_type(project, ids, "reference", name)
+  if (!nzchar(project$settings$calibration$primary)) {
+    project <- update_project_settings(project, list(calibration = list(primary = name)))
+  }
+  project
+}
+
+# Default accepted 87Sr/86Sr for the SBO reference material (set by the
+# IsoFishR authors; users can change it).
+SBO_DEFAULT <- 0.70918
+
+#' Find runfiles in a folder
+#'
+#' Lists files with the runfile extension of the import settings in a folder
+#' and all its subfolders.
+#'
+#' @param dir Folder to search.
+#' @param import The `import` section of a settings list (for `extension`).
+#' @return A tibble with `path`, `file`, `sample_id`, `folder` (relative to
+#'   `dir`) and `duplicate` (`TRUE` when another file in the folder tree has
+#'   the same name; such files can't be told apart and are not added).
+#' @export
+find_runfiles <- function(dir, import = default_settings()$import) {
+  ext <- sub("^[.]", "", import$extension %||% "run")
+  paths <- list.files(dir, pattern = paste0("[.]", ext, "$"), recursive = TRUE,
+                      full.names = TRUE, ignore.case = TRUE)
+  ids <- tools::file_path_sans_ext(basename(paths))
+  tibble::tibble(
+    path = paths,
+    file = basename(paths),
+    sample_id = ids,
+    folder = dirname(substring(paths, nchar(dir) + 2)),
+    duplicate = ids %in% ids[duplicated(ids)]
+  ) |>
+    dplyr::arrange(.data$folder, .data$file)
+}
+
+# The step of the app a project was last worked on, kept in the project
+# folder (app_state.yml) so the project reopens there. Not a project change,
+# so it is not logged.
+read_last_step <- function(project) {
+  f <- project_file(project$path, "app_state.yml")
+  if (!file.exists(f)) return(NULL)
+  tryCatch(yaml::read_yaml(f)$last_step, error = function(e) NULL)
+}
+
+write_last_step <- function(project, step) {
+  if (project$read_only || !owns_lock(project)) return(invisible(FALSE))
+  try(write_yaml_file(list(last_step = step), project_file(project$path, "app_state.yml")),
+      silent = TRUE)
+  invisible(TRUE)
+}

@@ -71,7 +71,7 @@ test_that("export_project writes the summaries to a new folder and logs it", {
   expect_equal(utils::tail(read_log(p)$action, 1), "export")
 
   Sys.sleep(1.1)
-  dir2 <- export_project(p, include_excluded = TRUE, include_data = TRUE)
+  dir2 <- export_project(p, files = EXPORT_FILES, include_excluded = TRUE)
   expect_false(dir2 == dir)
   expect_true(file.exists(file.path(dir2, "data.csv")))
   expect_equal(nrow(readr::read_csv(file.path(dir2, "samples.csv"), show_col_types = FALSE)), 3)
