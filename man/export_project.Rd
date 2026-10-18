@@ -45,6 +45,10 @@ and session
 \item \code{reference_materials.csv} and \code{reference_material_summary.csv} (when
 the project has reference material runs):
 \code{\link[=reference_material_results]{reference_material_results()}} and \code{\link[=summarise_reference_materials]{summarise_reference_materials()}}
+\item \code{export_info.yml} (always): \code{\link[=export_report]{export_report()}}, a record of the export:
+all project settings, the calibration method, the primary and secondary
+reference materials with their number of runs, mean and SD, the
+sessions, and per-sample setting overrides.
 \item \code{data.csv} (not by default): all reduction columns per point (raw
 voltages, mass bias, intermediate ratios), for checking the reduction
 itself.

@@ -36,3 +36,24 @@ test_that("export writes only the chosen files", {
   expect_setequal(list.files(dir), c("samples.csv", "profiles.csv", "export_info.yml"))
   expect_error(export_project(p, files = "nonsense"))
 })
+
+test_that("exports and replaced files within the same second get unique names", {
+  p <- add_runfiles(create_project(file.path(withr::local_tempdir(), "P"), user = "tester"),
+                    example_runfiles()[1])
+  on.exit(close_project(p))
+  d1 <- export_project(p, files = "samples")
+  d2 <- export_project(p, files = "samples")
+  expect_false(d1 == d2)
+  expect_true(all(file.exists(file.path(c(d1, d2), "samples.csv"))))
+
+  # Replace the same run twice in quick succession
+  dir <- withr::local_tempdir()
+  f <- file.path(dir, basename(example_runfiles()[1]))
+  for (k in 1:2) {
+    file.copy(example_runfiles()[1], f, overwrite = TRUE)
+    cat(rep("\n", k), file = f, append = TRUE)
+    p <- suppressMessages(add_runfiles(p, f, mode = "replace"))
+  }
+  expect_length(list.files(file.path(p$path, "raw", "removed")), 2)
+  expect_equal(p$samples$md5, unname(tools::md5sum(f)))
+})

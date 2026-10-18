@@ -161,3 +161,30 @@ format_regions <- function(regions) {
   paste0(regions$region, ": ", as.character(regions$start_s), "-",
          as.character(regions$end_s), " s", collapse = "; ")
 }
+
+# A time stamp (format `fmt`) not yet used as a name in `dir`: exports or
+# moved files within the same second get a suffix (_2, _3, ...).
+unique_stamp <- function(dir, fmt) {
+  base <- format(Sys.time(), fmt)
+  candidate <- base
+  i <- 1L
+  while (file.exists(file.path(dir, candidate))) {
+    i <- i + 1L
+    candidate <- paste0(base, "_", i)
+  }
+  candidate
+}
+
+# A file name in `dir` that doesn't exist yet: `name`, or `name` with a
+# suffix (_2, _3, ...) before its extension.
+unique_file <- function(dir, name) {
+  stem <- tools::file_path_sans_ext(name)
+  ext <- tools::file_ext(name)
+  candidate <- name
+  i <- 1L
+  while (file.exists(file.path(dir, candidate))) {
+    i <- i + 1L
+    candidate <- paste0(stem, "_", i, if (nzchar(ext)) paste0(".", ext))
+  }
+  candidate
+}

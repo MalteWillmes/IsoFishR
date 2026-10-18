@@ -260,3 +260,43 @@ test_that("SBO runs are suggested as the primary reference material with 0.70918
   p <- apply_reference_suggestion(p)
   expect_equal(p$reference_materials$value, 0.70917)
 })
+
+test_that("export_info.yml records the settings, calibration and reference materials", {
+  p <- bracketed_project()
+  p <- set_sample_settings(p, "fish1", ma_window = 15)
+  dir <- export_project(p, files = "samples")
+  info <- yaml::read_yaml(file.path(dir, "export_info.yml"))
+
+  expect_equal(info$files, c("samples.csv", "export_info.yml"))
+  expect_equal(info$runs$reference_material_runs, 4)
+  expect_equal(info$sessions[[1]]$runs, 6)
+
+  cal <- info$calibration
+  expect_equal(cal$correction, "on")
+  expect_equal(cal$method, "regression")
+  expect_match(cal$method_description, "regression")
+  expect_equal(cal$baseline, "per_run")
+  expect_equal(cal$primary$name, "MMC")
+  expect_equal(cal$primary$accepted, PRIMARY)
+  expect_equal(cal$primary$runs, 3)
+  expect_equal(cal$primary$mean_corrected, PRIMARY, tolerance = 1e-6)
+  expect_gt(cal$primary$sd_uncorrected, cal$primary$sd_corrected)
+  expect_equal(cal$primary$per_session[[1]]$runs, 3)
+  expect_length(cal$secondary, 1)
+  expect_equal(cal$secondary[[1]]$name, "SEC")
+  expect_equal(cal$secondary[[1]]$runs, 1)
+  expect_null(cal$secondary[[1]]$sd_corrected)  # one run: no SD (written as ~)
+
+  expect_equal(info$settings$reduction$integration, 1)
+  expect_equal(info$settings$import$preset, "Nu_UCDavis")
+  expect_equal(info$sample_setting_overrides$fish1, "ma_window=15")
+})
+
+test_that("export_info.yml says when there is no calibration", {
+  runs <- data.frame(id = c("a", "b"), minute = c(0, 10), ratio = 0.71)
+  p <- synthetic_project(runs)
+  info <- yaml::read_yaml(file.path(export_project(p, files = "samples"), "export_info.yml"))
+  expect_match(info$calibration$correction, "off")
+  expect_null(info$calibration$primary)
+  expect_length(info$calibration$secondary, 0)
+})

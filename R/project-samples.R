@@ -73,7 +73,8 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
     for (i in which(replace)) {
       j <- existing[i]
       old <- project$samples[j, ]
-      moved <- file.path("raw", "removed", paste0(stamp, "_", basename(old$runfile)))
+      moved <- file.path("raw", "removed",
+                         unique_file(removed_dir, paste0(stamp, "_", basename(old$runfile))))
       if (file.exists(project_file(project$path, old$runfile)) &&
           !file.rename(project_file(project$path, old$runfile), project_file(project$path, moved))) {
         stop("Could not move '", old$runfile, "'. Is it open in another program?", call. = FALSE)
@@ -297,6 +298,7 @@ remove_samples <- function(project, sample_ids) {
 
   moved_to <- file.path("raw", "removed", paste0(stamp, "_", basename(rows$runfile)))
   for (i in seq_len(nrow(rows))) {
+    moved_to[i] <- file.path("raw", "removed", unique_file(removed_dir, basename(moved_to[i])))
     from <- project_file(project$path, rows$runfile[i])
     if (file.exists(from) && !file.rename(from, project_file(project$path, moved_to[i]))) {
       stop("Could not move '", rows$runfile[i], "'. Is it open in another program?", call. = FALSE)

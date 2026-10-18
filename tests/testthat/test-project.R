@@ -171,14 +171,14 @@ test_that("project_data reduces with per-sample settings, applies edits and cach
   )
   cache_files <- function() list.files(file.path(p$path, "cache"))
   expect_length(cache_files(), 2)
-  before <- file.mtime(file.path(p$path, "cache", cache_files()))
+  before <- cache_files()
 
   # Changing one sample's settings only re-reduces that sample
   p <- set_sample_settings(p, ids[2], ma_window = 30)
   d2 <- project_data(p)
-  after <- file.mtime(file.path(p$path, "cache", cache_files()))
+  after <- cache_files()
   expect_length(cache_files(), 2)
-  expect_equal(sum(before %in% after), 1)
+  expect_equal(length(intersect(before, after)), 1)  # only sample 2 was re-reduced
   expect_identical(dplyr::filter(d2, sample_id == ids[1]), dplyr::filter(d, sample_id == ids[1]))
   expect_false(identical(dplyr::filter(d2, sample_id == ids[2])$sr87_sr86_ma,
                          dplyr::filter(d, sample_id == ids[2])$sr87_sr86_ma))

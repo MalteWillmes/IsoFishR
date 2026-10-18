@@ -241,6 +241,10 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
 #' * `reference_materials.csv` and `reference_material_summary.csv` (when
 #'   the project has reference material runs):
 #'   [reference_material_results()] and [summarise_reference_materials()]
+#' * `export_info.yml` (always): [export_report()], a record of the export:
+#'   all project settings, the calibration method, the primary and secondary
+#'   reference materials with their number of runs, mean and SD, the
+#'   sessions, and per-sample setting overrides.
 #' * `data.csv` (not by default): all reduction columns per point (raw
 #'   voltages, mass bias, intermediate ratios), for checking the reduction
 #'   itself.
@@ -260,7 +264,7 @@ export_project <- function(project, files = setdiff(EXPORT_FILES, "data"),
   if (nrow(samples) == 0) stop("The project has no samples to export.", call. = FALSE)
   data <- project_data(project, samples$sample_id)
 
-  stamp <- format(Sys.time(), "%Y-%m-%d_%H%M%S")
+  stamp <- unique_stamp(project_file(project$path, "exports"), "%Y-%m-%d_%H%M%S")
   dir <- project_file(project$path, "exports", stamp)
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -283,15 +287,12 @@ export_project <- function(project, files = setdiff(EXPORT_FILES, "data"),
   if ("data" %in% files) tables$data <- data
   purrr::iwalk(tables, \(x, name) write_table_file(x, file.path(dir, paste0(name, ".csv"))))
 
-  yaml::write_yaml(list(
-    project = project$meta$name,
-    exported = timestamp_now(),
-    exported_by = project$user,
-    isofishr_version = isofishr_version(),
-    include_excluded = include_excluded,
-    samples = nrow(samples),
-    files = paste0(names(tables), ".csv")
-  ), file.path(dir, "export_info.yml"))
+  report <- export_report(project, files = paste0(names(tables), ".csv"),
+                          include_excluded = include_excluded, n_samples = nrow(samples))
+  # Missing values (e.g. no SD for a single run) as YAML's empty value ~
+  # rather than R's .na.real.
+  text <- gsub("[.]na([.](real|integer|character))?\\b", "~", yaml::as.yaml(report))
+  writeLines(text, file.path(dir, "export_info.yml"), useBytes = TRUE)
 
   append_log(project_file(project$path, "log.csv"),
              log_entry(project$user, "export", new = file.path("exports", stamp)))
@@ -353,3 +354,99 @@ add_correction <- function(tbl, data) {
 #' @export
 EXPORT_FILES <- c("samples", "regions", "changepoints", "profiles", "runs",
                   "reference_materials", "settings", "data")
+
+#' Record of an export
+#'
+#' Everything needed to understand and reproduce the exported values, as
+#' written to `export_info.yml` by [export_project()]: the project, IsoFishR
+#' version and user; the runs and sessions; the calibration (method, baseline
+#' mode, session gap, and for the primary and each secondary reference
+#' material its accepted value, number of runs and the mean and SD of its run
+#' means before and after correction, overall and per session); all project
+#' settings; and the samples with their own setting overrides.
+#'
+#' @param project A project from [open_project()].
+#' @param files Names of the files written with it.
+#' @param include_excluded Whether excluded samples were exported.
+#' @param n_samples Number of samples exported.
+#' @return A nested list.
+#' @export
+export_report <- function(project, files = character(), include_excluded = FALSE,
+                          n_samples = NA_integer_) {
+  runs <- project_runs(project)
+  cal <- project$settings$calibration
+  in_use <- runs$status != "excluded"
+
+  sessions <- runs |>
+    dplyr::filter(in_use) |>
+    dplyr::summarise(runs = dplyr::n(),
+                     first_run = time_range(.data$acquired)[1],
+                     last_run = time_range(.data$acquired)[2], .by = "session")
+
+  rm_results <- if (any(runs$run_type == "reference")) reference_material_results(project) else NULL
+  rm_summary <- if (!is.null(rm_results) && nrow(rm_results) > 0) summarise_reference_materials(project)
+  describe_rm <- function(name) {
+    rm <- project$reference_materials[project$reference_materials$name == name, ]
+    r <- if (is.null(rm_results)) rm_results else rm_results[rm_results$reference_material == name, ]
+    sd_or_na <- function(x) if (length(x) > 1) stats::sd(x) else NA_real_
+    out <- list(name = name, accepted = rm$value, accepted_2s = rm$uncertainty_2s, note = rm$note,
+                runs = if (is.null(r)) 0L else nrow(r))
+    if (!is.null(r) && nrow(r) > 0) {
+      out <- c(out, list(
+        mean_uncorrected = mean(r$measured), sd_uncorrected = sd_or_na(r$measured),
+        mean_corrected = mean(r$mean), sd_corrected = sd_or_na(r$mean),
+        deviation_ppm = (mean(r$mean) / rm$value - 1) * 1e6,
+        runs_within_uncertainty = sum(r$within_uncertainty),
+        per_session = rm_summary |>
+          dplyr::filter(.data$reference_material == name) |>
+          dplyr::select("session", "runs", "mean_uncorrected", "sd_uncorrected",
+                        "mean_corrected", "sd_corrected", "deviation_ppm") |>
+          purrr::transpose()
+      ))
+    }
+    out
+  }
+  secondary <- setdiff(project$reference_materials$name, cal$primary)
+
+  overrides <- project$samples |>
+    dplyr::filter(nzchar(.data$settings)) |>
+    dplyr::select("sample_id", "settings")
+
+  list(
+    project = project$meta$name,
+    exported = timestamp_now(),
+    exported_by = project$user,
+    isofishr_version = isofishr_version(),
+    files = c(files, "export_info.yml"),
+    include_excluded = include_excluded,
+    samples = n_samples,
+    runs = list(
+      total = nrow(runs),
+      samples = sum(runs$run_type == "sample"),
+      reference_material_runs = sum(runs$run_type == "reference"),
+      baseline_runs = sum(runs$run_type == "baseline"),
+      excluded = sum(!in_use)
+    ),
+    sessions = purrr::transpose(sessions),
+    calibration = list(
+      correction = if (nzchar(cal$primary)) "on" else "off (values are uncorrected)",
+      method = cal$fit,
+      method_description = names(FIT_CHOICES)[FIT_CHOICES == cal$fit],
+      baseline = cal$baseline,
+      baseline_description = c(per_run = "Each run's own blank (start of run)",
+                               baseline_runs = "Baseline runs, interpolated in time")[[cal$baseline]],
+      session_gap_h = cal$session_gap_h,
+      primary = if (nzchar(cal$primary)) describe_rm(cal$primary),
+      secondary = purrr::map(secondary, describe_rm)
+    ),
+    settings = project$settings[c("sample", "import", "reduction", "regions")],
+    sample_setting_overrides = as.list(rlang::set_names(overrides$settings, overrides$sample_id))
+  )
+}
+
+# First and last time as text ("" when there are no timestamps).
+time_range <- function(t) {
+  t <- t[!is.na(t)]
+  if (length(t) == 0) return(c("", ""))
+  format_time(range(t))
+}
