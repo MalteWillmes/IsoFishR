@@ -1,8 +1,8 @@
 #' Run the IsoFishR app
 #'
-#' Opens IsoFishR in a browser. The app walks through six steps: 1 Project
-#' (create or open), 2 Settings, 3 Runfiles, 4 Calibration, 5 Workspace and
-#' 6 Export. Every change is saved immediately, and a project reopens on the
+#' Opens IsoFishR in a browser. The app walks through six steps: Project
+#' (create or open), Settings, Runfiles, Calibration, Workspace and Export.
+#' Every change is saved immediately, and a project reopens on the
 #' step it was last worked on.
 #'
 #' @param project Optional path of a project to open straight away.
@@ -22,15 +22,15 @@ run_app <- function(project = NULL, user = default_user(), ...) {
 }
 
 # The steps of the app, in order: id = navigation value, label = tab title.
-APP_STEPS <- c(project = "1 Project", settings = "2 Settings", runfiles = "3 Runfiles",
-               calibration = "4 Calibration", workspace = "5 Workspace", export = "6 Export")
+APP_STEPS <- c(project = "Project", settings = "Settings", runfiles = "Runfiles",
+               calibration = "Calibration", workspace = "Workspace", export = "Export")
 
 app_ui <- function(request) {
   bslib::page_navbar(
     id = "step",
     title = shiny::span("IsoFishR", shiny::uiOutput("project_title", inline = TRUE)),
     window_title = "IsoFishR",
-    theme = bslib::bs_theme(version = 5, preset = "shiny", primary = "#1f6f8b"),
+    theme = app_theme(),
     fillable = "workspace",
     header = shiny::tags$head(shiny::tags$style(shiny::HTML(app_css)),
                               shiny::tags$script(shiny::HTML(app_js))),
@@ -72,15 +72,37 @@ app_js <- "
   });
 "
 
+# A compact theme: slightly smaller text and less padding, so more fits on
+# the screen.
+app_theme <- function() {
+  bslib::bs_theme(
+    version = 5, preset = "shiny", primary = "#1f6f8b",
+    font_scale = 0.9, spacer = "0.75rem", "bslib-spacer" = "0.6rem",
+    "form-label-margin-bottom" = "0.15rem",
+    "card-spacer-y" = "0.5rem", "card-spacer-x" = "0.75rem", "card-cap-padding-y" = "0.35rem",
+    "input-padding-y" = "0.25rem", "input-btn-padding-y" = "0.25rem",
+    "navbar-padding-y" = "0.25rem", "nav-link-padding-y" = "0.35rem",
+    "headings-margin-bottom" = "0.35rem", "paragraph-margin-bottom" = "0.5rem",
+    "hr-margin-y" = "0.5rem", "modal-inner-padding" = "0.75rem"
+  )
+}
+
 app_css <- "
   .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.5rem; }
-  .ifr-start { max-width:980px; margin:1.5rem auto; padding:0 1rem; }
-  .ifr-recent a { display:block; padding:.15rem 0; word-break:break-all; }
-  .ifr-muted { color:var(--bs-secondary-color); font-size:.875rem; }
+  .ifr-start { max-width:980px; margin:.75rem auto; padding:0 .75rem; }
+  .ifr-recent a { display:block; padding:.1rem 0; word-break:break-all; }
+  .ifr-muted { color:var(--bs-secondary-color); font-size:.85rem; }
   .ifr-sample-table table.dataTable tbody tr { cursor:pointer; }
-  .ifr-panel .form-group { margin-bottom:.5rem; }
+  .form-group, .shiny-input-container { margin-bottom:.4rem; }
+  .card-body.bslib-gap-spacing > .shiny-input-container { margin-bottom:0; }
+  .shiny-input-container > label, .form-group > label { margin-bottom:.15rem; }
   .ifr-panel .shiny-input-container:not(.shiny-input-container-inline) { width:100%; }
-  .ifr-step { max-width:1400px; margin:0 auto; padding:1rem; }
+  .ifr-step { max-width:1600px; margin:0 auto; padding:.5rem .75rem; }
+  .shiny-input-container .progress { margin-bottom:.25rem; }
+  table.dataTable thead th, table.dataTable thead td { padding:4px 8px !important; }
+  table.dataTable tbody td { padding:2px 8px !important; }
+  table.dataTable thead input { padding:1px 4px; font-size:.8rem; }
+  .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { padding-top:.25rem; font-size:.85rem; }
 "
 
 app_server <- function(initial_project = NULL, user = default_user()) {
@@ -179,7 +201,7 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       recent <- recent_projects()
       if (length(recent) == 0) return(NULL)
       shiny::div(
-        class = "ifr-recent mt-3",
+        class = "ifr-recent mt-2",
         shiny::strong("Recent projects"),
         purrr::map(recent, \(path) shiny::tags$a(
           href = "#", path,
@@ -294,7 +316,7 @@ project_step_ui <- function() {
           class = "d-flex gap-2 align-items-end",
           shiny::div(class = "flex-grow-1",
                      shiny::textInput("open_path", "Project folder", width = "100%")),
-          shiny::div(class = "mb-3", shiny::actionButton("browse_open", "Browse\u2026"))
+          shiny::div(class = "mb-2", shiny::actionButton("browse_open", "Browse\u2026"))
         ),
         shiny::actionButton("open", "Open", class = "btn-primary"),
         shiny::uiOutput("recent")
@@ -305,12 +327,12 @@ project_step_ui <- function() {
           class = "d-flex gap-2 align-items-end",
           shiny::div(class = "flex-grow-1",
                      shiny::textInput("create_parent", "Create in folder", width = "100%")),
-          shiny::div(class = "mb-3", shiny::actionButton("browse_parent", "Browse\u2026"))
+          shiny::div(class = "mb-2", shiny::actionButton("browse_parent", "Browse\u2026"))
         ),
         shiny::textInput("create_name", "Project name", placeholder = "e.g. Salmon_2024"),
         shiny::selectInput("create_preset", "Instrument preset (runfile layout)",
                            list_import_presets()$name, selected = DEFAULT_PRESET),
-        shiny::p(class = "ifr-muted", "The new project opens on step 2, Settings."),
+        shiny::p(class = "ifr-muted", "The new project opens on Settings."),
         shiny::actionButton("create", "Create", class = "btn-primary")
       )
     )

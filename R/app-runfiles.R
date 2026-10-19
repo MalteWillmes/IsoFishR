@@ -36,7 +36,7 @@ runfiles_ui <- function(id) {
         ),
         shiny::p(class = "ifr-muted small",
                  "In acquisition order. Click rows to select them. Mark reference materials ",
-                 "and baselines in step 4, Calibration."),
+                 "and baselines under Calibration."),
         DT::DTOutput(ns("runs"))
       )
     )
@@ -56,13 +56,20 @@ runfiles_server <- function(id, project) {
 
     add <- function(paths, names) {
       n_before <- nrow(project()$samples)
-      shiny::withProgress(message = sprintf("Adding %d runfile(s)", length(paths)), {
-        change(add_runfiles, paths, source_names = names, mode = input$add_mode %||% "add")
+      p <- shiny::withProgress(message = sprintf("Adding %d runfile(s)", length(paths)), {
+        try_notify(suppressMessages(
+          add_runfiles(project(), paths, source_names = names, mode = input$add_mode %||% "add")
+        ))
       })
-      sbo <- suggest_reference_runs(project())
-      if (nrow(project()$samples) > n_before && length(sbo) > 0) {
+      if (is.null(p)) return()
+      report <- attr(p, "import_report")
+      attr(p, "import_report") <- NULL
+      project(p)
+      show_import_report(report)
+      sbo <- suggest_reference_runs(p)
+      if (nrow(p$samples) > n_before && length(sbo) > 0) {
         shiny::showNotification(
-          sprintf("%d run(s) look like SBO reference material runs; see step 4, Calibration.",
+          sprintf("%d run(s) look like SBO reference material runs; see Calibration.",
                   length(sbo)), type = "message", duration = 8)
       }
     }
@@ -75,7 +82,7 @@ runfiles_server <- function(id, project) {
     output$extension_note <- shiny::renderUI({
       ext <- shiny::req(project())$settings$import$extension %||% ".run"
       shiny::p(class = "ifr-muted small mt-2",
-               "Picks up all ", shiny::code(ext), " files (set under step 2, Settings).")
+               "Picks up all ", shiny::code(ext), " files (set under Settings).")
     })
 
     shiny::observeEvent(input$choose_folder, {
@@ -167,4 +174,27 @@ runfiles_server <- function(id, project) {
       change(remove_samples, ids)
     })
   })
+}
+
+# After an import: a short notification when everything went in, or a
+# dialog listing every file that failed, was skipped or needed a note.
+show_import_report <- function(report) {
+  if (is.null(report) || nrow(report) == 0) return(invisible())
+  done <- sum(report$result %in% c("added", "replaced"))
+  problems <- dplyr::filter(report, .data$result %in% c("failed", "skipped") | nzchar(.data$detail))
+  if (nrow(problems) == 0) {
+    shiny::showNotification(sprintf("Added %d runfile(s).", done), type = "message")
+    return(invisible())
+  }
+  shiny::showModal(shiny::modalDialog(
+    title = sprintf("%d of %d runfile(s) added", done, nrow(report)),
+    size = "l", easyClose = TRUE,
+    if (any(report$result == "failed")) shiny::p(
+      "Files that could not be read were not added. The other files were added as usual."
+    ),
+    simple_table(dplyr::transmute(problems, File = .data$file,
+                                  Result = tools::toTitleCase(.data$result),
+                                  Detail = .data$detail)),
+    footer = shiny::modalButton("OK")
+  ))
 }

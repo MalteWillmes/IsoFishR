@@ -35,6 +35,7 @@ The app guides you through a project from left to right. **Quit IsoFishR** and t
 3. **Runfiles.** Add runfiles as individual files, or choose a folder: all files with the preset's extension (`.run`) in it and its subfolders are found.
    - **More batches:** you can add more at any time.
    - **Same name as an existing run:** choose whether to keep the existing run or replace it with the new file. Replaced runs keep their edits, regions and notes.
+   - **Damaged files:** a file whose header was saved wrongly (lines missing or added) is still read: IsoFishR finds where the data starts and notes it. Files without readable data are skipped, and a summary lists which files were added, skipped or failed, and why.
    - **Runs table:** lists all runs in acquisition order (read from the runfile timestamps), and lets you remove runs.
 4. **Calibration.** Correct the samples to a reference material measured in the same session, in the style of Iolite.
    - **SBO suggestion:** runs with *SBO* in their name are suggested as the primary reference material, with an accepted value of 0.70918 that you can change.

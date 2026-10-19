@@ -3,7 +3,7 @@
 project_settings_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::div(
-    class = "container-fluid py-3",
+    class = "container-fluid py-2",
     shiny::p(class = "ifr-muted",
              "Project defaults. Samples with their own settings (Workspace > Reduction) ",
              "keep those overrides. Changing reduction settings reprocesses samples the next ",
@@ -179,7 +179,7 @@ update_column_inputs <- function(session, columns) {
 # Read a runfile with an import layout and summarise what came out, so a
 # wrong layout is obvious before any files are added.
 check_runfile_ui <- function(path, name, import) {
-  raw <- tryCatch(read_runfiles(path, import, sample_ids = "check"), error = function(e) e)
+  raw <- tryCatch(read_runfile(path, import, sample_id = "check"), error = function(e) e)
   if (inherits(raw, "error")) {
     return(shiny::div(class = "alert alert-danger py-1 px-2 small", conditionMessage(raw)))
   }
@@ -187,7 +187,12 @@ check_runfile_ui <- function(path, name, import) {
     return(shiny::div(class = "alert alert-danger py-1 px-2 small",
                       "No data rows were read. Check the header length and separator."))
   }
+  start <- attr(raw, "data_start")
   problems <- c(
+    if (!is.null(start)) sprintf(paste0(
+      "The data starts on line %d, but the header setting expects line %d. IsoFishR found it ",
+      "automatically; if all your files look like this, set 'Header lines to skip' to %d."),
+      start, import$skip_header + 1L, start - 1L),
     if (any(diff(raw$time_s) <= 0)) "The time column does not always increase; check its column number.",
     if (max(raw$raw88) < 0.05) "The 88Sr signal never exceeds 0.05 V; check the 88Sr column.",
     if (stats::median(raw$raw86 / raw$raw88, na.rm = TRUE) > 0.5)
@@ -219,7 +224,7 @@ simple_table <- function(df, digits = 3) {
 
 log_ui <- function(id) {
   ns <- shiny::NS(id)
-  shiny::div(class = "container-fluid py-3", DT::DTOutput(ns("log")))
+  shiny::div(class = "container-fluid py-2", DT::DTOutput(ns("log")))
 }
 
 log_server <- function(id, project) {

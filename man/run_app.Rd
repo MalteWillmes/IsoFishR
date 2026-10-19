@@ -18,8 +18,8 @@ run_app(project = NULL, user = default_user(), ...)
 A Shiny app object; printing it (or calling at the console) runs it.
 }
 \description{
-Opens IsoFishR in a browser. The app walks through six steps: 1 Project
-(create or open), 2 Settings, 3 Runfiles, 4 Calibration, 5 Workspace and
-6 Export. Every change is saved immediately, and a project reopens on the
+Opens IsoFishR in a browser. The app walks through six steps: Project
+(create or open), Settings, Runfiles, Calibration, Workspace and Export.
+Every change is saved immediately, and a project reopens on the
 step it was last worked on.
 }

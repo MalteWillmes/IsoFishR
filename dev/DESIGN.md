@@ -55,19 +55,20 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 
 ## App (`run_app()`): six steps
 `app_ui` is a static `bslib::page_navbar(id = "step")` with one panel per step (`APP_STEPS`): `project`, `settings`, `runfiles`, `calibration`, `workspace`, `export`. **Change log** (a modal) and **Quit IsoFishR** sit on the right of the navigation bar on every step.
-- **Navigation:** steps 2–6 are hidden (`nav_hide`) until a project is open. On opening, the project goes to its last step (`read_last_step()`, `app_state.yml` in the project folder, written on every step change, not logged); a new project goes to *settings*. Closing a project hides the steps and returns to *project*.
+- **Navigation:** all steps but Project are hidden (`nav_hide`) until a project is open. On opening, the project goes to its last step (`read_last_step()`, `app_state.yml` in the project folder, written on every step change, not logged); a new project goes to *settings*. Closing a project hides the steps and returns to *project*.
 - **Sidebars:** the side panels use `open = "always"`. They are set up while their step is hidden, and would otherwise start collapsed.
-- **1 Project:** the open-project card (runs by type, "Continue to <last step>", Close), user name, open (Browse, recent projects), create (preset). If another user holds the lock, the app offers read-only access or a takeover.
-- **2 Settings:** reduction, sample/laser and runfile import defaults (preset, layout check, extension), default region names.
-- **3 Runfiles** (`runfiles_server`): keep/replace for same-name runs; file upload (`shiny.maxRequestSize` raised to 4 GB in `run_app()`); folder import (`choose_folder()` + `find_runfiles()`; same-name files in different subfolders are flagged and skipped); runs table in acquisition order with multi-select removal. After adding, it points to SBO-named runs.
-- **4 Calibration** (`calibration_server`):
+- **Project:** the open-project card (runs by type, "Continue to <last step>", Close), user name, open (Browse, recent projects), create (preset). If another user holds the lock, the app offers read-only access or a takeover.
+- **Settings:** reduction, sample/laser and runfile import defaults (preset, layout check, extension), default region names.
+- **Runfiles** (`runfiles_server`): keep/replace for same-name runs; file upload (`shiny.maxRequestSize` raised to 4 GB in `run_app()`); folder import (`choose_folder()` + `find_runfiles()`; same-name files in different subfolders are flagged and skipped); runs table in acquisition order with multi-select removal. After adding, it points to SBO-named runs. `add_runfiles()` checks each file on its own and never stops a batch: the per-file result (added/replaced/skipped/failed + detail) is the `import_report` attribute, shown as a modal. `read_runfile()` marks each line as data or not (`data_lines()`); if the data doesn't start right after `skip_header` lines, it uses the first block of ≥5 data lines (`data_start()`) and reports the line.
+- **Look:** compact theme (`app_theme()`: font scale 0.9, smaller spacers and paddings) plus `app_css`. Step tabs are not numbered. The Windows folder dialog is the Explorer-style picker (`inst/windows/FolderPicker.cs`, compiled by PowerShell `Add-Type`), with the old folder tree as fallback.
+- **Calibration** (`calibration_server`):
   - SBO suggestion banner (`apply_reference_suggestion()`, value editable, default 0.70918).
   - Reference material editor; primary; fit (`FIT_CHOICES`, regression first); baseline mode; session gap.
   - Tabs: *Reference materials* (`reference_material_plot()` + uncorrected/corrected summary), *Assign runs* (types and sessions; the selection clears after each change), *Run details*.
-- **5 Workspace** (`workspace_server`): sample table with type; plotly profile with Sr, Kr and Rb panels at 40/20/20/20 % height; a corrected/uncorrected badge; Edit / Reduction / Notes panels.
+- **Workspace** (`workspace_server`): sample table with type; plotly profile with Sr, Kr and Rb panels at 40/20/20/20 % height; a corrected/uncorrected badge; Edit / Reduction / Notes panels.
   - Edits save immediately. A field is only written if its value differs from the stored one, so switching samples never writes anything.
   - The plot's data key includes `calibration_inputs()`, so a changed calibration recalculates the plotted data.
-- **6 Export** (`export_server`): checkboxes per file (`EXPORT_FILE_CHOICES`), excluded samples, previews.
+- **Export** (`export_server`): checkboxes per file (`EXPORT_FILE_CHOICES`), excluded samples, previews.
 - **Locks and stopping:** each open project has its own lock token. The app stops on Quit, or once no tab has been connected for 5 seconds; closing or reloading the tab asks first.
 - **Calibration speed:** `calibration_model()` is cached in memory (keyed by `calibration_inputs()`), so the many `project_data()` calls of the steps don't rebuild it.
 

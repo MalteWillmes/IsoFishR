@@ -259,7 +259,7 @@ workspace_server <- function(id, project) {
     })
 
     # Whether the plotted 87Sr/86Sr is corrected to the primary reference
-    # material (step 4) or raw.
+    # material (Calibration step) or raw.
     output$calibration_badge <- shiny::renderUI({
       d <- sample_data()
       cal <- shiny::isolate(project())$settings$calibration

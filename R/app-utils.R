@@ -32,12 +32,25 @@ choose_folder_r <- function(caption, default) {
 }
 
 # PowerShell script showing the Windows folder dialog in front of all windows
-# and printing the chosen folder (nothing if cancelled).
-folder_dialog_ps1 <- function(caption, default) {
+# and printing the chosen folder (nothing if cancelled). It uses the modern
+# Explorer-style picker (inst/windows/FolderPicker.cs) and falls back to the
+# older folder tree dialog if that can't be loaded.
+folder_dialog_ps1 <- function(caption, default,
+                              picker = system.file("windows", "FolderPicker.cs", package = "IsoFishR")) {
   q <- function(x) paste0("'", gsub("'", "''", x, fixed = TRUE), "'")
+  start <- if (nzchar(default) && dir.exists(default)) normalizePath(default, winslash = "\\") else ""
   c(
     "Add-Type -AssemblyName System.Windows.Forms",
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+    "$modern = $false",
+    if (nzchar(picker)) c(
+      "try {",
+      paste0("  Add-Type -TypeDefinition (Get-Content -Raw -Encoding UTF8 ", q(picker), ")"),
+      "  [IsoFishRFolderPicker]::UseScreenResolution()",
+      "  $modern = $true",
+      "} catch { }"
+    ),
+    "[System.Windows.Forms.Application]::EnableVisualStyles()",
     "$owner = New-Object System.Windows.Forms.Form",
     "$owner.TopMost = $true",
     "$owner.ShowInTaskbar = $false",
@@ -45,12 +58,18 @@ folder_dialog_ps1 <- function(caption, default) {
     "$owner.Size = New-Object System.Drawing.Size(1, 1)",
     "$owner.Show()",
     "$owner.Activate()",
+    "if ($modern) {",
+    "  try {",
+    paste0("    $path = [IsoFishRFolderPicker]::Show($owner.Handle, ", q(caption), ", ", q(start), ")"),
+    "    $owner.Close()",
+    "    if ($path) { Write-Output $path }",
+    "    exit 0",
+    "  } catch { }",
+    "}",
     "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog",
     paste0("$dialog.Description = ", q(caption)),
     "$dialog.ShowNewFolderButton = $true",
-    if (nzchar(default) && dir.exists(default)) {
-      paste0("$dialog.SelectedPath = ", q(normalizePath(default, winslash = "\\")))
-    },
+    if (nzchar(start)) paste0("$dialog.SelectedPath = ", q(start)),
     "$result = $dialog.ShowDialog($owner)",
     "$owner.Close()",
     "if ($result -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }"

@@ -80,7 +80,7 @@ export_server <- function(id, project) {
       dir <- last_dir()
       shiny::req(dir)
       shiny::div(
-        class = "mt-3",
+        class = "mt-2",
         shiny::p(class = "ifr-muted small", "Exported to:", shiny::br(), shiny::code(dir)),
         shiny::actionButton(session$ns("open_folder"), "Open folder", class = "btn-sm")
       )

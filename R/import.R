@@ -54,35 +54,76 @@ read_acquisition_times <- function(paths, import = default_settings()$import) {
   as.POSIXct(strptime(text, import$timestamp_format, tz = "UTC"))
 }
 
+# Reads one runfile. If the header doesn't match the import settings (e.g. a
+# file saved with missing or extra header lines), the start of the data is
+# found automatically; the result then has the attribute "data_start" (the
+# line where the data was found).
 read_runfile <- function(path, import, sample_id) {
+  # Where the data should start, and where it does: header lines can go
+  # missing or be added when the instrument saves a file.
+  expected <- import$skip_header + 1L + isTRUE(import$header)
+  is_data <- data_lines(path, import)
+  ok <- isTRUE(is_data[expected]) && (expected == 1L || !is_data[expected - 1L])
+  raw <- if (ok) read_cycles(path, import, skip = import$skip_header)
+  if (is.null(raw)) {
+    start <- data_start(is_data)
+    if (is.na(start)) {
+      stop("No data found in '", basename(path), "' with the import settings (separator ",
+           "and column numbers). Is it a complete runfile of this instrument?", call. = FALSE)
+    }
+    raw <- read_cycles(path, import, skip = start - 1L)
+    if (is.null(raw)) {
+      stop("Could not read the data in '", basename(path), "'.", call. = FALSE)
+    }
+    if (start != expected) attr(raw, "data_start") <- start
+  }
+  dplyr::mutate(raw, sample_id = sample_id, cycle = dplyr::row_number(), .before = 1) |>
+    dplyr::relocate(time_s, .after = cycle)
+}
+
+# The numeric cycle data after skipping `skip` lines, or NULL if those lines
+# don't contain data in the expected columns.
+read_cycles <- function(path, import, skip) {
   cols <- unlist(import$columns)
   # Lines of a different shape (e.g. header lines when the header length is
-  # wrong) make readr warn; rows that don't parse as numbers are dropped
-  # below, and callers check what was read.
+  # wrong) make readr warn; rows that don't parse as numbers are dropped.
   raw <- suppressWarnings(readr::read_delim(
     path,
     delim = import$sep,
-    skip = import$skip_header,
-    col_names = isTRUE(import$header),
+    skip = skip,
+    col_names = isTRUE(import$header) && skip == import$skip_header,
     col_types = readr::cols(.default = readr::col_character()),
     name_repair = "minimal",
     trim_ws = TRUE,
     progress = FALSE
   ))
-  if (import$skip_footer > 0) {
-    raw <- utils::head(raw, -import$skip_footer)
-  }
-  if (max(cols) > ncol(raw)) {
-    stop("Runfile '", basename(path), "' has ", ncol(raw), " columns, but the import ",
-         "settings refer to column ", max(cols), ". Check the column numbers and ",
-         "header length.", call. = FALSE)
-  }
+  if (import$skip_footer > 0) raw <- utils::head(raw, -import$skip_footer)
+  if (max(cols) > ncol(raw)) return(NULL)
 
   raw <- raw[, cols]
   names(raw) <- names(cols)
-  raw |>
+  raw <- raw |>
     dplyr::mutate(dplyr::across(dplyr::everything(), \(x) suppressWarnings(as.numeric(x)))) |>
-    dplyr::filter(!is.na(raw88), !is.na(time_s)) |>
-    dplyr::mutate(sample_id = sample_id, cycle = dplyr::row_number(), .before = 1) |>
-    dplyr::relocate(time_s, .after = cycle)
+    dplyr::filter(!is.na(raw88), !is.na(time_s))
+  if (nrow(raw) == 0) NULL else raw
+}
+
+# For each line of a runfile: does it have numbers in all the columns the
+# import settings use?
+data_lines <- function(path, import) {
+  cols <- unlist(import$columns)
+  lines <- readLines(path, warn = FALSE)
+  fields <- strsplit(gsub("\"", "", lines), import$sep, fixed = TRUE)
+  vapply(fields, \(f) {
+    length(f) >= max(cols) && !anyNA(suppressWarnings(as.numeric(f[cols])))
+  }, logical(1))
+}
+
+# First line of the first block of (at least) 5 consecutive data lines; NA
+# if there is none.
+data_start <- function(is_data) {
+  runs <- rle(is_data)
+  ends <- cumsum(runs$lengths)
+  block <- which(runs$values & runs$lengths >= 5)[1]
+  if (is.na(block)) NA_integer_ else as.integer(ends[block] - runs$lengths[block] + 1L)
 }

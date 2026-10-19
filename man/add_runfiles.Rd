@@ -25,14 +25,19 @@ are temporary upload paths).}
 \item{mode}{\code{"add"} or \code{"replace"}, see above.}
 }
 \value{
-The updated project. A message summarises what was added,
-replaced and skipped.
+The updated project. A message summarises what happened; the
+attribute \code{"import_report"} holds one row per file with \code{file},
+\code{sample_id}, \code{result} (\code{"added"}, \code{"replaced"}, \code{"skipped"} or
+\code{"failed"}) and \code{detail}.
 }
 \description{
 Copies runfiles into the project's \verb{raw/} folder and registers them as new
 runs, so a project can be built up batch by batch. Each file is read first
-with the project's import settings, so a wrong layout is caught before
-anything is copied.
+with the project's import settings. A file that can't be read is not added
+and is reported, without stopping the rest of the batch. If a file's
+header doesn't match the import settings (e.g. lines missing after a bad
+save on the instrument), the start of its data is found automatically and
+the file is added with a note.
 }
 \details{
 Files identical to one already in the project are always skipped. For a

@@ -54,7 +54,7 @@ calibration_ui <- function(id) {
           "Reference materials",
           shiny::uiOutput(ns("correction_note")),
           plotly::plotlyOutput(ns("rm_plot"), height = "560px"),
-          shiny::h6(class = "mt-3", "Mean and SD of the run means, per session"),
+          shiny::h6(class = "mt-2", "Mean and SD of the run means, per session"),
           DT::DTOutput(ns("rm_summary"))
         ),
         bslib::nav_panel(
@@ -62,11 +62,11 @@ calibration_ui <- function(id) {
           shiny::div(
             class = "d-flex flex-wrap gap-2 align-items-end mb-2",
             shiny::div(shiny::selectInput(ns("assign_type"), "Set selected runs to", NULL, width = "240px")),
-            shiny::div(class = "mb-3", shiny::actionButton(ns("assign"), "Apply", class = "btn-sm btn-primary")),
+            shiny::div(class = "mb-2", shiny::actionButton(ns("assign"), "Apply", class = "btn-sm btn-primary")),
             shiny::div(class = "ms-3", shiny::textInput(ns("session_name"), "Session", width = "180px",
                                                       placeholder = "e.g. Day 2 PM")),
-            shiny::div(class = "mb-3", shiny::actionButton(ns("session_set"), "Move selected", class = "btn-sm")),
-            shiny::div(class = "mb-3", shiny::actionButton(ns("session_auto"), "Automatic session", class = "btn-sm"))
+            shiny::div(class = "mb-2", shiny::actionButton(ns("session_set"), "Move selected", class = "btn-sm")),
+            shiny::div(class = "mb-2", shiny::actionButton(ns("session_auto"), "Automatic session", class = "btn-sm"))
           ),
           shiny::p(class = "ifr-muted small",
                    "Runs in acquisition order. Click rows to select or deselect them; the selection ",
@@ -115,7 +115,7 @@ calibration_server <- function(id, project) {
         ),
         shiny::div(shiny::numericInput(ns("sbo_value"), "SBO accepted 87Sr/86Sr", value,
                                        step = 0.00001, width = "180px")),
-        shiny::div(class = "mb-3", shiny::actionButton(ns("sbo_apply"), "Mark as SBO", class = "btn-primary"))
+        shiny::div(class = "mb-2", shiny::actionButton(ns("sbo_apply"), "Mark as SBO", class = "btn-primary"))
       )
     })
 

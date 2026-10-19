@@ -19,7 +19,7 @@ test_that("read_runfiles uses supplied sample IDs and rejects duplicates", {
 test_that("a wrong column layout gives a clear error", {
   imp <- default_settings()$import
   imp$columns$time_s <- 50L
-  expect_error(read_runfiles(example_runfiles()[1], imp), "column 50")
+  expect_error(read_runfiles(example_runfiles()[1], imp), "No data found")
 })
 
 test_that("settings round-trip through YAML and fill in missing values", {

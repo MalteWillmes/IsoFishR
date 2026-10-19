@@ -45,15 +45,60 @@ test_that("adding the same file twice or a clashing name is skipped", {
   expect_equal(nrow(p2$samples), 1)
   expect_message(p3 <- add_runfiles(p, salmon(2)[2], sample_ids = "PC_2016_01_A2_4R"), "choose Replace")
   expect_equal(nrow(p3$samples), 1)
-  expect_error(add_runfiles(p, salmon(2)[2], sample_ids = "a/b"), "cannot")
+  expect_message(p4 <- add_runfiles(p, salmon(2)[2], sample_ids = "a/b"), "not allowed")
+  expect_equal(attr(p4, "import_report")$result, "failed")
+  expect_equal(nrow(p4$samples), 1)
 })
 
-test_that("files that don't match the import settings are rejected before copying", {
+test_that("files without readable data are reported and not copied", {
   p <- new_project()
   bad <- withr::local_tempfile(fileext = ".run")
   writeLines(c(rep("header", 46), "1,2,3"), bad)
-  expect_error(add_runfiles(p, bad), "column")
+  expect_message(p2 <- add_runfiles(p, bad), "Could not read 1 file")
+  expect_equal(attr(p2, "import_report")$result, "failed")
+  expect_match(attr(p2, "import_report")$detail, "No data found")
   expect_length(list.files(file.path(p$path, "raw")), 0)
+})
+
+test_that("one bad file doesn't stop the batch", {
+  p <- new_project()
+  dir <- withr::local_tempdir()
+  bad <- file.path(dir, "broken.run")
+  writeLines(c("garbage", "more garbage"), bad)
+  p <- suppressMessages(add_runfiles(p, c(salmon(2)[1], bad, salmon(2)[2])))
+  report <- attr(p, "import_report")
+  expect_equal(report$result, c("added", "failed", "added"))
+  expect_equal(nrow(p$samples), 2)
+})
+
+test_that("runfiles with a damaged header are read from where the data starts", {
+  # As after a bad save on the instrument: some header lines missing, or extra
+  # lines added. The data must come out the same as from the intact file.
+  lines <- readLines(salmon(1))
+  dir <- withr::local_tempdir()
+  short <- file.path(dir, "short_header.run")
+  long <- file.path(dir, "long_header.run")
+  writeLines(lines[-(10:13)], short)
+  writeLines(c(lines[1:20], "extra line", "\"another\"", lines[21:length(lines)]), long)
+
+  import <- default_settings()$import
+  intact <- read_runfiles(salmon(1), import, "x")
+  for (f in c(short, long)) {
+    d <- read_runfile(f, import, "x")
+    expect_false(is.null(attr(d, "data_start")))
+    attr(d, "data_start") <- NULL
+    expect_equal(d, intact)
+  }
+
+  p <- new_project()
+  p <- suppressMessages(add_runfiles(p, c(short, long)))
+  report <- attr(p, "import_report")
+  expect_equal(report$result, c("added", "added"))
+  expect_match(report$detail[1], "data found from line 43 \\(expected line 47\\)")
+  expect_match(report$detail[2], "data found from line 49")
+  # The damaged timestamp line is reported, the data is reduced normally
+  expect_match(report$detail[1], "no readable acquisition time")
+  expect_gt(nrow(project_data(p, "short_header")), 1000)
 })
 
 test_that("sample edits are saved, logged and survive reopening", {
@@ -268,5 +313,7 @@ test_that("runfiles can be added in batches, skipping or replacing same-name run
   # Replacing with the identical file again changes nothing
   expect_message(p4 <- add_runfiles(p3, changed, mode = "replace"), "identical file")
   expect_equal(p4$samples, p3$samples)
-  expect_error(add_runfiles(p3, c(salmon(1), salmon(1)), sample_ids = c("x", "x")), "more than one")
+  expect_message(p5 <- add_runfiles(p3, c(salmon(1), salmon(1)), sample_ids = c("x", "x")),
+                 "same name")
+  expect_equal(attr(p5, "import_report")$result[2], "skipped")
 })
