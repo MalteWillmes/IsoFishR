@@ -10,8 +10,8 @@ suggest_reference_runs(project, pattern = "SBO")
 apply_reference_suggestion(
   project,
   pattern = "SBO",
-  name = "SBO",
-  value = SBO_DEFAULT
+  name = pattern,
+  value = default_rm_value(name)
 )
 }
 \arguments{
@@ -22,7 +22,7 @@ apply_reference_suggestion(
 \item{name}{Reference material name.}
 
 \item{value}{Accepted 87Sr/86Sr used when the reference material is not
-yet defined (SBO: 0.70918).}
+yet defined (defaults: \code{\link[=default_reference_materials]{default_reference_materials()}}).}
 }
 \value{
 \code{suggest_reference_runs()}: sample IDs of matching runs that are
@@ -30,7 +30,8 @@ still samples. \code{apply_reference_suggestion()}: the updated project.
 }
 \description{
 Finds runs whose name contains \code{pattern} (case-insensitive), e.g. "SBO"
-for the seabass otolith reference material run at UC Davis.
+for the seabass otolith reference material run at UC Davis (see
+\code{\link[=default_reference_materials]{default_reference_materials()}}).
 \code{apply_reference_suggestion()} marks them as runs of that reference
 material, defines it with \code{value} if it isn't defined yet, and makes it the
 primary reference material if none is set.

@@ -216,7 +216,8 @@ parse_time <- function(x) {
 #' Suggest reference material runs from their names
 #'
 #' Finds runs whose name contains `pattern` (case-insensitive), e.g. "SBO"
-#' for the seabass otolith reference material run at UC Davis.
+#' for the seabass otolith reference material run at UC Davis (see
+#' [default_reference_materials()]).
 #' `apply_reference_suggestion()` marks them as runs of that reference
 #' material, defines it with `value` if it isn't defined yet, and makes it the
 #' primary reference material if none is set.
@@ -225,7 +226,7 @@ parse_time <- function(x) {
 #' @param pattern Text to look for in run names.
 #' @param name Reference material name.
 #' @param value Accepted 87Sr/86Sr used when the reference material is not
-#'   yet defined (SBO: 0.70918).
+#'   yet defined (defaults: [default_reference_materials()]).
 #' @return `suggest_reference_runs()`: sample IDs of matching runs that are
 #'   still samples. `apply_reference_suggestion()`: the updated project.
 #' @export
@@ -236,7 +237,8 @@ suggest_reference_runs <- function(project, pattern = "SBO") {
 
 #' @rdname suggest_reference_runs
 #' @export
-apply_reference_suggestion <- function(project, pattern = "SBO", name = "SBO", value = SBO_DEFAULT) {
+apply_reference_suggestion <- function(project, pattern = "SBO", name = pattern,
+                                       value = default_rm_value(name)) {
   ids <- suggest_reference_runs(project, pattern)
   if (!name %in% project$reference_materials$name) {
     project <- set_reference_material(project, name, value, note = "suggested default")
@@ -248,9 +250,38 @@ apply_reference_suggestion <- function(project, pattern = "SBO", name = "SBO", v
   project
 }
 
-# Default accepted 87Sr/86Sr for the SBO reference material (set by the
-# IsoFishR authors; users can change it).
-SBO_DEFAULT <- 0.70918
+#' Default reference materials
+#'
+#' Reference materials IsoFishR recognises in run names, with default
+#' accepted 87Sr/86Sr values set by the IsoFishR authors. They are only used
+#' to suggest marking runs (see [suggest_reference_runs()]); the value can be
+#' changed when the suggestion is applied, and afterwards under Calibration.
+#'
+#' @return A tibble with `name` (also the text looked for in run names) and
+#'   `value`.
+#' @export
+default_reference_materials <- function() {
+  tibble::tribble(
+    ~name,  ~value,
+    "SBO",  0.70918,
+    "GSFR", 0.70918
+  )
+}
+
+# The default accepted value of a reference material (NA if there is none).
+default_rm_value <- function(name) {
+  d <- default_reference_materials()
+  if (name %in% d$name) d$value[d$name == name] else NA_real_
+}
+
+# Runs that look like runs of each default reference material, as a named
+# list (only reference materials with matching runs).
+reference_suggestions <- function(project) {
+  defaults <- default_reference_materials()
+  ids <- purrr::map(defaults$name, \(nm) suggest_reference_runs(project, nm)) |>
+    rlang::set_names(defaults$name)
+  purrr::keep(ids, \(x) length(x) > 0)
+}
 
 #' Find runfiles in a folder
 #'

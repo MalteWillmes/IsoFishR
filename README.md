@@ -38,7 +38,7 @@ The app guides you through a project from left to right. **Quit IsoFishR** and t
    - **Damaged files:** a file whose header was saved wrongly (lines missing or added) is still read: IsoFishR finds where the data starts and notes it. Files without readable data are skipped, and a summary lists which files were added, skipped or failed, and why.
    - **Runs table:** lists all runs in acquisition order (read from the runfile timestamps), and lets you remove runs.
 4. **Calibration.** Correct the samples to a reference material measured in the same session, in the style of Iolite.
-   - **SBO suggestion:** runs with *SBO* in their name are suggested as the primary reference material, with an accepted value of 0.70918 that you can change.
+   - **Default reference materials:** runs with *SBO* or *GSFR* in their name are suggested as reference material runs (accepted value 0.70918 for both, which you can change). The first one marked becomes the primary reference material.
    - **Other reference materials:** add them with their accepted value and ± 2σ, then mark their runs under *Assign runs*. Runs can also be marked as baselines (gas blanks).
    - **Primary vs secondary:** the primary reference material corrects the samples. By default this is a linear regression of its run means against time, within each analytical session. A new session starts after a gap of more than 6 hours, and runs can be moved between sessions. The correction is applied to every point at the time it was measured. Other fits are available under *Advanced*. All other reference materials are secondary: they are corrected like samples and reported per session as accuracy checks.
    - **The plot:** each reference material's run means before and after correction, the regression line, the accepted values and the secondary session averages.
@@ -100,24 +100,6 @@ summarise_project_regions(p)
 export_project(p)
 close_project(p)
 ```
-
-## What changed from v1
-
-- **One workspace:** data reduction and analysis share a single screen, and you can move back and forth freely.
-- **Non-destructive edits:** trims, regions and setting changes are stored as choices, not baked into the data, so they can always be undone or changed.
-- **Session log:** every choice is recorded in the project's session log (log.csv).
-- **Projects anywhere:** projects live in any folder, not inside the app.
-- **Faster:** reduction is several times faster, and only samples whose data or settings changed are reprocessed.
-- **v1 bugs fixed:**
-  - Integration blocks no longer span two runfiles.
-  - The right-hand trim no longer applies to every sample.
-  - Changepoint means are no longer pooled across samples.
-  - Spline smoothing now works.
-  - The moving-average SE now uses the points actually in each window.
-- **SE from individual points:** region and sample statistics are calculated from the individual points rather than smoothed values, so the reported SE is no longer underestimated.
-- **No PDF plots:** per-sample PDF plots are no longer produced. Summaries and full profiles are exported as CSV instead.
-
-Details are in [`dev/DESIGN.md`](dev/DESIGN.md).
 
 ## Citation
 

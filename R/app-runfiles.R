@@ -66,11 +66,12 @@ runfiles_server <- function(id, project) {
       attr(p, "import_report") <- NULL
       project(p)
       show_import_report(report)
-      sbo <- suggest_reference_runs(p)
-      if (nrow(p$samples) > n_before && length(sbo) > 0) {
+      found <- reference_suggestions(p)
+      if (nrow(p$samples) > n_before && length(found) > 0) {
         shiny::showNotification(
-          sprintf("%d run(s) look like SBO reference material runs; see Calibration.",
-                  length(sbo)), type = "message", duration = 8)
+          sprintf("%d run(s) look like %s reference material runs; see Calibration.",
+                  sum(lengths(found)), paste(names(found), collapse = " or ")),
+          type = "message", duration = 8)
       }
     }
 

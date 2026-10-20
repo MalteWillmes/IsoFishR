@@ -261,6 +261,21 @@ test_that("SBO runs are suggested as the primary reference material with 0.70918
   expect_equal(p$reference_materials$value, 0.70917)
 })
 
+test_that("GSFR runs are suggested too, as a secondary reference material", {
+  runs <- data.frame(id = c("SBO_1", "GSFR_1", "fish1", "gsfr_2"), minute = c(0, 10, 20, 30),
+                     ratio = c(0.70918, 0.70918, 0.71, 0.70918))
+  p <- synthetic_project(runs)
+  found <- reference_suggestions(p)
+  expect_equal(names(found), c("SBO", "GSFR"))
+  expect_setequal(found$GSFR, c("GSFR_1", "gsfr_2"))
+  p <- apply_reference_suggestion(p, "SBO")
+  p <- apply_reference_suggestion(p, "GSFR")
+  expect_equal(p$reference_materials$value[p$reference_materials$name == "GSFR"], 0.70918)
+  expect_equal(p$settings$calibration$primary, "SBO")
+  expect_equal(p$samples$reference_material, c("SBO", "GSFR", "", "GSFR"))
+  expect_length(reference_suggestions(p), 0)
+})
+
 test_that("the export record documents settings, calibration and reference materials", {
   p <- bracketed_project()
   p <- set_sample_settings(p, "fish1", ma_window = 15)

@@ -96,43 +96,53 @@ calibration_server <- function(id, project) {
       invisible(p)
     }
 
-    # ---- SBO suggestion ----
+    # ---- suggestions for the default reference materials (SBO, GSFR) ----
+    # Inputs are named after the reference material, e.g. sbo_value, sbo_apply.
+    rm_input <- function(name, what) paste0(tolower(name), "_", what)
+
     output$suggestion <- shiny::renderUI({
       p <- shiny::req(project())
-      ids <- suggest_reference_runs(p)
-      if (length(ids) == 0) return(NULL)
+      found <- reference_suggestions(p)
+      if (length(found) == 0) return(NULL)
       rms <- p$reference_materials
-      value <- if ("SBO" %in% rms$name) rms$value[rms$name == "SBO"] else SBO_DEFAULT
-      shiny::div(
-        class = "alert alert-info d-flex flex-wrap align-items-end gap-3",
+      no_primary <- !nzchar(p$settings$calibration$primary)
+      shiny::tagList(purrr::imap(found, \(ids, name) {
+        value <- if (name %in% rms$name) rms$value[rms$name == name] else default_rm_value(name)
         shiny::div(
-          class = "flex-grow-1",
-          shiny::strong(sprintf("%d run(s) have SBO in their name", length(ids))),
-          sprintf(" (%s). Mark them as the reference material SBO?",
-                  paste(utils::head(ids, 6), collapse = ", ")),
-          if (length(ids) > 6) "\u2026",
-          if (!nzchar(p$settings$calibration$primary)) " It becomes the primary reference material."
-        ),
-        shiny::div(shiny::numericInput(ns("sbo_value"), "SBO accepted 87Sr/86Sr", value,
-                                       step = 0.00001, width = "180px")),
-        shiny::div(class = "mb-2", shiny::actionButton(ns("sbo_apply"), "Mark as SBO", class = "btn-primary"))
-      )
+          class = "alert alert-info d-flex flex-wrap align-items-end gap-3 py-2",
+          shiny::div(
+            class = "flex-grow-1",
+            shiny::strong(sprintf("%d run(s) have %s in their name", length(ids), name)),
+            sprintf(" (%s). Mark them as the reference material %s?",
+                    paste(utils::head(ids, 6), collapse = ", "), name),
+            if (length(ids) > 6) "\u2026",
+            if (no_primary) " The first one marked becomes the primary reference material."
+          ),
+          shiny::div(shiny::numericInput(ns(rm_input(name, "value")),
+                                         paste(name, "accepted 87Sr/86Sr"), value,
+                                         step = 0.00001, width = "180px")),
+          shiny::div(class = "mb-2", shiny::actionButton(ns(rm_input(name, "apply")),
+                                                         paste("Mark as", name), class = "btn-primary"))
+        )
+      }))
     })
 
-    shiny::observeEvent(input$sbo_apply, {
-      v <- input$sbo_value
-      if (is.null(v) || is.na(v) || v <= 0) {
-        shiny::showNotification("Enter the accepted 87Sr/86Sr of SBO.", type = "warning")
-        return()
-      }
-      change(\(p) {
-        p <- apply_reference_suggestion(p, value = v)
-        rms <- p$reference_materials
-        if (!isTRUE(all.equal(rms$value[rms$name == "SBO"], v))) {
-          p <- set_reference_material(p, "SBO", v, rms$uncertainty_2s[rms$name == "SBO"],
-                                      rms$note[rms$name == "SBO"])
+    purrr::walk(default_reference_materials()$name, \(name) {
+      shiny::observeEvent(input[[rm_input(name, "apply")]], {
+        v <- input[[rm_input(name, "value")]]
+        if (is.null(v) || is.na(v) || v <= 0) {
+          shiny::showNotification(paste0("Enter the accepted 87Sr/86Sr of ", name, "."), type = "warning")
+          return()
         }
-        p
+        change(\(p) {
+          p <- apply_reference_suggestion(p, pattern = name, value = v)
+          rms <- p$reference_materials
+          if (!isTRUE(all.equal(rms$value[rms$name == name], v))) {
+            p <- set_reference_material(p, name, v, rms$uncertainty_2s[rms$name == name],
+                                        rms$note[rms$name == name])
+          }
+          p
+        })
       })
     })
 
@@ -273,7 +283,7 @@ calibration_server <- function(id, project) {
       m <- model()
       r <- results()
       shiny::validate(shiny::need(nrow(r) > 0,
-                                  "Mark reference material runs (Assign runs, or the SBO suggestion above)."))
+                                  "Mark reference material runs (Assign runs, or the suggestion above)."))
       reference_material_plot(m, r)
     })
 

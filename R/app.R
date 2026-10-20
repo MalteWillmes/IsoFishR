@@ -26,6 +26,8 @@ APP_STEPS <- c(project = "Project", settings = "Settings", runfiles = "Runfiles"
                calibration = "Calibration", workspace = "Workspace", export = "Export")
 
 app_ui <- function(request) {
+  # Images (the logo) in inst/www.
+  shiny::addResourcePath("isofishr", system.file("www", package = "IsoFishR"))
   bslib::page_navbar(
     id = "step",
     title = shiny::span("IsoFishR", shiny::uiOutput("project_title", inline = TRUE)),
@@ -110,6 +112,7 @@ app_css <- "
 
   .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.5rem; }
   .ifr-start { max-width:980px; margin:.75rem auto; padding:0 .75rem; }
+  .ifr-logo { display:block; height:64px; width:auto; max-width:100%; margin:.25rem 0 .75rem; }
   .ifr-recent a { display:block; padding:.1rem 0; word-break:break-all; }
   .ifr-muted { color:var(--bs-secondary-color); font-size:.85rem; }
   .ifr-sample-table table.dataTable tbody tr { cursor:pointer; }
@@ -322,10 +325,16 @@ app_server <- function(initial_project = NULL, user = default_user()) {
 project_step_ui <- function() {
   shiny::div(
     class = "ifr-start",
+    shiny::img(src = "isofishr/logo.png", alt = "IsoFishR", class = "ifr-logo"),
     shiny::p(class = "ifr-muted",
-             "Data reduction and analysis of laser-ablation 87Sr/86Sr profiles. Projects are ",
-             "folders on your computer; all changes are saved as you work. Work through the ",
-             "steps from left to right; each project reopens on the step it was left on."),
+             "Data reduction and analysis of 87Sr/86Sr isotope ratios obtained via ",
+             "laser-ablation mass spectrometry. The aim of this application is to provide a ",
+             "rapid, reliable, and reproducible data reduction and analysis tool that can be ",
+             "applied across disciplines. A paper outlining the application is available in ",
+             shiny::a("PLOS ONE",
+                      href = "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0204519",
+                      target = "_blank", rel = "noopener", .noWS = "after"),
+             "."),
     shiny::uiOutput("current_project"),
     shiny::textInput("user_name", "Your name (recorded in the project log)", default_user()),
     bslib::layout_columns(
