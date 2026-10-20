@@ -2,20 +2,36 @@
 % Please edit documentation in R/reduce.R
 \name{smooth_spline}
 \alias{smooth_spline}
-\title{Spline fit of 87Sr/86Sr}
+\title{Adaptive spline fit of 87Sr/86Sr}
 \usage{
-smooth_spline(data, k = 10L)
+smooth_spline(data)
 }
 \arguments{
 \item{data}{Data from \code{\link[=reject_outliers]{reject_outliers()}}.}
-
-\item{k}{Basis dimension; reduced automatically for short profiles.}
 }
 \value{
-\code{data} with \code{sr87_sr86_spline} and \code{sr87_sr86_spline_se} added.
+\code{data} with \code{sr87_sr86_spline}, \code{sr87_sr86_spline_se} (standard
+error of the fitted curve) and \code{sr87_sr86_spline_edf} added.
 }
 \description{
-Fits a thin plate regression spline (\code{mgcv::gam}) against distance for
-each sample. This is the slowest reduction step, so \code{\link[=reduce_runs]{reduce_runs()}} only
-runs it when the smoothing setting is \code{"spline"}.
+Fits a penalised regression spline against distance for each sample,
+with the amount of smoothing chosen from the data:
+}
+\details{
+\itemize{
+\item The penalty is estimated by restricted maximum likelihood (\code{mgcv::bam},
+\code{method = "fREML"}), so noisy profiles are smoothed more and clean ones
+less.
+\item The penalty is adaptive (\code{bs = "ad"}): it varies along the profile, so
+the curve stays smooth on plateaus but can follow sharp transitions.
+\item Points are weighted by their total Sr signal, so low-signal (noisier)
+stretches pull the curve less.
+\item The basis size grows with the profile length (one basis function per
+10 points, 10 to 80); it only caps how wiggly the curve can be.
+}
+
+Profiles of fewer than 60 points get a thin plate spline (\code{bs = "tp"})
+instead, which needs fewer data. The fitted effective degrees of freedom
+(how flexible the curve ended up, 1 = a straight line) are in
+\code{sr87_sr86_spline_edf}.
 }

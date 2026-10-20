@@ -107,3 +107,58 @@ test_that("example runfiles reduce to plausible values", {
   means <- tapply(d$sr87_sr86_value, d$sample_id, mean, na.rm = TRUE)
   expect_true(all(means > 0.703 & means < 0.712))
 })
+
+test_that("the adaptive spline follows a sharp step and smooths noise", {
+  set.seed(11)
+  x <- seq(0, 3000, length.out = 900)
+  truth <- ifelse(x < 1500, 0.7080, 0.7092)
+  d <- tibble::tibble(sample_id = "s", distance_um = x, total_sr = 5,
+                      sr87_sr86 = truth + stats::rnorm(length(x), sd = 4e-4))
+  s <- smooth_spline(d)
+  expect_named(s, c(names(d), "sr87_sr86_spline", "sr87_sr86_spline_se", "sr87_sr86_spline_edf"))
+  # Plateaus: close to the true values, much less scatter than the points
+  plateau <- abs(x - 1500) > 300
+  expect_lt(stats::sd(s$sr87_sr86_spline[plateau] - truth[plateau]), 1e-4)
+  # The step is followed within 150 um
+  mid <- s$sr87_sr86_spline[which.min(abs(x - 1650))]
+  expect_gt(mid, 0.7088)
+  expect_gt(s$sr87_sr86_spline_edf[1], 2)
+  # Pure noise around a constant gives an almost straight line
+  flat <- dplyr::mutate(d, sr87_sr86 = 0.709 + stats::rnorm(length(x), sd = 4e-4))
+  expect_lt(smooth_spline(flat)$sr87_sr86_spline_edf[1], 3)
+  # No scatter at all still works (falls back to a line)
+  const <- dplyr::mutate(d, sr87_sr86 = 0.709)
+  expect_equal(smooth_spline(const)$sr87_sr86_spline, rep(0.709, length(x)), tolerance = 1e-9)
+})
+
+test_that("moving average + spline uses the spline as the smoothed value", {
+  raw <- read_runfiles(example_runfiles()[1])
+  s <- default_settings()
+  expect_equal(s$reduction$smoothing, "ma_spline")
+  d <- reduce_runs(raw, s)$data
+  expect_equal(d$sr87_sr86_value, d$sr87_sr86_spline)
+  expect_false(anyNA(d$sr87_sr86_ma[!is.na(d$sr87_sr86)]))
+  s$reduction$smoothing <- "ma"
+  expect_false("sr87_sr86_spline" %in% names(reduce_runs(raw, s)$data))
+})
+
+test_that("settings from older versions with spline_k still load", {
+  path <- withr::local_tempfile(fileext = ".yml")
+  old <- default_settings()
+  old$reduction$spline_k <- 10L
+  old$reduction$smoothing <- "spline"
+  yaml::write_yaml(old, path)
+  s <- read_settings(path)
+  expect_null(s$reduction$spline_k)
+  expect_equal(s$reduction$smoothing, "spline")
+  expect_equal(parse_overrides("spline_k=12; ma_window=5"), list(ma_window = 5L))
+})
+
+test_that("a run with no points above the thresholds reduces without error", {
+  raw <- read_runfiles(example_runfiles()[1])
+  s <- default_settings()
+  s$reduction$raw88_min_v <- 9.7   # nothing passes
+  d <- reduce_runs(raw, s)$data
+  expect_equal(nrow(d), 0)
+  expect_true(all(c("sr87_sr86_spline", "sr87_sr86_value") %in% names(d)))
+})

@@ -112,10 +112,11 @@ test_that("smoothed line uses every point even when outliers were rejected", {
   # Regression: a filtered `data =` on the outlier trace leaked into later traces.
   d <- reduce_runs(read_runfiles(salmon_files(2)[2]))$data
   expect_gt(sum(d$is_outlier), 0)
-  b <- plotly::plotly_build(profile_plot(d))
+  b <- plotly::plotly_build(profile_plot(d, smoothing = "ma_spline"))
   traces <- rlang::set_names(b$x$data, vapply(b$x$data, \(t) t$name %||% "", ""))
   n_values <- length
   expect_equal(n_values(traces[["Moving average"]]$y), nrow(d))
+  expect_equal(n_values(traces[["Spline"]]$y), nrow(d))
   expect_equal(n_values(traces[["Data"]]$y), sum(!is.na(d$sr87_sr86)))
   expect_equal(n_values(traces[["Outliers"]]$y), sum(d$is_outlier))
 })

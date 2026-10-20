@@ -143,6 +143,10 @@ parse_overrides <- function(x) {
   pairs <- strsplit(strsplit(x, ";", fixed = TRUE)[[1]], "=", fixed = TRUE)
   keys <- trimws(vapply(pairs, `[`, character(1), 1))
   vals <- trimws(vapply(pairs, `[`, character(1), 2))
+  # No longer a setting (the spline sets its own basis size).
+  old <- keys == "spline_k"
+  keys <- keys[!old]
+  vals <- vals[!old]
   unknown <- setdiff(keys, names(defaults))
   if (length(unknown) > 0) {
     stop("Unknown sample setting(s): ", paste(unknown, collapse = ", "), call. = FALSE)

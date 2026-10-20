@@ -148,9 +148,10 @@ project_settings_table <- function(project, include_excluded = FALSE) {
 #' the profile as plotted in the app, in a single table.
 #'
 #' Columns: `sample_id`, `distance_um`, `time_s`, `sr87_sr86` (the point,
-#' `NA` if rejected), `sr87_sr86_outlier` (rejected value), `sr87_sr86_smoothed`
-#' and `sr87_sr86_smoothed_se` (by the sample's smoothing method, named in
-#' `smoothing`; empty for `"none"`), `region` (region name(s) the point falls
+#' `NA` if rejected), `sr87_sr86_outlier` (rejected value), `sr87_sr86_ma` and
+#' `sr87_sr86_ma_se` (moving average and its SE) and `sr87_sr86_spline` and
+#' `sr87_sr86_spline_se` (spline and its SE), each filled when the sample's
+#' smoothing method (in `smoothing`) uses it, `region` (region name(s) the point falls
 #' in, separated by `;`), `cp_segment` and `cp_mean` (for samples with
 #' changepoints enabled), and the signal columns `total_sr_v`, `kr83_v`,
 #' `rb85_sr88` and `sr84_sr86`.
@@ -168,6 +169,7 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
     sample_id = samples$sample_id,
     smoothing = purrr::map_chr(samples$sample_id, \(id) sample_settings(project, id)$reduction$smoothing)
   )
+  spline <- if ("sr87_sr86_spline" %in% names(data)) data$sr87_sr86_spline else NA_real_
   spline_se <- if ("sr87_sr86_spline_se" %in% names(data)) data$sr87_sr86_spline_se else NA_real_
 
   # Changepoint segments for samples that have them enabled
@@ -190,7 +192,7 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
     dplyr::summarise(region = paste(region, collapse = "; "), .by = c(sample_id, time_s))
 
   out <- data |>
-    dplyr::mutate(.spline_se = spline_se) |>
+    dplyr::mutate(.spline = spline, .spline_se = spline_se) |>
     dplyr::left_join(smoothing, by = "sample_id") |>
     dplyr::left_join(point_regions, by = c("sample_id", "time_s")) |>
     dplyr::left_join(cp, by = c("sample_id", "time_s")) |>
@@ -200,12 +202,11 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
       time_s,
       sr87_sr86,
       sr87_sr86_outlier,
-      sr87_sr86_smoothed = dplyr::if_else(.data$smoothing == "none", NA_real_, sr87_sr86_value),
-      sr87_sr86_smoothed_se = dplyr::case_when(
-        .data$smoothing == "ma" ~ sr87_sr86_ma_se,
-        .data$smoothing == "spline" ~ .data$.spline_se,
-        .default = NA_real_
-      ),
+      sr87_sr86_ma = dplyr::if_else(.data$smoothing %in% c("ma", "ma_spline"), sr87_sr86_ma, NA_real_),
+      sr87_sr86_ma_se = dplyr::if_else(.data$smoothing %in% c("ma", "ma_spline"), sr87_sr86_ma_se, NA_real_),
+      sr87_sr86_spline = dplyr::if_else(.data$smoothing %in% c("spline", "ma_spline"), .data$.spline, NA_real_),
+      sr87_sr86_spline_se = dplyr::if_else(.data$smoothing %in% c("spline", "ma_spline"),
+                                           .data$.spline_se, NA_real_),
       smoothing = .data$smoothing,
       region = dplyr::coalesce(.data$region, ""),
       cp_segment = .data$cp_segment,
@@ -304,9 +305,9 @@ round_summary <- function(x) {
     dplyr::mutate(
       dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "mean_uncorrected", "mean_corrected", "sr87_sr86",
                                     "sr87_sr86_outlier", "sr87_sr86_uncorrected",
-                                    "sr87_sr86_smoothed", "cp_mean", "sr84_sr86", "measured",
+                                    "sr87_sr86_ma", "sr87_sr86_spline", "cp_mean", "sr84_sr86", "measured",
                                     "accepted")), \(v) round(v, 6)),
-      dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_smoothed_se",
+      dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_ma_se", "sr87_sr86_spline_se",
                                     "rb85_sr88", "kr83_v", "deviation", "accepted_2s")),
                     \(v) round(v, 7)),
       dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),

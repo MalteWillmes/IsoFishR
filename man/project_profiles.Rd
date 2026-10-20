@@ -23,9 +23,10 @@ the profile as plotted in the app, in a single table.
 }
 \details{
 Columns: \code{sample_id}, \code{distance_um}, \code{time_s}, \code{sr87_sr86} (the point,
-\code{NA} if rejected), \code{sr87_sr86_outlier} (rejected value), \code{sr87_sr86_smoothed}
-and \code{sr87_sr86_smoothed_se} (by the sample's smoothing method, named in
-\code{smoothing}; empty for \code{"none"}), \code{region} (region name(s) the point falls
+\code{NA} if rejected), \code{sr87_sr86_outlier} (rejected value), \code{sr87_sr86_ma} and
+\code{sr87_sr86_ma_se} (moving average and its SE) and \code{sr87_sr86_spline} and
+\code{sr87_sr86_spline_se} (spline and its SE), each filled when the sample's
+smoothing method (in \code{smoothing}) uses it, \code{region} (region name(s) the point falls
 in, separated by \verb{;}), \code{cp_segment} and \code{cp_mean} (for samples with
 changepoints enabled), and the signal columns \code{total_sr_v}, \code{kr83_v},
 \code{rb85_sr88} and \code{sr84_sr86}.

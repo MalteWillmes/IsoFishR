@@ -43,9 +43,8 @@ default_settings <- function() {
       rb85_rb87 = 2.59712,
       outlier_sd = 3,
       outlier_window = 20L,
-      smoothing = "ma",
-      ma_window = 10L,
-      spline_k = 10L
+      smoothing = "ma_spline",
+      ma_window = 10L
     ),
     regions = list(
       default_labels = paste("Region", 1:8)
@@ -82,11 +81,11 @@ merge_settings <- function(settings, overrides = list()) {
 #' @export
 check_settings <- function(settings) {
   r <- settings$reduction
-  if (!r$smoothing %in% c("none", "ma", "spline")) {
-    stop("reduction$smoothing must be one of 'none', 'ma' or 'spline', not '",
+  if (!r$smoothing %in% SMOOTHING_METHODS) {
+    stop("reduction$smoothing must be one of ", paste0("'", SMOOTHING_METHODS, "'", collapse = ", "), ", not '",
          r$smoothing, "'.", call. = FALSE)
   }
-  for (nm in c("integration", "outlier_window", "ma_window", "spline_k")) {
+  for (nm in c("integration", "outlier_window", "ma_window")) {
     if (!is.numeric(r[[nm]]) || length(r[[nm]]) != 1 || r[[nm]] < 1) {
       stop("reduction$", nm, " must be a single number >= 1.", call. = FALSE)
     }
@@ -127,8 +126,16 @@ NULL
 #' @rdname settings_io
 #' @export
 read_settings <- function(path) {
-  merge_settings(default_settings(), yaml::read_yaml(path))
+  s <- yaml::read_yaml(path)
+  # Earlier versions set the spline's basis size; the spline now sets it
+  # itself.
+  s$reduction$spline_k <- NULL
+  merge_settings(default_settings(), s)
 }
+
+# Smoothing of the 87Sr/86Sr profile: none, moving average, adaptive spline,
+# or both (the spline is then the smoothed value used in summaries).
+SMOOTHING_METHODS <- c("none", "ma", "spline", "ma_spline")
 
 #' @rdname settings_io
 #' @export
@@ -193,8 +200,7 @@ import_v1_settings <- function(path) {
       outlier_sd = if (is.na(v1$SD_outlier)) 0 else num(v1$SD_outlier),
       outlier_window = int(v1$outlier_num),
       smoothing = smoothing,
-      ma_window = int(v1$average_num),
-      spline_k = int(v1$spline_k)
+      ma_window = int(v1$average_num)
     ),
     regions = list(default_labels = range_labels)
   ))

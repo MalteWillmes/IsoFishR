@@ -95,9 +95,10 @@ test_that("profiles hold every point of every included sample, after edits", {
   expect_equal(pr$distance_um, d$distance_um)
   expect_equal(min(pr$distance_um[pr$sample_id == ids[1]]), 0)   # trimmed and re-zeroed
   expect_equal(pr$sr87_sr86, d$sr87_sr86)
-  expect_equal(pr$sr87_sr86_smoothed, d$sr87_sr86_ma)
-  expect_equal(pr$sr87_sr86_smoothed_se, d$sr87_sr86_ma_se)
-  expect_equal(unique(pr$smoothing), "ma")
+  expect_equal(pr$sr87_sr86_ma, d$sr87_sr86_ma)
+  expect_equal(pr$sr87_sr86_ma_se, d$sr87_sr86_ma_se)
+  expect_equal(pr$sr87_sr86_spline, d$sr87_sr86_spline)   # both by default
+  expect_equal(unique(pr$smoothing), "ma_spline")
 
   # Region labels per point match the region definitions
   core <- pr$sample_id == ids[1] & pr$time_s >= 200 & pr$time_s <= 260
@@ -119,8 +120,9 @@ test_that("profiles report the spline and its SE for spline-smoothed samples", {
   pr <- dplyr::filter(project_profiles(p), sample_id == id)
   d <- project_data(p, id)
   expect_equal(unique(pr$smoothing), "spline")
-  expect_equal(pr$sr87_sr86_smoothed, d$sr87_sr86_spline)
-  expect_equal(pr$sr87_sr86_smoothed_se, d$sr87_sr86_spline_se)
+  expect_equal(pr$sr87_sr86_spline, d$sr87_sr86_spline)
+  expect_equal(pr$sr87_sr86_spline_se, d$sr87_sr86_spline_se)
+  expect_true(all(is.na(pr$sr87_sr86_ma)))   # spline only
 })
 
 test_that("profiles.csv is written with every point and rounded values", {

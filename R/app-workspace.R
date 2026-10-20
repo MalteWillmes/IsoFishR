@@ -318,7 +318,7 @@ workspace_server <- function(id, project) {
         }
       ))
       p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"),
-                        lines = ratio_lines())
+                        lines = ratio_lines(), smoothing = shiny::isolate(data_key())$reduction$smoothing)
       toggle_idx(toggle_trace_indices(p))
       plot_renders(shiny::isolate(plot_renders()) + 1L)
       plot_ready(TRUE)

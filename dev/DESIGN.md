@@ -118,7 +118,7 @@ A preset is a named runfile layout: header/footer lines, separator, and which co
 | `regions.csv` | One row per sample and region: mean, SD, n, SE, mean of smoothed values, distance range, start/end time |
 | `changepoints.csv` | One row per segment for samples with changepoints enabled: mean, SD, n, SE, distance range, method, penalty |
 | `settings.csv` | Every setting each sample was reduced with (project defaults plus overrides) |
-| `profiles.csv` | Always: every point of every profile in one table (after trims/reversal). Columns: distance, time, the point's 87Sr/86Sr (empty if rejected), the rejected value, the smoothed value and its SE for the sample's smoothing method, region name(s), changepoint segment and mean, total Sr, 83Kr, 85Rb/88Sr, 84Sr/86Sr |
+| `profiles.csv` | Always: every point of every profile in one table (after trims/reversal). Columns: distance, time, the point's 87Sr/86Sr (empty if rejected), the rejected value, the moving average and the spline with their SEs (each filled when the sample's smoothing uses it), region name(s), changepoint segment and mean, total Sr, 83Kr, 85Rb/88Sr, 84Sr/86Sr |
 | `data.csv` | Optional: all reduction columns per point (raw voltages, mass bias, intermediate ratios), for checking the reduction itself |
 | `export_report.md` | Always: `report_markdown(export_report())`, a readable record (runs, sessions, calibration method, primary and secondary reference materials with runs, mean and SD before and after correction, overall and per session, all settings, per-sample overrides). Missing values are shown as `-` |
 
@@ -129,7 +129,7 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 |---|---|
 | `R/settings.R` | Default settings, validation, YAML input/output, v1 `_settings.csv` import |
 | `R/import.R` | `read_runfiles()` |
-| `R/reduce.R` | `reduce_runs()`: integration → blank → thresholds → distance → Rb and mass bias correction → outliers → smoothing |
+| `R/reduce.R` | `reduce_runs()`: integration → blank → thresholds → distance → Rb and mass bias correction → outliers → smoothing (`SMOOTHING_METHODS`: none, ma, spline, ma_spline = default). `smooth_spline()`: adaptive penalised spline (`mgcv::bam`, `bs = "ad"`, fREML, weights = total Sr, k = n/10 within 10–80; `tp`/REML below 60 points; falls back to a line if the fit fails); edf in `sr87_sr86_spline_edf`. About 0.2–0.4 s per run, cached. `discrete = TRUE` was tried and rejected: it changed some fits. |
 | `R/roll.R` | O(n) rolling mean, SD and median |
 | `R/edits.R` | `apply_edits()` (trim, reverse), `summarise_regions()`, `find_changepoints()` |
 | `R/project.R` | Create/open/close, lock, log |

@@ -54,14 +54,16 @@ reduce_runs <- function(raw, settings = default_settings(), blank = NULL) {
     reject_outliers(r$outlier_sd, r$outlier_window) |>
     smooth_ma(r$ma_window)
 
-  if (r$smoothing == "spline") {
-    data <- smooth_spline(data, r$spline_k)
+  if (r$smoothing %in% c("spline", "ma_spline")) {
+    data <- smooth_spline(data)
   }
+  # The smoothed value used in summaries; with both, the spline.
   data <- dplyr::mutate(data, sr87_sr86_value = switch(
     r$smoothing,
     none = sr87_sr86,
     ma = sr87_sr86_ma,
-    spline = sr87_sr86_spline
+    spline = ,
+    ma_spline = sr87_sr86_spline
   ))
 
   list(data = data, blank = blank)
@@ -221,28 +223,64 @@ smooth_ma <- function(data, window = 10L) {
     )
 }
 
-#' Spline fit of 87Sr/86Sr
+#' Adaptive spline fit of 87Sr/86Sr
 #'
-#' Fits a thin plate regression spline (`mgcv::gam`) against distance for
-#' each sample. This is the slowest reduction step, so [reduce_runs()] only
-#' runs it when the smoothing setting is `"spline"`.
+#' Fits a penalised regression spline against distance for each sample,
+#' with the amount of smoothing chosen from the data:
+#'
+#' * The penalty is estimated by restricted maximum likelihood (`mgcv::bam`,
+#'   `method = "fREML"`), so noisy profiles are smoothed more and clean ones
+#'   less.
+#' * The penalty is adaptive (`bs = "ad"`): it varies along the profile, so
+#'   the curve stays smooth on plateaus but can follow sharp transitions.
+#' * Points are weighted by their total Sr signal, so low-signal (noisier)
+#'   stretches pull the curve less.
+#' * The basis size grows with the profile length (one basis function per
+#'   10 points, 10 to 80); it only caps how wiggly the curve can be.
+#'
+#' Profiles of fewer than 60 points get a thin plate spline (`bs = "tp"`)
+#' instead, which needs fewer data. The fitted effective degrees of freedom
+#' (how flexible the curve ended up, 1 = a straight line) are in
+#' `sr87_sr86_spline_edf`.
 #'
 #' @param data Data from [reject_outliers()].
-#' @param k Basis dimension; reduced automatically for short profiles.
-#' @return `data` with `sr87_sr86_spline` and `sr87_sr86_spline_se` added.
+#' @return `data` with `sr87_sr86_spline`, `sr87_sr86_spline_se` (standard
+#'   error of the fitted curve) and `sr87_sr86_spline_edf` added.
 #' @export
-smooth_spline <- function(data, k = 10L) {
+smooth_spline <- function(data) {
   fit_one <- function(d) {
-    n_ok <- sum(!is.na(d$sr87_sr86))
-    kk <- min(k, n_ok - 1L)
-    if (kk < 3) {
-      return(dplyr::mutate(d, sr87_sr86_spline = NA_real_, sr87_sr86_spline_se = NA_real_))
+    ok <- !is.na(d$sr87_sr86) & !is.na(d$distance_um)
+    n_ok <- sum(ok)
+    if (n_ok < 5) {
+      return(dplyr::mutate(d, sr87_sr86_spline = NA_real_, sr87_sr86_spline_se = NA_real_,
+                           sr87_sr86_spline_edf = NA_real_))
     }
-    fit <- mgcv::gam(sr87_sr86 ~ s(distance_um, k = kk, bs = "tp"), data = d)
+    fit_data <- d[ok, ]
+    fit_data$w <- if ("total_sr" %in% names(d)) pmax(fit_data$total_sr, 1e-6) else 1
+    fit_data$w <- fit_data$w / mean(fit_data$w)
+    k <- as.integer(min(80, max(10, n_ok %/% 10), n_ok - 1))
+    # Gaps (trims, rejected stretches) leave some basis functions without
+    # data; the penalty handles them, so mgcv's warning about it is muted.
+    # Profiles without scatter (e.g. constant values) can make the fit
+    # fail; then a simpler spline, and finally a straight line, is used.
+    attempt <- function(expr) tryCatch(suppressWarnings(expr), error = function(e) NULL)
+    fit <- if (n_ok >= 60) {
+      attempt(mgcv::bam(sr87_sr86 ~ s(distance_um, bs = "ad", k = k), data = fit_data,
+                        weights = fit_data$w, method = "fREML"))
+    }
+    fit <- fit %||% attempt(mgcv::gam(sr87_sr86 ~ s(distance_um, bs = "tp", k = min(k, 20L)),
+                                      data = fit_data, weights = fit_data$w, method = "REML"))
+    fit <- fit %||% mgcv::gam(sr87_sr86 ~ distance_um, data = fit_data, weights = fit_data$w)
     pred <- stats::predict(fit, newdata = d, se.fit = TRUE)
     dplyr::mutate(d,
                   sr87_sr86_spline = as.numeric(pred$fit),
-                  sr87_sr86_spline_se = as.numeric(pred$se.fit))
+                  sr87_sr86_spline_se = as.numeric(pred$se.fit),
+                  sr87_sr86_spline_edf = sum(fit$edf) - 1)
+  }
+  if (nrow(data) == 0) {
+    # e.g. no cycles pass the 88Sr thresholds
+    return(dplyr::mutate(data, sr87_sr86_spline = double(), sr87_sr86_spline_se = double(),
+                         sr87_sr86_spline_edf = double()))
   }
   data |>
     split(~ factor(sample_id, levels = unique(sample_id))) |>

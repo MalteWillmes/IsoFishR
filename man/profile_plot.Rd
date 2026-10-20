@@ -9,7 +9,8 @@ profile_plot(
   regions = NULL,
   show = c("points", "outliers", "smooth", "band", "strips"),
   source = "profile",
-  lines = numeric()
+  lines = numeric(),
+  smoothing = NULL
 )
 }
 \arguments{
@@ -26,6 +27,9 @@ they can be switched on without rebuilding the plot.}
 
 \item{lines}{87Sr/86Sr values to mark with labelled horizontal lines
 (e.g. values of known habitats).}
+
+\item{smoothing}{The sample's smoothing method (see \code{\link[=default_settings]{default_settings()}}):
+which smoothed lines to draw. By default worked out from \code{data}.}
 }
 \value{
 A built plotly object (see \code{\link[plotly:plotly_build]{plotly::plotly_build()}}).

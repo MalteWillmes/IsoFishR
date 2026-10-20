@@ -31,7 +31,7 @@ The app guides you through a project from left to right. **Quit IsoFishR** and t
 1. **Project.** Create a new project (a folder you choose, e.g. in Dropbox or on a shared drive) or open an existing one; recent projects are listed. Pick the instrument preset when creating a project.
 2. **Settings.** Check the runfile layout first.
    - **Instrument preset:** `Nu_UCDavis` (Nu Plasma) is built in. For another instrument, set the layout, test it with **Check the layout with a runfile**, and save it as a preset to reuse it.
-   - **Reduction defaults:** run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing.
+   - **Reduction defaults:** run speed, integration, blank time, 88Sr limits, outlier rejection and smoothing: none, moving average, spline, or moving average + spline (default; both lines are drawn, and the spline is the smoothed value in summaries). The spline sets its own smoothness from the data: noisy profiles get a smoother curve, and it can still follow sharp transitions.
 3. **Runfiles.** Add runfiles as individual files, or choose a folder: all files with the preset's extension (`.run`) in it and its subfolders are found.
    - **More batches:** you can add more at any time.
    - **Same name as an existing run:** choose whether to keep the existing run or replace it with the new file. Replaced runs start afresh: their edits, regions and notes are removed (the old file is kept in raw/removed).
@@ -78,7 +78,7 @@ Each export creates `exports/<date_time>/` containing:
 
 | File | Contents |
 |---|---|
-| `profiles.csv` | Every point of every profile in one table: distance, time, <sup>87</sup>Sr/<sup>86</sup>Sr, smoothed value and SE, region, changepoint segment, and signal intensities |
+| `profiles.csv` | Every point of every profile in one table: distance, time, <sup>87</sup>Sr/<sup>86</sup>Sr, moving average and spline (with SE), region, changepoint segment, and signal intensities |
 | `samples.csv` | One row per sample: type, session, status, comment, edits, profile mean, SD and SE (and, when corrected, the uncorrected mean, correction factor and combined SE) |
 | `regions.csv` | One row per sample and region: mean, SD, n, SE, distance range |
 | `changepoints.csv` | One row per changepoint segment |
