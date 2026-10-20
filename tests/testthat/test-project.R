@@ -285,8 +285,12 @@ test_that("removing a sample drops its rows, regions and cache but keeps the run
 test_that("runfiles can be added in batches, skipping or replacing same-name runs", {
   p <- add_runfiles(new_project(), salmon(2))
   ids <- p$samples$sample_id
-  p <- update_sample(p, ids[1], comment = "keep me", trim_start_s = 5)
+  p <- update_sample(p, ids[1], comment = "old note", trim_start_s = 5, status = "reviewed")
+  p <- set_sample_settings(p, ids[1], ma_window = 25)
+  p <- set_reference_material(p, "SBO", 0.70918)
+  p <- set_run_type(p, ids[1], "reference", "SBO")
   p <- set_regions(p, ids[1], data.frame(region = "core", start_s = 200, end_s = 260))
+  p <- set_regions(p, ids[2], data.frame(region = "edge", start_s = 100, end_s = 150))
 
   # A second batch: one new file and a re-exported version of an existing run
   dir <- withr::local_tempdir()
@@ -303,9 +307,16 @@ test_that("runfiles can be added in batches, skipping or replacing same-name run
   expect_equal(nrow(p3$samples), 3)
   row <- p3$samples[p3$samples$sample_id == ids[1], ]
   expect_equal(row$md5, unname(tools::md5sum(changed)))
-  expect_equal(row$comment, "keep me")              # edits are kept
-  expect_equal(row$trim_start_s, 5)
-  expect_equal(nrow(p3$regions), 1)
+  # The replaced run starts afresh; its run type is kept
+  expect_equal(row$comment, "")
+  expect_equal(row$trim_start_s, 0)
+  expect_equal(row$status, "new")
+  expect_equal(row$settings, "")
+  expect_equal(row$run_type, "reference")
+  expect_equal(row$reference_material, "SBO")
+  expect_equal(p3$regions$sample_id, ids[2])        # other runs keep theirs
+  expect_equal(open_project(p3$path, read_only = TRUE)$regions$sample_id, ids[2])
+  expect_equal(open_project(p3$path, read_only = TRUE)$samples$comment[1], "")
   expect_length(list.files(file.path(p3$path, "raw", "removed")), 1)
   expect_true("replace_runfile" %in% read_log(p3)$action)
   expect_gt(nrow(project_data(p3, ids[1])), 100)    # reduced from the new file

@@ -428,7 +428,7 @@ export_report <- function(project, files = character(), include_excluded = FALSE
     calibration = list(
       correction = if (nzchar(cal$primary)) "on" else "off (values are uncorrected)",
       method = cal$fit,
-      method_description = names(FIT_CHOICES)[FIT_CHOICES == cal$fit],
+      method_description = unname(FIT_METHOD_NAMES[cal$fit]),
       baseline = cal$baseline,
       baseline_description = c(per_run = "Each run's own blank (start of run)",
                                baseline_runs = "Baseline runs, interpolated in time")[[cal$baseline]],

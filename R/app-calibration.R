@@ -2,11 +2,20 @@
 # reference material correction and the secondary reference material checks.
 
 FIT_CHOICES <- c(
-  "Linear regression through the standards (drift)" = "regression",
-  "Advanced: linear between bracketing standards" = "linear",
-  "Advanced: smoothing spline" = "spline",
-  "Advanced: step forward (most recent standard)" = "step",
-  "Advanced: session mean" = "mean"
+  "Straight line through all standards of the session (corrects steady drift)" = "regression",
+  "Join neighbouring standards (each sample uses the standards before and after it)" = "linear",
+  "Smooth curve through the standards (for non-linear drift; needs 4+ standards)" = "spline",
+  "Most recent standard (each sample uses the last standard run before it)" = "step",
+  "Session average (one correction for the whole session, no drift)" = "mean"
+)
+
+# Method names for the export record.
+FIT_METHOD_NAMES <- c(
+  regression = "Linear regression through the standards of each session",
+  linear = "Linear interpolation between bracketing standards",
+  spline = "Smoothing spline through the standards",
+  step = "Most recent standard (step forward)",
+  mean = "Session mean of the standards"
 )
 
 calibration_ui <- function(id) {

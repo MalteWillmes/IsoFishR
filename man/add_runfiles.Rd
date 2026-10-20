@@ -45,8 +45,10 @@ file whose name matches a run already in the project but whose content
 differs (e.g. a re-exported runfile):
 \itemize{
 \item \code{mode = "add"} skips it and reports it;
-\item \code{mode = "replace"} gives that run the new file. Its edits, regions,
-comment and settings are kept; the previous file is moved to
-\verb{raw/removed/} and the replacement is logged.
+\item \code{mode = "replace"} gives that run the new file and starts it afresh:
+its edits (trims, status, flag, comment, changepoint and per-sample
+settings) and regions are removed. Its run type, reference material and
+session are kept. The previous file is moved to \verb{raw/removed/} and the
+replacement is logged.
 }
 }

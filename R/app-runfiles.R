@@ -15,8 +15,8 @@ runfiles_ui <- function(id) {
           selected = "add"
         ),
         shiny::p(class = "ifr-muted small",
-                 "Replaced runs keep their edits, regions and notes; the old file is kept in ",
-                 "the project's raw/removed folder."),
+                 "Replaced runs start afresh: their edits, regions and notes are removed. The old ",
+                 "file is kept in the project's raw/removed folder."),
         shiny::hr(),
         shiny::h6("Individual files"),
         shiny::fileInput(ns("add_files"), NULL, multiple = TRUE, width = "100%",

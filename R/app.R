@@ -100,7 +100,7 @@ app_css <- "
   .form-control, .form-select { padding-top:.25rem; padding-bottom:.25rem; }
   .form-control:focus, .form-select:focus { border-color:#8fb7c5; box-shadow:0 0 0 .2rem rgba(31,111,139,.25); }
   .form-check-input:checked { background-color:#1f6f8b; border-color:#1f6f8b; }
-  .form-label, label { margin-bottom:.15rem; }
+  .form-label, .control-label { margin-bottom:.15rem; }
   .card { --bs-card-spacer-y:.5rem; --bs-card-spacer-x:.75rem; --bs-card-cap-padding-y:.35rem; }
   .navbar { --bs-navbar-padding-y:.25rem; }
   .nav { --bs-nav-link-padding-y:.35rem; }
@@ -120,6 +120,17 @@ app_css <- "
   .card-body.bslib-gap-spacing > .shiny-input-container { margin-bottom:0; }
   .shiny-input-container > label, .form-group > label { margin-bottom:.15rem; }
   .ifr-panel .shiny-input-container:not(.shiny-input-container-inline) { width:100%; }
+  /* Settings page: label and input on one line, to fit more on the screen */
+  .ifr-settings .card-body.bslib-gap-spacing { gap:.3rem; }
+  .ifr-settings .shiny-input-container:not(.shiny-input-container-inline):not(:has(textarea)):not(:has(.checkbox)):not(:has(input[type=file])) {
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,45%); align-items:center;
+    column-gap:.5rem; width:100%; margin-bottom:0;
+  }
+  .ifr-settings .shiny-input-container > label { margin-bottom:0; line-height:1.2; }
+  .ifr-settings .shiny-input-container .checkbox { margin:0; }
+  .ifr-settings .shiny-input-container:has(textarea), .ifr-settings .shiny-input-container:has(input[type=file]) { width:100%; }
+  .ifr-settings .card-body > p, .ifr-settings h6 { margin-bottom:.2rem; }
+  .ifr-settings hr { margin:.35rem 0; }
   .ifr-step { max-width:1600px; margin:0 auto; padding:.5rem .75rem; }
   .shiny-input-container .progress { margin-bottom:.25rem; }
   table.dataTable thead th, table.dataTable thead td { padding:4px 8px !important; }
@@ -361,7 +372,6 @@ project_step_ui <- function() {
         shiny::textInput("create_name", "Project name", placeholder = "e.g. Salmon_2024"),
         shiny::selectInput("create_preset", "Instrument preset (runfile layout)",
                            list_import_presets()$name, selected = DEFAULT_PRESET),
-        shiny::p(class = "ifr-muted", "The new project opens on Settings."),
         shiny::actionButton("create", "Create", class = "btn-primary")
       )
     )

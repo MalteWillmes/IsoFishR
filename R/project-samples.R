@@ -13,9 +13,11 @@
 #' differs (e.g. a re-exported runfile):
 #'
 #' * `mode = "add"` skips it and reports it;
-#' * `mode = "replace"` gives that run the new file. Its edits, regions,
-#'   comment and settings are kept; the previous file is moved to
-#'   `raw/removed/` and the replacement is logged.
+#' * `mode = "replace"` gives that run the new file and starts it afresh:
+#'   its edits (trims, status, flag, comment, changepoint and per-sample
+#'   settings) and regions are removed. Its run type, reference material and
+#'   session are kept. The previous file is moved to `raw/removed/` and the
+#'   replacement is logged.
 #'
 #' @param project A project from [open_project()].
 #' @param paths Paths to runfiles.
@@ -110,10 +112,17 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
       project$samples$source[j] <- source_names[i]
       project$samples$md5[j] <- md5[i]
       project$samples$acquired[j] <- acquired[i]
+      # A new file starts afresh: edits and regions made for the old file
+      # don't apply to it.
+      for (field in c(EDITABLE_SAMPLE_FIELDS, "settings")) {
+        project$samples[[field]][j] <- sample_defaults()[[field]]
+      }
+      project$regions <- dplyr::filter(project$regions, .data$sample_id != old$sample_id)
       result[i] <- "replaced"
       append_log(project_file(project$path, "log.csv"),
                  log_entry(project$user, "replace_runfile", old$sample_id, "runfile",
-                           paste0(old$source, " (", moved, ")"), source_names[i]))
+                           paste0(old$source, " (", moved, ")"),
+                           paste0(source_names[i], " (edits and regions cleared)")))
     }
   }
 
@@ -137,6 +146,9 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
   }
   if (any(result %in% c("added", "replaced"))) {
     write_table_file(project$samples, project_file(project$path, "samples.csv"))
+  }
+  if (any(result == "replaced")) {
+    write_table_file(project$regions, project_file(project$path, "regions.csv"))
   }
 
   report <- tibble::tibble(file = source_names, sample_id = sample_ids, result = result,

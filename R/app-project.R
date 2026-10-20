@@ -12,7 +12,7 @@ project_settings_ui <- function(id) {
                "keep those overrides. Changing reduction settings reprocesses samples the next ",
                "time they are viewed.")
     ),
-    shiny::uiOutput(ns("form"))
+    shiny::uiOutput(ns("form"), class = "ifr-settings")
   )
 }
 

@@ -317,7 +317,7 @@ test_that("export_report.md presents the record as readable Markdown", {
   expect_true(all(c("## Runs and sessions", "## Calibration", "### Reference materials",
                     "### Per session", "## Settings", "### Data reduction",
                     "## Samples with their own settings") %in% md))
-  expect_true(any(grepl("**Method:** Linear regression through the standards (drift) (`regression`)",
+  expect_true(any(grepl("**Method:** Linear regression through the standards of each session (`regression`)",
                         md, fixed = TRUE)))
   expect_true(any(grepl("**Primary reference material:** MMC", md, fixed = TRUE)))
   expect_true(any(grepl("**Secondary reference materials:** SEC", md, fixed = TRUE)))
