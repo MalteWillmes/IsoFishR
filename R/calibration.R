@@ -75,7 +75,7 @@ interpolate_baseline <- function(baselines, session, acquired, sample_id) {
 #' correction factor `accepted / measured` through time within each session,
 #' using `calibration$fit`:
 #'
-#' * `"regression"` (default): a least-squares line through the primary
+#' * `"regression"`: a least-squares line through the primary
 #'   runs' measured means against time (instrument drift); the factor is
 #'   `accepted / predicted`. Its uncertainty is the standard error of the
 #'   regression line at each time (with 2 runs, the runs' own SE).
@@ -85,7 +85,7 @@ interpolate_baseline <- function(baselines, session, acquired, sample_id) {
 #' * `"spline"`: a smoothing spline through the session's primary runs
 #'   (needs at least 4; with fewer, linear interpolation is used).
 #' * `"step"`: the factor of the most recent primary run ("step forward").
-#' * `"mean"`: one factor per session, the mean of its primary runs.
+#' * `"mean"` (default): one factor per session, the mean of its primary runs.
 #'
 #' @param project A project from [open_project()].
 #' @return `NULL` when no primary reference material is set; otherwise a list

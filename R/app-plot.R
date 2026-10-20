@@ -24,11 +24,13 @@ TOGGLE_TRACES <- c(points = "Data", outliers = "Outliers", seawater = "Seawater"
 #'   always included; those not in `show` start hidden (`"legendonly"`) so
 #'   they can be switched on without rebuilding the plot.
 #' @param source plotly event source ID.
+#' @param lines 87Sr/86Sr values to mark with labelled horizontal lines
+#'   (e.g. values of known habitats).
 #' @return A built plotly object (see [plotly::plotly_build()]).
 #' @export
 profile_plot <- function(data, regions = NULL,
                          show = c("points", "outliers", "smooth", "band", "strips"),
-                         source = "profile") {
+                         source = "profile", lines = numeric()) {
   has_spline <- "sr87_sr86_spline" %in% names(data) && any(!is.na(data$sr87_sr86_spline))
   value_is_spline <- has_spline && isTRUE(all.equal(data$sr87_sr86_value, data$sr87_sr86_spline))
   value_is_raw <- isTRUE(all.equal(data$sr87_sr86_value, data$sr87_sr86))
@@ -87,10 +89,20 @@ profile_plot <- function(data, regions = NULL,
                             name = TOGGLE_TRACES[["seawater"]], visible = vis("seawater"),
                             line = list(color = "#2ca02c", dash = "dash", width = 1),
                             hoverinfo = "skip")
+  # Custom lines, labelled with their value at the right end.
+  for (v in lines) {
+    main <- plotly::add_lines(main, x = range(d$x), y = rep(v, 2), name = sprintf("%.5f", v),
+                              showlegend = FALSE, line = list(color = "#7b3fa0", dash = "dot", width = 1.5),
+                              hovertemplate = sprintf("Line %.5f<extra></extra>", v))
+  }
+  line_labels <- purrr::map(lines, \(v) list(
+    x = 1, xref = "paper", xanchor = "right", y = v, yref = "y", yanchor = "bottom",
+    text = sprintf("%.5f", v), showarrow = FALSE, font = list(color = "#7b3fa0", size = 11)
+  ))
   # Shapes go on the main panel before subplot(), which drops shapes added later.
   shapes <- region_shapes(data, regions)
   main <- plotly::layout(main, yaxis = list(title = sr_label(), tickformat = ".4f"),
-                         shapes = shapes$shapes, annotations = shapes$annotations)
+                         shapes = shapes$shapes, annotations = c(shapes$annotations, line_labels))
   plots <- list(main)
   heights <- 1
   if ("strips" %in% show) {
@@ -120,7 +132,7 @@ profile_plot <- function(data, regions = NULL,
     margin = list(l = 70, r = 10, t = 30, b = 40),
     hovermode = "closest"
   )
-  p <- plotly::config(p, displaylogo = FALSE,
+  p <- plotly::config(p, displaylogo = FALSE, scrollZoom = TRUE,
                       modeBarButtonsToRemove = c("lasso2d", "autoScale2d", "toggleSpikelines"))
   p <- plotly::plotly_build(plotly::event_register(p, "plotly_brushed"))
   slim_plot(p)

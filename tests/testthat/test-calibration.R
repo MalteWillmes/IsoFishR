@@ -16,7 +16,7 @@ bracketed_project <- function(env = parent.frame()) {
   p <- set_reference_material(p, "SEC", SECONDARY, 0.00004, "test secondary")
   p <- set_run_type(p, c("RM1", "RM2", "RM3"), "reference", "MMC")
   p <- set_run_type(p, "SEC1", "reference", "SEC")
-  update_project_settings(p, list(calibration = list(primary = "MMC")))
+  update_project_settings(p, list(calibration = list(primary = "MMC", fit = "regression")))
 }
 
 run_means <- function(d) c(tapply(d$sr87_sr86, d$sample_id, mean, na.rm = TRUE))
@@ -97,7 +97,7 @@ test_that("corrections never cross sessions", {
   p <- synthetic_project(runs)
   p <- set_reference_material(p, "MMC", PRIMARY)
   p <- set_run_type(p, "RM1", "reference", "MMC")
-  p <- update_project_settings(p, list(calibration = list(primary = "MMC")))
+  p <- update_project_settings(p, list(calibration = list(primary = "MMC", fit = "regression")))
   runs <- project_runs(p)
   expect_equal(length(unique(runs$session)), 2)
 
@@ -217,7 +217,7 @@ test_that("a project without runs works with the calibration functions", {
   expect_equal(nrow(project_runs(p)), 0)
 })
 
-test_that("the default regression fit follows the least-squares drift line", {
+test_that("the regression fit follows the least-squares drift line (session mean is the default)", {
   # Primary runs with scatter around a linear drift: the regression line,
   # not the individual runs, sets the correction.
   set.seed(7)
@@ -228,8 +228,8 @@ test_that("the default regression fit follows the least-squares drift line", {
   p <- synthetic_project(runs)
   p <- set_reference_material(p, "MMC", PRIMARY)
   p <- set_run_type(p, paste0("RM", 1:5), "reference", "MMC")
-  p <- update_project_settings(p, list(calibration = list(primary = "MMC")))
-  expect_equal(p$settings$calibration$fit, "regression")
+  p <- update_project_settings(p, list(calibration = list(primary = "MMC", fit = "regression")))
+  expect_equal(default_settings()$calibration$fit, "mean")
 
   model <- calibration_model(p)
   line <- stats::lm(measured ~ time, data = model$points)

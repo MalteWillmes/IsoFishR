@@ -55,7 +55,7 @@ default_settings <- function() {
     calibration = list(
       baseline = "per_run",
       primary = "",
-      fit = "regression",
+      fit = "mean",
       session_gap_h = 6
     )
   )

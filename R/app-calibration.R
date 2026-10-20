@@ -2,11 +2,11 @@
 # reference material correction and the secondary reference material checks.
 
 FIT_CHOICES <- c(
+  "Session mean" = "mean",
   "Linear regression" = "regression",
   "Linear interpolation" = "linear",
   "Smoothing spline" = "spline",
-  "Step forward" = "step",
-  "Session mean" = "mean"
+  "Step forward" = "step"
 )
 
 # What each method does, shown under the choice.
@@ -415,7 +415,7 @@ reference_material_plot <- function(model, results, x = c("order", "time"), runs
   plotly::subplot(panels, nrows = length(panels), shareX = TRUE, titleY = TRUE, margin = 0.04) |>
     plotly::layout(xaxis = list(title = x_title), hovermode = "closest",
                    legend = list(orientation = "h", y = 1.06)) |>
-    plotly::config(displaylogo = FALSE)
+    plotly::config(displaylogo = FALSE, scrollZoom = TRUE)
 }
 
 # The primary correction drawn through the uncorrected standards, per

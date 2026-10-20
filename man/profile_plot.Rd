@@ -8,7 +8,8 @@ profile_plot(
   data,
   regions = NULL,
   show = c("points", "outliers", "smooth", "band", "strips"),
-  source = "profile"
+  source = "profile",
+  lines = numeric()
 )
 }
 \arguments{
@@ -22,6 +23,9 @@ always included; those not in \code{show} start hidden (\code{"legendonly"}) so
 they can be switched on without rebuilding the plot.}
 
 \item{source}{plotly event source ID.}
+
+\item{lines}{87Sr/86Sr values to mark with labelled horizontal lines
+(e.g. values of known habitats).}
 }
 \value{
 A built plotly object (see \code{\link[plotly:plotly_build]{plotly::plotly_build()}}).

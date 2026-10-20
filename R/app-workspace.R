@@ -35,6 +35,13 @@ workspace_ui <- function(id) {
                           "Uncertainty" = "band", "Seawater" = "seawater", "Sr, Kr and Rb panels" = "strips"),
               selected = c("points", "outliers", "smooth", "band", "strips")
             )
+          ),
+          shiny::div(
+            class = "ifr-lines d-flex align-items-center gap-2",
+            shiny::tags$label(`for` = ns("ratio_lines"), class = "small mb-0 text-nowrap",
+                              "Lines at 87Sr/86Sr"),
+            shiny::textInput(ns("ratio_lines"), NULL, width = "170px", placeholder = "e.g. 0.7092, 0.7105",
+                             updateOn = "blur")
           )
         ),
         bslib::card_body(
@@ -285,6 +292,20 @@ workspace_server <- function(id, project) {
     toggle_idx <- shiny::reactiveVal(integer())
     plot_renders <- shiny::reactiveVal(0L)  # counted for tests
 
+    # Custom 87Sr/86Sr lines: one set per project, kept in app_state.yml.
+    ratio_lines <- shiny::reactiveVal(numeric())
+    shiny::observeEvent(project()$path, {
+      v <- as.numeric(unlist(read_app_state(project())$ratio_lines))
+      ratio_lines(v)
+      shiny::updateTextInput(session, "ratio_lines", value = paste(sprintf("%.5f", v), collapse = ", "))
+    })
+    shiny::observeEvent(input$ratio_lines, {
+      v <- parse_ratio_lines(input$ratio_lines)
+      if (identical(v, ratio_lines())) return()
+      ratio_lines(v)
+      write_app_state(project(), ratio_lines = v)
+    }, ignoreInit = TRUE)
+
     output$plot <- plotly::renderPlotly({
       show <- union(setdiff(shiny::isolate(input$show), "strips"), if (show_strips()) "strips")
       d <- sample_data()
@@ -296,7 +317,8 @@ workspace_server <- function(id, project) {
           "No data points pass the 88Sr thresholds; check the reduction settings."
         }
       ))
-      p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"))
+      p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"),
+                        lines = ratio_lines())
       toggle_idx(toggle_trace_indices(p))
       plot_renders(shiny::isolate(plot_renders()) + 1L)
       plot_ready(TRUE)

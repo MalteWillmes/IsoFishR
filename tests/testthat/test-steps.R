@@ -57,3 +57,18 @@ test_that("exports and replaced files within the same second get unique names", 
   expect_length(list.files(file.path(p$path, "raw", "removed")), 2)
   expect_equal(p$samples$md5, unname(tools::md5sum(f)))
 })
+
+test_that("custom 87Sr/86Sr lines are parsed and kept with the last step", {
+  expect_equal(parse_ratio_lines("0.7105, 0.7092;0.7092 abc 5"), c(0.7092, 0.7105))
+  expect_equal(parse_ratio_lines(""), numeric())
+  p <- create_project(file.path(withr::local_tempdir(), "P"), user = "tester")
+  p <- suppressMessages(add_runfiles(p, example_runfiles()[1]))
+  write_last_step(p, "workspace")
+  write_app_state(p, ratio_lines = c(0.7092, 0.7105))
+  expect_equal(read_last_step(p), "workspace")
+  expect_equal(unlist(read_app_state(p)$ratio_lines), c(0.7092, 0.7105))
+  d <- project_data(p, p$samples$sample_id[1])
+  b <- profile_plot(d, lines = c(0.7092, 0.7105))
+  expect_true(all(c("0.70920", "0.71050") %in% vapply(b$x$data, \(t) t$name %||% "", "")))
+  expect_true(b$x$config$scrollZoom)
+})

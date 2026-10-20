@@ -125,6 +125,8 @@ app_css <- "
   .card-body.bslib-gap-spacing > .shiny-input-container { margin-bottom:0; }
   .shiny-input-container > label, .form-group > label { margin-bottom:.15rem; }
   .ifr-panel .shiny-input-container:not(.shiny-input-container-inline) { width:100%; }
+  .ifr-lines .shiny-input-container { margin-bottom:0; }
+  .ifr-lines .form-control { padding-top:.1rem; padding-bottom:.1rem; }
   /* Settings page: label and input on one line, to fit more on the screen */
   .ifr-settings .card-body.bslib-gap-spacing { gap:.3rem; }
   .ifr-settings .shiny-input-container:not(.shiny-input-container-inline):not(:has(textarea)):not(:has(.checkbox)):not(:has(input[type=file])) {

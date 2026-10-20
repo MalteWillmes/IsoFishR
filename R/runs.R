@@ -312,15 +312,29 @@ find_runfiles <- function(dir, import = default_settings()$import) {
 # The step of the app a project was last worked on, kept in the project
 # folder (app_state.yml) so the project reopens there. Not a project change,
 # so it is not logged.
-read_last_step <- function(project) {
+read_last_step <- function(project) read_app_state(project)$last_step
+
+write_last_step <- function(project, step) write_app_state(project, last_step = step)
+
+# App display state kept in the project folder (app_state.yml): the last
+# step and the custom 87Sr/86Sr lines. It is not logged; a missing or broken
+# file just means defaults.
+read_app_state <- function(project) {
   f <- project_file(project$path, "app_state.yml")
-  if (!file.exists(f)) return(NULL)
-  tryCatch(yaml::read_yaml(f)$last_step, error = function(e) NULL)
+  if (!file.exists(f)) return(list())
+  tryCatch(yaml::read_yaml(f) %||% list(), error = function(e) list())
 }
 
-write_last_step <- function(project, step) {
+write_app_state <- function(project, ...) {
   if (project$read_only || !owns_lock(project)) return(invisible(FALSE))
-  try(write_yaml_file(list(last_step = step), project_file(project$path, "app_state.yml")),
-      silent = TRUE)
+  state <- utils::modifyList(read_app_state(project), list(...))
+  try(write_yaml_file(state, project_file(project$path, "app_state.yml")), silent = TRUE)
   invisible(TRUE)
+}
+
+# Custom 87Sr/86Sr lines for the profile plot, from text such as
+# "0.7092, 0.7105": numbers between 0.6 and 1 (anything else is dropped).
+parse_ratio_lines <- function(text) {
+  v <- suppressWarnings(as.numeric(trimws(strsplit(text %||% "", "[,; ]+")[[1]])))
+  sort(unique(v[!is.na(v) & v > 0.6 & v < 1]))
 }

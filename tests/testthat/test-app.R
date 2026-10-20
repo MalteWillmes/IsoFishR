@@ -347,15 +347,15 @@ test_that("the Calibration step applies the SBO suggestion with the chosen value
   b <- plotly::plotly_build(reference_material_plot(calibration_model(shiny::isolate(rv())),
                                                     reference_material_results(shiny::isolate(rv()))))
   names <- vapply(b$x$data, \(t) t$name %||% "", "")
-  expect_true(all(c("Uncorrected", "Corrected", "Correction: Linear regression") %in% names))
+  expect_true(all(c("Uncorrected", "Corrected", "Correction: Session mean") %in% names))
 
   # In run order the correction line covers every run of the session,
   # including the sample between the standards
   p <- shiny::isolate(rv())
   lines <- correction_lines(calibration_model(p), project_runs(p), "order")
   expect_equal(lines$x, 1:3)
-  expect_equal(lines$y[c(1, 3)], c(0.70918, 0.70920), tolerance = 1e-5)
+  expect_equal(lines$y, rep(mean(c(0.70918, 0.70920)), 3), tolerance = 1e-5)  # session mean
   b <- plotly::plotly_build(reference_material_plot(calibration_model(p), reference_material_results(p),
                                                     x = "time", runs = project_runs(p)))
-  expect_true("Correction: Linear regression" %in% vapply(b$x$data, \(t) t$name %||% "", ""))
+  expect_true("Correction: Session mean" %in% vapply(b$x$data, \(t) t$name %||% "", ""))
 })

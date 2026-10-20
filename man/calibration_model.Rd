@@ -23,7 +23,7 @@ using \code{calibration$fit}:
 }
 \details{
 \itemize{
-\item \code{"regression"} (default): a least-squares line through the primary
+\item \code{"regression"}: a least-squares line through the primary
 runs' measured means against time (instrument drift); the factor is
 \code{accepted / predicted}. Its uncertainty is the standard error of the
 regression line at each time (with 2 runs, the runs' own SE).
@@ -33,6 +33,6 @@ after the last primary run of the session.
 \item \code{"spline"}: a smoothing spline through the session's primary runs
 (needs at least 4; with fewer, linear interpolation is used).
 \item \code{"step"}: the factor of the most recent primary run ("step forward").
-\item \code{"mean"}: one factor per session, the mean of its primary runs.
+\item \code{"mean"} (default): one factor per session, the mean of its primary runs.
 }
 }
