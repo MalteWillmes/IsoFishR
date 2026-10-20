@@ -12,11 +12,16 @@
 #' @return A Shiny app object; printing it (or calling at the console) runs it.
 #' @export
 run_app <- function(project = NULL, user = default_user(), ...) {
+  # Identifies this run of the app, so delayed stops scheduled by an earlier
+  # run in the same R session (Quit, closed tab) don't stop this one.
+  run_id <- basename(tempfile("run"))
   shiny::shinyApp(
     ui = app_ui,
-    server = app_server(project, user),
-    # Uploads of many runfiles at once exceed Shiny's default 5 MB limit.
-    onStart = function() options(shiny.maxRequestSize = 4 * 1024^3),
+    server = app_server(project, user, run_id = run_id),
+    onStart = function() {
+      # Uploads of many runfiles at once exceed Shiny's default 5 MB limit.
+      options(shiny.maxRequestSize = 4 * 1024^3, isofishr.run_id = run_id)
+    },
     options = utils::modifyList(list(launch.browser = TRUE), list(...))
   )
 }
@@ -139,10 +144,12 @@ app_css <- "
   .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { padding-top:.25rem; font-size:.85rem; }
 "
 
-app_server <- function(initial_project = NULL, user = default_user()) {
+app_server <- function(initial_project = NULL, user = default_user(), run_id = NULL) {
   # Shared by all browser sessions of this app.
   sessions <- new.env()
   sessions$n <- 0L
+  # Is this run of the app (see run_app()) still the one running?
+  this_run <- function() is.null(run_id) || identical(getOption("isofishr.run_id"), run_id)
 
   function(input, output, session) {
     sessions$n <- sessions$n + 1L
@@ -318,7 +325,7 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       if (!is.null(p)) close_project(p)
       project(NULL)
       session$sendCustomMessage("ifr-quit", list())
-      later::later(function() shiny::stopApp(), delay = 0.5)
+      later::later(function() if (this_run()) shiny::stopApp(), delay = 0.5)
     })
 
     # Release the lock when the tab closes. Stop the app (freeing the R
@@ -328,7 +335,7 @@ app_server <- function(initial_project = NULL, user = default_user()) {
       p <- shiny::isolate(project())
       if (!is.null(p)) close_project(p)
       sessions$n <- sessions$n - 1L
-      later::later(function() if (sessions$n == 0L) shiny::stopApp(), delay = 5)
+      later::later(function() if (sessions$n == 0L && this_run()) shiny::stopApp(), delay = 5)
     })
   }
 }
