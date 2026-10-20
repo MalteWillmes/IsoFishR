@@ -282,7 +282,7 @@ reference_material_results <- function(project) {
       correction_status = dplyr::first(.data$correction_status),
       .by = sample_id
     ) |>
-    dplyr::inner_join(dplyr::select(runs, "sample_id", "reference_material", role = "rm_role",
+    dplyr::inner_join(dplyr::select(runs, "sample_id", "sequence", "reference_material", role = "rm_role",
                                     "session", "acquired"), by = "sample_id") |>
     dplyr::left_join(dplyr::select(project$reference_materials, reference_material = "name",
                                    accepted = "value", accepted_2s = "uncertainty_2s"),
@@ -294,8 +294,8 @@ reference_material_results <- function(project) {
       within_uncertainty = abs(.data$deviation) <=
         sqrt((2 * .data$se_combined)^2 + dplyr::coalesce(.data$accepted_2s, 0)^2)
     ) |>
-    dplyr::arrange(.data$acquired) |>
-    dplyr::select("sample_id", "reference_material", "role", "session", "acquired", "n",
+    dplyr::arrange(.data$sequence) |>
+    dplyr::select("sample_id", "sequence", "reference_material", "role", "session", "acquired", "n",
                   "measured", "mean", "se", "se_combined", "accepted", "accepted_2s",
                   "deviation", "deviation_ppm", "within_uncertainty", "correction_factor",
                   "correction_status")

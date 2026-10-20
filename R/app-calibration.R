@@ -89,6 +89,8 @@ calibration_ui <- function(id) {
         bslib::nav_panel(
           "Reference materials",
           shiny::uiOutput(ns("correction_note")),
+          shiny::radioButtons(ns("rm_x"), NULL, inline = TRUE,
+                              c("Run order" = "order", "Acquisition time" = "time")),
           plotly::plotlyOutput(ns("rm_plot"), height = "560px"),
           shiny::h6(class = "mt-2", "Mean and SD of the run means, per session"),
           DT::DTOutput(ns("rm_summary"))
@@ -306,7 +308,7 @@ calibration_server <- function(id, project) {
       r <- results()
       shiny::validate(shiny::need(nrow(r) > 0,
                                   "Mark reference material runs (Assign runs, or the suggestion above)."))
-      reference_material_plot(m, r)
+      reference_material_plot(m, r, x = input$rm_x %||% "order", runs = project_runs(project()))
     })
 
     output$rm_summary <- DT::renderDT({
@@ -333,76 +335,122 @@ calibration_server <- function(id, project) {
 
 #' Reference material plot
 #'
-#' One panel per reference material, against acquisition time. For the
-#' primary reference material: each run's measured (uncorrected) mean with
-#' 2 SE, the fitted correction line (by default the linear regression) and
-#' the corrected run means. For secondary reference materials: uncorrected
-#' and corrected run means, with the corrected session averages as
-#' horizontal lines. The accepted values are dashed lines.
+#' One panel per reference material, against run order or acquisition time.
+#' For the primary reference material: each run's measured (uncorrected)
+#' mean with 2 SE, the fitted correction line (by default the linear
+#' regression) and the corrected run means. For secondary reference
+#' materials: uncorrected and corrected run means, with the corrected session
+#' averages as horizontal lines. The accepted values are dashed lines.
+#'
+#' On a time axis, sessions that are days or months apart leave each
+#' session's lines too short to see; in run order (the default) every run
+#' takes the same space.
 #'
 #' @param model A model from [calibration_model()] (`NULL` if no primary
 #'   reference material is set).
 #' @param results Output of [reference_material_results()].
+#' @param x `"order"` (run number in acquisition order) or `"time"`.
+#' @param runs Output of [project_runs()], used to draw the correction over
+#'   all runs of each session (otherwise only between its standards).
 #' @return A plotly object.
 #' @export
-reference_material_plot <- function(model, results) {
-  hover <- "%{text}<br>%{x}<br>%{y:.6f}<extra></extra>"
-  accepted_line <- function(p, d, value) {
-    plotly::add_lines(p, x = range(d$acquired), y = rep(value, 2), name = "Accepted",
-                      line = list(color = "#555", dash = "dash", width = 1), showlegend = FALSE,
-                      hoverinfo = "skip")
-  }
+reference_material_plot <- function(model, results, x = c("order", "time"), runs = NULL) {
+  x <- match.arg(x)
+  xcol <- if (x == "order") "sequence" else "acquired"
+  # Without all runs, the correction is drawn over the reference material runs.
+  runs <- runs %||% results[, c("sample_id", "sequence", "acquired", "session")]
+  results$label <- paste0(results$sample_id, "<br>",
+                          format(results$acquired, "%Y-%m-%d %H:%M", tz = "UTC"))
+  hover <- "%{text}<br>%{y:.6f}<extra></extra>"
+  first_rm <- results$reference_material[1]
+
   panels <- purrr::map(unique(results$reference_material), \(rm_name) {
     d <- dplyr::filter(results, .data$reference_material == rm_name)
     p <- plotly::plot_ly() |>
-      accepted_line(d, d$accepted[1]) |>
-      plotly::add_markers(data = d, x = ~acquired, y = ~measured, name = "Uncorrected",
-                          legendgroup = "uncorrected", showlegend = rm_name == results$reference_material[1],
+      plotly::add_lines(x = range(d[[xcol]], na.rm = TRUE), y = rep(d$accepted[1], 2),
+                        name = "Accepted", line = list(color = "#555", dash = "dash", width = 1),
+                        showlegend = FALSE, hoverinfo = "skip") |>
+      plotly::add_markers(x = d[[xcol]], y = d$measured, name = "Uncorrected",
+                          legendgroup = "uncorrected", showlegend = rm_name == first_rm,
                           error_y = list(type = "data", array = 2 * d$se, color = "#999"),
                           marker = list(color = "#999", size = 7, symbol = "circle-open"),
-                          text = ~sample_id, hovertemplate = hover)
+                          text = d$label, hovertemplate = hover)
     if (d$role[1] == "primary" && !is.null(model) && nrow(model$points) > 0) {
-      # The correction through time, drawn through the uncorrected standards.
-      # The grid includes the standards' times (and just before them), so
-      # steps and kinks are drawn sharply.
-      fitted <- purrr::map(unique(model$points$session), \(s) {
-        tt <- model$points$time[model$points$session == s]
-        grid <- sort(unique(c(seq(min(tt) - 300, max(tt) + 300, length.out = 200), tt, tt - 0.5)))
-        tibble::tibble(session = s, acquired = as.POSIXct(grid, origin = "1970-01-01", tz = "UTC"),
-                       measured = model$accepted / correction_at(model, s, grid)$factor)
-      }) |> purrr::list_rbind()
+      fitted <- correction_lines(model, runs, x)
       fit_name <- names(FIT_CHOICES)[FIT_CHOICES == model$fit]
+      shape <- if (x == "order" && model$fit == "step") "hv" else "linear"
       for (s in unique(fitted$session)) {
-        p <- plotly::add_lines(p, data = dplyr::filter(fitted, .data$session == s),
-                               x = ~acquired, y = ~measured,
+        f <- dplyr::filter(fitted, .data$session == s)
+        p <- plotly::add_lines(p, x = f$x, y = f$y,
                                name = paste("Correction:", fit_name), legendgroup = "fit",
                                showlegend = s == fitted$session[1],
-                               line = list(color = "#d9822b", width = 2),
+                               line = list(color = "#d9822b", width = 2, shape = shape),
                                hovertemplate = paste0(fit_name, " (", s, ")<br>%{y:.6f}<extra></extra>"))
       }
     }
     if (d$role[1] == "secondary") {
       avg <- d |>
-        dplyr::summarise(start = min(.data$acquired), end = max(.data$acquired),
+        dplyr::summarise(start = min(.data[[xcol]]), end = max(.data[[xcol]]),
                          mean = mean(.data$mean), .by = "session")
       for (i in seq_len(nrow(avg))) {
-        p <- plotly::add_lines(p, x = c(avg$start[i], avg$end[i]), y = rep(avg$mean[i], 2),
+        # A session with one run still gets a visible line.
+        pad <- if (x == "order" && avg$start[i] == avg$end[i]) 0.3 else 0
+        p <- plotly::add_lines(p, x = c(avg$start[i] - pad, avg$end[i] + pad), y = rep(avg$mean[i], 2),
                                name = "Session average (corrected)", legendgroup = "avg",
-                               showlegend = FALSE, line = list(color = "#1f6f8b", width = 2),
+                               showlegend = rm_name == first_rm && i == 1,
+                               line = list(color = "#1f6f8b", width = 2),
                                hovertemplate = paste0(avg$session[i], " average %{y:.6f}<extra></extra>"))
       }
     }
     p |>
-      plotly::add_markers(data = d, x = ~acquired, y = ~mean, name = "Corrected",
-                          legendgroup = "corrected", showlegend = rm_name == results$reference_material[1],
+      plotly::add_markers(x = d[[xcol]], y = d$mean, name = "Corrected",
+                          legendgroup = "corrected", showlegend = rm_name == first_rm,
                           error_y = list(type = "data", array = 2 * d$se_combined, color = "#1f6f8b"),
                           marker = list(color = "#1f6f8b", size = 7),
-                          text = ~sample_id, hovertemplate = hover) |>
+                          text = d$label, hovertemplate = hover) |>
       plotly::layout(yaxis = list(title = paste0(rm_name, "<br>(", d$role[1], ")"),
                                   tickformat = ".5f"))
   })
+  x_title <- if (x == "order") "Run number (acquisition order)" else "Acquisition time"
   plotly::subplot(panels, nrows = length(panels), shareX = TRUE, titleY = TRUE, margin = 0.04) |>
-    plotly::layout(xaxis = list(title = "Acquisition time"), hovermode = "closest",
+    plotly::layout(xaxis = list(title = x_title), hovermode = "closest",
                    legend = list(orientation = "h", y = 1.06)) |>
     plotly::config(displaylogo = FALSE)
+}
+
+# The primary correction drawn through the uncorrected standards, per
+# session: `x` (run number or time), `y` (accepted / factor). It covers all
+# runs of the session when `runs` is given, otherwise its standards.
+correction_lines <- function(model, runs, x = c("order", "time")) {
+  x <- match.arg(x)
+  pts <- model$points
+  # Runs are corrected at their measurement times; place each run at the
+  # typical midpoint of a standard run.
+  offset <- 0
+  if (!is.null(runs)) {
+    starts <- as.numeric(runs$acquired[match(pts$sample_id, runs$sample_id)])
+    offset <- stats::median(pts$time - starts, na.rm = TRUE)
+    if (!is.finite(offset)) offset <- 0
+  }
+  purrr::map(unique(pts$session), \(s) {
+    tt <- pts$time[pts$session == s]
+    in_session <- if (is.null(runs)) NULL else
+      dplyr::filter(runs, .data$session == s, !is.na(.data$acquired))
+    if (x == "order") {
+      if (is.null(in_session) || nrow(in_session) == 0) {
+        in_session <- tibble::tibble(sample_id = pts$sample_id[pts$session == s],
+                                     sequence = NA_real_, acquired = NA)
+      }
+      t <- as.numeric(in_session$acquired) + offset
+      # Standards at their own measured times (step changes happen there).
+      own <- match(in_session$sample_id, pts$sample_id)
+      t[!is.na(own)] <- pts$time[own[!is.na(own)]]
+      return(tibble::tibble(session = s, x = in_session$sequence,
+                            y = model$accepted / correction_at(model, s, t)$factor))
+    }
+    span <- range(c(tt, if (!is.null(in_session)) as.numeric(in_session$acquired) + offset))
+    grid <- sort(unique(c(seq(span[1] - 300, span[2] + 300, length.out = 200), tt, tt - 0.5)))
+    tibble::tibble(session = s, x = as.POSIXct(grid, origin = "1970-01-01", tz = "UTC"),
+                   y = model$accepted / correction_at(model, s, grid)$factor)
+  }) |> purrr::list_rbind()
 }

@@ -4,22 +4,32 @@
 \alias{reference_material_plot}
 \title{Reference material plot}
 \usage{
-reference_material_plot(model, results)
+reference_material_plot(model, results, x = c("order", "time"), runs = NULL)
 }
 \arguments{
 \item{model}{A model from \code{\link[=calibration_model]{calibration_model()}} (\code{NULL} if no primary
 reference material is set).}
 
 \item{results}{Output of \code{\link[=reference_material_results]{reference_material_results()}}.}
+
+\item{x}{\code{"order"} (run number in acquisition order) or \code{"time"}.}
+
+\item{runs}{Output of \code{\link[=project_runs]{project_runs()}}, used to draw the correction over
+all runs of each session (otherwise only between its standards).}
 }
 \value{
 A plotly object.
 }
 \description{
-One panel per reference material, against acquisition time. For the
-primary reference material: each run's measured (uncorrected) mean with
-2 SE, the fitted correction line (by default the linear regression) and
-the corrected run means. For secondary reference materials: uncorrected
-and corrected run means, with the corrected session averages as
-horizontal lines. The accepted values are dashed lines.
+One panel per reference material, against run order or acquisition time.
+For the primary reference material: each run's measured (uncorrected)
+mean with 2 SE, the fitted correction line (by default the linear
+regression) and the corrected run means. For secondary reference
+materials: uncorrected and corrected run means, with the corrected session
+averages as horizontal lines. The accepted values are dashed lines.
+}
+\details{
+On a time axis, sessions that are days or months apart leave each
+session's lines too short to see; in run order (the default) every run
+takes the same space.
 }
