@@ -161,7 +161,7 @@ test_that("the plot is only rebuilt when what it shows changes", {
   rv <- shiny::reactiveVal(p)
   shiny::testServer(workspace_server, args = list(project = rv), {
     session$setInputs(samples_rows_selected = 1,
-                      show = c("points", "outliers", "smooth", "band", "strips"))
+                      show = c("points", "outliers", "ma", "spline", "band", "strips"))
     output$plot
     n <- plot_renders()
     expect_gte(n, 1)
@@ -169,16 +169,16 @@ test_that("the plot is only rebuilt when what it shows changes", {
     # Notes and display toggles: no rebuild
     session$setInputs(comment = "looks fine", flag = TRUE, status = "reviewed")
     output$plot
-    session$setInputs(show = c("points", "smooth", "strips"))
+    session$setInputs(show = c("points", "ma", "strips"))
     output$plot
     expect_equal(plot_renders(), n)
-    expect_true(all(c("points", "smooth", "band", "seawater") %in% names(toggle_idx())))
+    expect_true(all(c("points", "ma", "spline", "band", "seawater") %in% names(toggle_idx())))
 
     # Things that change the plot: rebuild
     session$setInputs(trim_start_um = 50)
     output$plot
     expect_equal(plot_renders(), n + 1)
-    session$setInputs(show = c("points", "smooth"))
+    session$setInputs(show = c("points", "ma"))
     output$plot
     expect_equal(plot_renders(), n + 2)
     session$setInputs(next_sample = 1)
@@ -235,7 +235,7 @@ test_that("the workspace plot follows changes to the calibration", {
   p <- set_run_type(p, "RM1", "reference", "MMC")
   rv <- shiny::reactiveVal(p)
   shiny::testServer(workspace_server, args = list(project = rv), {
-    session$setInputs(samples_rows_selected = 2, show = c("points", "smooth", "strips"))
+    session$setInputs(samples_rows_selected = 2, show = c("points", "ma", "spline", "strips"))
     before <- mean(sample_data()$sr87_sr86, na.rm = TRUE)
     expect_equal(before, 0.71, tolerance = 1e-9)
     rv(update_project_settings(rv(), list(calibration = list(primary = "MMC"))))
@@ -359,4 +359,19 @@ test_that("the Calibration step applies the SBO suggestion with the chosen value
   b <- plotly::plotly_build(reference_material_plot(calibration_model(p), reference_material_results(p),
                                                     x = "time", runs = project_runs(p)))
   expect_true("Correction: Session mean" %in% vapply(b$x$data, \(t) t$name %||% "", ""))
+})
+
+test_that("the moving average and the spline can be shown separately", {
+  d <- reduce_runs(read_runfiles(salmon_files(1)))$data
+  vis <- function(show) {
+    b <- plotly::plotly_build(profile_plot(d, show = show, smoothing = "ma_spline"))
+    t <- rlang::set_names(b$x$data, vapply(b$x$data, \(t) t$name %||% "", ""))
+    c(ma = t[["Moving average"]]$visible, spline = t[["Spline"]]$visible)
+  }
+  expect_equal(vis(c("points", "ma")), c(ma = TRUE, spline = "legendonly"))
+  expect_equal(vis(c("points", "spline")), c(ma = "legendonly", spline = TRUE))
+  expect_equal(vis("smooth"), c(ma = TRUE, spline = TRUE))   # older option name
+  idx <- toggle_trace_indices(profile_plot(d, smoothing = "ma_spline"))
+  expect_length(idx[names(idx) == "ma"], 1)
+  expect_length(idx[names(idx) == "spline"], 1)
 })

@@ -19,8 +19,9 @@ TOGGLE_TRACES <- c(points = "Data", outliers = "Outliers", seawater = "Seawater"
 #'
 #' @param data Reduced and edited data for one sample (from [project_data()]).
 #' @param regions Regions of the sample (`region`, `start_s`, `end_s`).
-#' @param show Elements to show: any of `"points"`, `"outliers"`, `"smooth"`,
-#'   `"band"`, `"seawater"`, `"strips"`. All traces except the strips are
+#' @param show Elements to show: any of `"points"`, `"outliers"`, `"ma"`
+#'   (moving average), `"spline"`, `"band"`, `"seawater"`, `"strips"`. All
+#'   traces except the strips are
 #'   always included; those not in `show` start hidden (`"legendonly"`) so
 #'   they can be switched on without rebuilding the plot.
 #' @param source plotly event source ID.
@@ -31,7 +32,7 @@ TOGGLE_TRACES <- c(points = "Data", outliers = "Outliers", seawater = "Seawater"
 #' @return A built plotly object (see [plotly::plotly_build()]).
 #' @export
 profile_plot <- function(data, regions = NULL,
-                         show = c("points", "outliers", "smooth", "band", "strips"),
+                         show = c("points", "outliers", "ma", "spline", "band", "strips"),
                          source = "profile", lines = numeric(), smoothing = NULL) {
   has_spline <- "sr87_sr86_spline" %in% names(data) && any(!is.na(data$sr87_sr86_spline))
   smoothing <- smoothing %||% if (isTRUE(all.equal(data$sr87_sr86_value, data$sr87_sr86))) {
@@ -45,6 +46,8 @@ profile_plot <- function(data, regions = NULL,
   draw_spline <- smoothing %in% c("spline", "ma_spline") && has_spline
   # The band belongs to the spline when there is one.
   band_label <- if (draw_spline) SMOOTH_LABELS[["spline_band"]] else SMOOTH_LABELS[["ma_band"]]
+  # "smooth" (earlier versions) means both smoothed lines.
+  if ("smooth" %in% show) show <- union(show, c("ma", "spline"))
   vis <- function(option) if (option %in% show) TRUE else "legendonly"
 
   # Only the columns that are drawn, rounded to the precision shown.
@@ -88,13 +91,13 @@ profile_plot <- function(data, regions = NULL,
   if (draw_ma) {
     # Thinner when the spline is drawn too.
     main <- plotly::add_lines(main, data = d, x = ~x, y = ~ma, name = SMOOTH_LABELS[["ma"]],
-                              visible = vis("smooth"),
+                              visible = vis("ma"),
                               line = list(color = "#1f6f8b", width = if (draw_spline) 1.2 else 2),
                               hovertemplate = paste0("Moving average<br>", hover))
   }
   if (draw_spline) {
     main <- plotly::add_lines(main, data = d, x = ~x, y = ~spline, name = SMOOTH_LABELS[["spline"]],
-                              visible = vis("smooth"), line = list(color = "#d9822b", width = 2.5),
+                              visible = vis("spline"), line = list(color = "#d9822b", width = 2.5),
                               hovertemplate = paste0("Spline<br>", hover))
   }
   if (any(!is.na(d$cp))) {
@@ -185,7 +188,7 @@ SMOOTH_LABELS <- c(ma = "Moving average", spline = "Spline", ma_band = "95% CI",
 toggle_trace_indices <- function(plot) {
   names <- vapply(plot$x$data, \(t) t$name %||% "", character(1))
   targets <- c(TOGGLE_TRACES,
-               smooth = SMOOTH_LABELS[["ma"]], smooth = SMOOTH_LABELS[["spline"]],
+               ma = SMOOTH_LABELS[["ma"]], spline = SMOOTH_LABELS[["spline"]],
                band = SMOOTH_LABELS[["ma_band"]], band = SMOOTH_LABELS[["spline_band"]])
   # An option can control several traces (both smoothed lines).
   idx <- purrr::imap(unname(targets), \(target, i) {

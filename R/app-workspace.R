@@ -31,9 +31,9 @@ workspace_ui <- function(id) {
             class = "ms-auto",
             shiny::checkboxGroupInput(
               ns("show"), NULL, inline = TRUE,
-              choices = c("Points" = "points", "Outliers" = "outliers", "Smoothed" = "smooth",
+              choices = c("Points" = "points", "Outliers" = "outliers", "Moving average" = "ma", "Spline" = "spline",
                           "Uncertainty" = "band", "Seawater" = "seawater", "Sr, Kr and Rb panels" = "strips"),
-              selected = c("points", "outliers", "smooth", "band", "strips")
+              selected = c("points", "outliers", "ma", "spline", "band", "strips")
             )
           ),
           shiny::div(

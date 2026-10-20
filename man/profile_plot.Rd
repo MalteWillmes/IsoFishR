@@ -7,7 +7,7 @@
 profile_plot(
   data,
   regions = NULL,
-  show = c("points", "outliers", "smooth", "band", "strips"),
+  show = c("points", "outliers", "ma", "spline", "band", "strips"),
   source = "profile",
   lines = numeric(),
   smoothing = NULL
@@ -18,8 +18,9 @@ profile_plot(
 
 \item{regions}{Regions of the sample (\code{region}, \code{start_s}, \code{end_s}).}
 
-\item{show}{Elements to show: any of \code{"points"}, \code{"outliers"}, \code{"smooth"},
-\code{"band"}, \code{"seawater"}, \code{"strips"}. All traces except the strips are
+\item{show}{Elements to show: any of \code{"points"}, \code{"outliers"}, \code{"ma"}
+(moving average), \code{"spline"}, \code{"band"}, \code{"seawater"}, \code{"strips"}. All
+traces except the strips are
 always included; those not in \code{show} start hidden (\code{"legendonly"}) so
 they can be switched on without rebuilding the plot.}
 
