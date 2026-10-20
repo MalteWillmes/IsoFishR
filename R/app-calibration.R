@@ -2,11 +2,20 @@
 # reference material correction and the secondary reference material checks.
 
 FIT_CHOICES <- c(
-  "Straight line through all standards of the session (corrects steady drift)" = "regression",
-  "Join neighbouring standards (each sample uses the standards before and after it)" = "linear",
-  "Smooth curve through the standards (for non-linear drift; needs 4+ standards)" = "spline",
-  "Most recent standard (each sample uses the last standard run before it)" = "step",
-  "Session average (one correction for the whole session, no drift)" = "mean"
+  "Linear regression" = "regression",
+  "Linear interpolation" = "linear",
+  "Smoothing spline" = "spline",
+  "Step forward" = "step",
+  "Session mean" = "mean"
+)
+
+# What each method does, shown under the choice.
+FIT_HELP <- c(
+  regression = "A straight line through all standards of the session: corrects steady drift.",
+  linear = "Joins neighbouring standards: each sample uses the standards run before and after it.",
+  spline = "A smooth curve through the standards, for drift that isn't linear (needs 4+ standards).",
+  step = "Each sample uses the last standard run before it.",
+  mean = "One correction for the whole session (no drift)."
 )
 
 # Method names for the export record.
@@ -48,6 +57,7 @@ calibration_ui <- function(id) {
         shiny::hr(),
         shiny::selectInput(ns("primary"), "Primary reference material (corrects samples)", NULL),
         shiny::selectInput(ns("fit"), "Correction through time", FIT_CHOICES),
+        shiny::uiOutput(ns("fit_help")),
         shiny::radioButtons(ns("baseline"), "Baseline", c(
           "Each run's own blank (start of run)" = "per_run",
           "Baseline runs, interpolated in time" = "baseline_runs"
@@ -199,6 +209,9 @@ calibration_server <- function(id, project) {
     }
     shiny::observeEvent(input$primary, save_setting("primary", input$primary), ignoreInit = TRUE)
     shiny::observeEvent(input$fit, save_setting("fit", input$fit), ignoreInit = TRUE)
+    output$fit_help <- shiny::renderUI({
+      shiny::p(class = "ifr-muted small mt-n1", FIT_HELP[[shiny::req(input$fit)]])
+    })
     shiny::observeEvent(input$baseline, save_setting("baseline", input$baseline), ignoreInit = TRUE)
     shiny::observeEvent(input$session_gap, save_setting("session_gap_h", input$session_gap),
                         ignoreInit = TRUE)
@@ -349,15 +362,24 @@ reference_material_plot <- function(model, results) {
                           marker = list(color = "#999", size = 7, symbol = "circle-open"),
                           text = ~sample_id, hovertemplate = hover)
     if (d$role[1] == "primary" && !is.null(model) && nrow(model$points) > 0) {
+      # The correction through time, drawn through the uncorrected standards.
+      # The grid includes the standards' times (and just before them), so
+      # steps and kinks are drawn sharply.
       fitted <- purrr::map(unique(model$points$session), \(s) {
         tt <- model$points$time[model$points$session == s]
-        grid <- seq(min(tt) - 300, max(tt) + 300, length.out = 100)
+        grid <- sort(unique(c(seq(min(tt) - 300, max(tt) + 300, length.out = 200), tt, tt - 0.5)))
         tibble::tibble(session = s, acquired = as.POSIXct(grid, origin = "1970-01-01", tz = "UTC"),
                        measured = model$accepted / correction_at(model, s, grid)$factor)
       }) |> purrr::list_rbind()
-      p <- plotly::add_lines(p, data = fitted, x = ~acquired, y = ~measured, split = ~session,
-                             name = "Fit (uncorrected)", legendgroup = "fit", showlegend = FALSE,
-                             line = list(color = "#999", width = 2), hoverinfo = "skip")
+      fit_name <- names(FIT_CHOICES)[FIT_CHOICES == model$fit]
+      for (s in unique(fitted$session)) {
+        p <- plotly::add_lines(p, data = dplyr::filter(fitted, .data$session == s),
+                               x = ~acquired, y = ~measured,
+                               name = paste("Correction:", fit_name), legendgroup = "fit",
+                               showlegend = s == fitted$session[1],
+                               line = list(color = "#d9822b", width = 2),
+                               hovertemplate = paste0(fit_name, " (", s, ")<br>%{y:.6f}<extra></extra>"))
+      }
     }
     if (d$role[1] == "secondary") {
       avg <- d |>
