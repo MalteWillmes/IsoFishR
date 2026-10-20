@@ -8,13 +8,12 @@ export_ui <- function(id) {
     sidebar = bslib::sidebar(
       open = "always",  # set up while its step is hidden; would otherwise start collapsed
       width = 300,
-      title = "Export summaries",
+      title = "Export",
       shiny::p(class = "ifr-muted",
-               "Writes the tables to a new dated folder in the project's exports folder. ",
-               "Earlier exports are kept."),
-      shiny::checkboxGroupInput(ns("files"), "Files to export", EXPORT_FILE_CHOICES,
-                                selected = setdiff(EXPORT_FILES, "data")),
-      shiny::checkboxInput(ns("include_excluded"), "Include excluded samples", FALSE),
+               "Writes the results to a new dated folder in the project's exports folder: ",
+               "sample and region summaries, changepoints, full profiles, the run sequence, ",
+               "reference material results, settings, and export_report.md, which records ",
+               "everything. Excluded samples are left out. Earlier exports are kept."),
       shiny::actionButton(ns("export"), "Export", class = "btn-primary"),
       shiny::uiOutput(ns("last_export"))
     ),
@@ -33,7 +32,7 @@ export_server <- function(id, project) {
 
     preview_data <- shiny::reactive({
       p <- shiny::req(project())
-      ids <- export_samples(p, input$include_excluded)$sample_id
+      ids <- export_samples(p, FALSE)$sample_id
       shiny::req(length(ids) > 0)
       shiny::withProgress(message = "Reducing samples", project_data(p, ids))
     })
@@ -48,30 +47,29 @@ export_server <- function(id, project) {
     }
 
     output$regions <- DT::renderDT({
-      x <- summarise_project_regions(project(), preview_data(), input$include_excluded)
+      x <- summarise_project_regions(project(), preview_data(), FALSE)
       shiny::validate(shiny::need(nrow(x) > 0, "No regions defined yet."))
       preview_table(x)
     })
     output$samples <- DT::renderDT({
-      preview_table(summarise_project_samples(project(), preview_data(), input$include_excluded))
+      preview_table(summarise_project_samples(project(), preview_data(), FALSE))
     })
     output$changepoints <- DT::renderDT({
-      x <- summarise_project_changepoints(project(), preview_data(), input$include_excluded)
+      x <- summarise_project_changepoints(project(), preview_data(), FALSE)
       shiny::validate(shiny::need(nrow(x) > 0, "No samples have changepoint detection enabled."))
       preview_table(x)
     })
 
     output$profiles <- DT::renderDT({
-      x <- round_summary(project_profiles(project(), preview_data(), input$include_excluded))
+      x <- round_summary(project_profiles(project(), preview_data(), FALSE))
       DT::datatable(x, rownames = FALSE, filter = "top",
                     options = list(pageLength = 25, dom = "tip", scrollX = TRUE))
     })
 
     shiny::observeEvent(input$export, {
       dir <- shiny::withProgress(message = "Exporting", try_notify(
-        export_project(project(), files = input$files,
-                       include_excluded = isTRUE(input$include_excluded)),
-        success = "Summaries exported."
+        export_project(project()),
+        success = "Exported."
       ))
       if (!is.null(dir)) last_dir(dir)
     })
@@ -100,14 +98,3 @@ open_folder <- function(path) {
     system2("xdg-open", shQuote(path), wait = FALSE)
   }
 }
-
-EXPORT_FILE_CHOICES <- c(
-  "Sample summaries (samples.csv)" = "samples",
-  "Regions (regions.csv)" = "regions",
-  "Changepoint segments (changepoints.csv)" = "changepoints",
-  "Full profiles, every point (profiles.csv)" = "profiles",
-  "Run sequence and sessions (runs.csv)" = "runs",
-  "Reference material results (reference_materials.csv, reference_material_summary.csv)" = "reference_materials",
-  "Settings used per sample (settings.csv)" = "settings",
-  "All reduction columns, for checking (data.csv)" = "data"
-)

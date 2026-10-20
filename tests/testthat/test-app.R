@@ -49,6 +49,12 @@ test_that("workspace edits are saved to the project", {
     session$setInputs(set_reduction_ma_window = 25, reduction_apply = 1)
     expect_equal(rv()$samples$settings[2], "ma_window=25")
     expect_equal(rv()$samples$settings[1], "")
+    # The run speed can be changed per sample too
+    session$setInputs(set_sample_run_speed_um_s = 5, reduction_apply = 2)
+    expect_equal(rv()$samples$settings[2], "ma_window=25; run_speed_um_s=5")
+    expect_equal(sample_settings(rv(), "PC_2016_01_A3_6R")$sample$run_speed_um_s, 5)
+    d <- project_data(rv(), "PC_2016_01_A3_6R")
+    expect_equal(diff(range(d$distance_um)) / diff(range(d$time_s)), 5)
     session$setInputs(reduction_reset = 1)
     expect_equal(rv()$samples$settings[2], "")
 
@@ -81,7 +87,6 @@ test_that("export page writes an export and previews the summaries", {
   p <- set_regions(p, p$samples$sample_id[1], data.frame(region = "core", start_s = 200, end_s = 260))
   rv <- shiny::reactiveVal(p)
   shiny::testServer(export_server, args = list(project = rv), {
-    session$setInputs(files = c("samples", "regions"), include_excluded = FALSE)
     expect_equal(nrow(preview_data()) > 0, TRUE)
     session$setInputs(export = 1)
     expect_true(dir.exists(last_dir()))

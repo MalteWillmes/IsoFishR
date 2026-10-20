@@ -123,9 +123,23 @@ format_overrides <- function(overrides) {
   paste0(names(overrides), "=", vals, collapse = "; ")
 }
 
+# A sample can override every reduction setting and these sample settings.
+SAMPLE_OVERRIDE_KEYS <- "run_speed_um_s"
+
+# The project values of the settings a sample can override, as one flat list.
+override_defaults <- function(settings) {
+  c(settings$reduction, settings$sample[SAMPLE_OVERRIDE_KEYS])
+}
+
+# Overrides (flat list) as a partial settings list for merge_settings().
+overrides_to_settings <- function(overrides) {
+  is_sample <- names(overrides) %in% SAMPLE_OVERRIDE_KEYS
+  list(reduction = overrides[!is_sample], sample = overrides[is_sample])
+}
+
 parse_overrides <- function(x) {
   if (is.na(x) || !nzchar(trimws(x))) return(list())
-  defaults <- default_settings()$reduction
+  defaults <- override_defaults(default_settings())
   pairs <- strsplit(strsplit(x, ";", fixed = TRUE)[[1]], "=", fixed = TRUE)
   keys <- trimws(vapply(pairs, `[`, character(1), 1))
   vals <- trimws(vapply(pairs, `[`, character(1), 2))

@@ -95,8 +95,8 @@ edit_panel_ui <- function(ns) {
 reduction_panel_ui <- function(ns) {
   shiny::tagList(
     shiny::p(class = "ifr-muted",
-             "Settings used for this sample. Changes apply to this sample only; project-wide ",
-             "defaults are under Project settings."),
+             "Settings used for this sample. Changes apply to this sample only; the other ",
+             "settings and the project-wide defaults are under Settings."),
     shiny::uiOutput(ns("override_summary")),
     shiny::uiOutput(ns("reduction_inputs")),
     shiny::div(
@@ -465,10 +465,12 @@ workspace_server <- function(id, project) {
     # ---- reduction settings for this sample ----
     output$reduction_inputs <- shiny::renderUI({
       shiny::req(current())
-      settings_inputs(ns, shiny::isolate(sample_settings(project(), current())), "reduction")
+      settings_inputs(ns, shiny::isolate(sample_settings(project(), current())),
+                      c("reduction", "sample"), SAMPLE_PANEL_KEYS)
     })
     shiny::observeEvent(sample_row(), {
-      update_settings_inputs(session, sample_settings(project(), current()), "reduction")
+      update_settings_inputs(session, sample_settings(project(), current()),
+                             c("reduction", "sample"), SAMPLE_PANEL_KEYS)
     })
 
     output$override_summary <- shiny::renderUI({
@@ -483,11 +485,14 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(input$reduction_apply, {
       p <- project()
       id <- current()
-      wanted <- settings_from_inputs(input, p$settings, "reduction")$reduction
+      wanted <- settings_from_inputs(input, p$settings, c("reduction", "sample"), SAMPLE_PANEL_KEYS) |>
+        override_defaults()
+      wanted <- wanted[SAMPLE_PANEL_KEYS]
+      project_values <- override_defaults(p$settings)
       current_overrides <- parse_overrides(sample_row()$settings)
       changes <- list()
       for (key in names(wanted)) {
-        differs <- !identical(wanted[[key]], p$settings$reduction[[key]])
+        differs <- !identical(wanted[[key]], project_values[[key]])
         if (differs) {
           changes[key] <- list(wanted[[key]])
         } else if (key %in% names(current_overrides)) {
@@ -505,7 +510,8 @@ workspace_server <- function(id, project) {
       if (length(overrides) == 0) return()
       resets <- rlang::set_names(rep(list(NULL), length(overrides)), names(overrides))
       change(\(p) rlang::exec(set_sample_settings, p, current(), !!!resets))
-      update_settings_inputs(session, sample_settings(project(), current()), "reduction")
+      update_settings_inputs(session, sample_settings(project(), current()),
+                             c("reduction", "sample"), SAMPLE_PANEL_KEYS)
     })
 
     # ---- notes ----
@@ -519,7 +525,7 @@ workspace_server <- function(id, project) {
         title = paste("Remove", current(), "?"),
         shiny::p("The sample, its regions and its edits are removed from the project. ",
                  "The runfile is kept in the project's raw/removed folder, and the removal ",
-                 "is recorded in the change log."),
+                 "is recorded in the session log."),
         shiny::p("To keep the sample but leave it out of exports, set its status to ",
                  shiny::strong("Excluded"), " instead."),
         footer = shiny::tagList(

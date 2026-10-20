@@ -51,13 +51,6 @@ calibration_ui <- function(id) {
       ),
       bslib::navset_card_underline(
         bslib::nav_panel(
-          "Reference materials",
-          shiny::uiOutput(ns("correction_note")),
-          plotly::plotlyOutput(ns("rm_plot"), height = "560px"),
-          shiny::h6(class = "mt-2", "Mean and SD of the run means, per session"),
-          DT::DTOutput(ns("rm_summary"))
-        ),
-        bslib::nav_panel(
           "Assign runs",
           shiny::div(
             class = "d-flex flex-wrap gap-2 align-items-end mb-2",
@@ -73,6 +66,13 @@ calibration_ui <- function(id) {
                    "is cleared after each change. Type in the filter boxes to narrow the list, e.g. ",
                    "a name pattern under Run."),
           DT::DTOutput(ns("runs"))
+        ),
+        bslib::nav_panel(
+          "Reference materials",
+          shiny::uiOutput(ns("correction_note")),
+          plotly::plotlyOutput(ns("rm_plot"), height = "560px"),
+          shiny::h6(class = "mt-2", "Mean and SD of the run means, per session"),
+          DT::DTOutput(ns("rm_summary"))
         ),
         bslib::nav_panel(
           "Run details",

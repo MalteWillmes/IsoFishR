@@ -43,7 +43,7 @@ Trims and regions are stored in **seconds of analysis time** and shown as distan
 | `update_project_settings(p, overrides)` | Change the project defaults |
 | `project_data(p)` / `project_regions(p)` | Cached reduction with each sample's own settings and edits applied |
 | `remove_samples(p, ids)` | Remove samples with their regions and cache. The runfile moves to `raw/removed/` (never deleted) and the removal is logged. To keep a sample but leave it out of exports, set its status to `excluded` instead |
-| `read_log(p)` | The change log |
+| `read_log(p)` | The session log (log.csv) |
 
 Every change is written to disk immediately, and every changed value is logged with its old and new value. Each function returns the updated project object, which the Shiny app will keep in a reactive value.
 
@@ -54,21 +54,21 @@ Cache files are named `<hash of sample ID>_<hash of md5 + import + reduction set
 The lock is advisory: Dropbox sync is not instant, so two people opening the same project within seconds of each other can still clash. A session whose lock was taken over refuses further writes.
 
 ## App (`run_app()`): six steps
-`app_ui` is a static `bslib::page_navbar(id = "step")` with one panel per step (`APP_STEPS`): `project`, `settings`, `runfiles`, `calibration`, `workspace`, `export`. **Change log** (a modal) and **Quit IsoFishR** sit on the right of the navigation bar on every step.
+`app_ui` is a static `bslib::page_navbar(id = "step")` with one panel per step (`APP_STEPS`): `project`, `settings`, `runfiles`, `calibration`, `workspace`, `export`. **Session log** (a modal) and **Quit IsoFishR** sit on the right of the navigation bar on every step.
 - **Navigation:** all steps but Project are hidden (`nav_hide`) until a project is open. On opening, the project goes to its last step (`read_last_step()`, `app_state.yml` in the project folder, written on every step change, not logged); a new project goes to *settings*. Closing a project hides the steps and returns to *project*.
 - **Sidebars:** the side panels use `open = "always"`. They are set up while their step is hidden, and would otherwise start collapsed.
 - **Project:** the open-project card (runs by type, "Continue to <last step>", Close), user name, open (Browse, recent projects), create (preset). If another user holds the lock, the app offers read-only access or a takeover.
 - **Settings:** reduction, sample/laser and runfile import defaults (preset, layout check, extension), default region names.
 - **Runfiles** (`runfiles_server`): keep/replace for same-name runs; file upload (`shiny.maxRequestSize` raised to 4 GB in `run_app()`); folder import (`choose_folder()` + `find_runfiles()`; same-name files in different subfolders are flagged and skipped); runs table in acquisition order with multi-select removal. After adding, it points to SBO-named runs. `add_runfiles()` checks each file on its own and never stops a batch: the per-file result (added/replaced/skipped/failed + detail) is the `import_report` attribute, shown as a modal. `read_runfile()` marks each line as data or not (`data_lines()`); if the data doesn't start right after `skip_header` lines, it uses the first block of ≥5 data lines (`data_start()`) and reports the line.
-- **Look:** compact theme (`app_theme()`: font scale 0.9, smaller spacers and paddings) plus `app_css`. Step tabs are not numbered. The Windows folder dialog is the Explorer-style picker (`inst/windows/FolderPicker.cs`, compiled by PowerShell `Add-Type`), with the old folder tree as fallback.
+- **Look:** the default Bootstrap 5 theme (`app_theme()`), which bslib ships precompiled; colour and compact spacing come from CSS variables in `app_css`. A customised `bs_theme()` is compiled with Sass at startup and added 1-2 s (up to 5 s on first use). Step tabs are not numbered. The Windows folder dialog is the Explorer-style picker (`inst/windows/FolderPicker.cs`, compiled by PowerShell `Add-Type`), with the old folder tree as fallback.
 - **Calibration** (`calibration_server`):
   - SBO suggestion banner (`apply_reference_suggestion()`, value editable, default 0.70918).
   - Reference material editor; primary; fit (`FIT_CHOICES`, regression first); baseline mode; session gap.
-  - Tabs: *Reference materials* (`reference_material_plot()` + uncorrected/corrected summary), *Assign runs* (types and sessions; the selection clears after each change), *Run details*.
-- **Workspace** (`workspace_server`): sample table with type; plotly profile with Sr, Kr and Rb panels at 40/20/20/20 % height; a corrected/uncorrected badge; Edit / Reduction / Notes panels.
+  - Tabs: *Assign runs* first (types and sessions; the selection clears after each change), then *Reference materials* (`reference_material_plot()` + uncorrected/corrected summary), *Run details*.
+- **Workspace** (`workspace_server`): sample table with type; plotly profile with Sr, Kr and Rb panels at 40/20/20/20 % height; a corrected/uncorrected badge; Edit / Reduction / Notes panels. The Reduction panel shows only `SAMPLE_PANEL_KEYS` (run speed, 88Sr limits, outlier SD, moving average window); per-sample overrides can be any reduction setting or the run speed (`SAMPLE_OVERRIDE_KEYS`).
   - Edits save immediately. A field is only written if its value differs from the stored one, so switching samples never writes anything.
   - The plot's data key includes `calibration_inputs()`, so a changed calibration recalculates the plotted data.
-- **Export** (`export_server`): checkboxes per file (`EXPORT_FILE_CHOICES`), excluded samples, previews.
+- **Export** (`export_server`): one Export button (all files except data.csv, excluded samples left out), previews.
 - **Locks and stopping:** each open project has its own lock token. The app stops on Quit, or once no tab has been connected for 5 seconds; closing or reloading the tab asks first.
 - **Calibration speed:** `calibration_model()` is cached in memory (keyed by `calibration_inputs()`), so the many `project_data()` calls of the steps don't rebuild it.
 
@@ -139,7 +139,7 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 | `R/app.R` | `run_app()`, start screen, lock conflicts, session handling |
 | `R/app-workspace.R` | Workspace module (sample table, plot, Edit / Reduction / Notes) |
 | `R/app-plot.R` | `profile_plot()` |
-| `R/app-project.R` | Project settings and change log pages |
+| `R/app-project.R` | Project settings and session log pages |
 | `R/app-settings.R` | Settings form definitions shared by the project and sample forms |
 | `R/app-utils.R` | Folder dialog, recent projects, error notifications |
 | `R/export.R` | Summary tables and `export_project()` |

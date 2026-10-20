@@ -1,15 +1,18 @@
-# Project settings and change log pages.
+# Project settings and session log pages.
 
 project_settings_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::div(
     class = "container-fluid py-2",
-    shiny::p(class = "ifr-muted",
-             "Project defaults. Samples with their own settings (Workspace > Reduction) ",
-             "keep those overrides. Changing reduction settings reprocesses samples the next ",
-             "time they are viewed."),
-    shiny::uiOutput(ns("form")),
-    shiny::actionButton(ns("save"), "Save project settings", class = "btn-primary")
+    shiny::div(
+      class = "d-flex align-items-center gap-3 mb-2",
+      shiny::actionButton(ns("save"), "Save project settings", class = "btn-primary flex-shrink-0"),
+      shiny::p(class = "ifr-muted mb-0",
+               "Project defaults. Samples with their own settings (Workspace > Reduction) ",
+               "keep those overrides. Changing reduction settings reprocesses samples the next ",
+               "time they are viewed.")
+    ),
+    shiny::uiOutput(ns("form"))
   )
 }
 

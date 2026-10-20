@@ -2,7 +2,7 @@
 % Please edit documentation in R/project.R
 \name{read_log}
 \alias{read_log}
-\title{Read the project change log}
+\title{Read the project session log}
 \usage{
 read_log(project)
 }
@@ -13,5 +13,5 @@ read_log(project)
 A tibble with one row per recorded change.
 }
 \description{
-Read the project change log
+Read the project session log
 }

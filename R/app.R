@@ -41,7 +41,7 @@ app_ui <- function(request) {
     bslib::nav_panel(APP_STEPS[["workspace"]], value = "workspace", workspace_ui("ws")),
     bslib::nav_panel(APP_STEPS[["export"]], value = "export", export_ui("export")),
     bslib::nav_spacer(),
-    bslib::nav_item(shiny::actionLink("show_log", "Change log")),
+    bslib::nav_item(shiny::actionLink("show_log", "Session log")),
     bslib::nav_item(shiny::actionButton("quit", "Quit IsoFishR", class = "btn-sm btn-outline-secondary"))
   )
 }
@@ -72,22 +72,42 @@ app_js <- "
   });
 "
 
-# A compact theme: slightly smaller text and less padding, so more fits on
-# the screen.
+# The default Bootstrap 5 theme, which bslib ships precompiled: a customised
+# theme is compiled with Sass when the app starts, which takes seconds. The
+# colour and the compact spacing are set with CSS variables instead (app_css).
 app_theme <- function() {
-  bslib::bs_theme(
-    version = 5, preset = "shiny", primary = "#1f6f8b",
-    font_scale = 0.9, spacer = "0.75rem", "bslib-spacer" = "0.6rem",
-    "form-label-margin-bottom" = "0.15rem",
-    "card-spacer-y" = "0.5rem", "card-spacer-x" = "0.75rem", "card-cap-padding-y" = "0.35rem",
-    "input-padding-y" = "0.25rem", "input-btn-padding-y" = "0.25rem",
-    "navbar-padding-y" = "0.25rem", "nav-link-padding-y" = "0.35rem",
-    "headings-margin-bottom" = "0.35rem", "paragraph-margin-bottom" = "0.5rem",
-    "hr-margin-y" = "0.5rem", "modal-inner-padding" = "0.75rem"
-  )
+  bslib::bs_theme(version = 5)
 }
 
 app_css <- "
+  :root {
+    --bs-primary:#1f6f8b; --bs-primary-rgb:31,111,139;
+    --bs-link-color:#1f6f8b; --bs-link-color-rgb:31,111,139;
+    --bs-link-hover-color:#174f63; --bs-link-hover-color-rgb:23,79,99;
+    --bs-body-font-size:.9rem; --bslib-spacer:.6rem; --bslib-sidebar-padding:.75rem;
+  }
+  .btn { --bs-btn-padding-y:.25rem; --bs-btn-font-size:.9rem; }
+  .btn-sm { --bs-btn-padding-y:.2rem; --bs-btn-font-size:.8rem; }
+  .btn-primary {
+    --bs-btn-bg:#1f6f8b; --bs-btn-border-color:#1f6f8b;
+    --bs-btn-hover-bg:#195b72; --bs-btn-hover-border-color:#195b72;
+    --bs-btn-active-bg:#174f63; --bs-btn-active-border-color:#174f63;
+    --bs-btn-disabled-bg:#1f6f8b; --bs-btn-disabled-border-color:#1f6f8b;
+  }
+  .form-control, .form-select, .selectize-input, .selectize-dropdown { font-size:.9rem; }
+  .form-control, .form-select { padding-top:.25rem; padding-bottom:.25rem; }
+  .form-control:focus, .form-select:focus { border-color:#8fb7c5; box-shadow:0 0 0 .2rem rgba(31,111,139,.25); }
+  .form-check-input:checked { background-color:#1f6f8b; border-color:#1f6f8b; }
+  .form-label, label { margin-bottom:.15rem; }
+  .card { --bs-card-spacer-y:.5rem; --bs-card-spacer-x:.75rem; --bs-card-cap-padding-y:.35rem; }
+  .navbar { --bs-navbar-padding-y:.25rem; }
+  .nav { --bs-nav-link-padding-y:.35rem; }
+  .modal { --bs-modal-padding:.75rem; }
+  h1, h2, h3, h4, h5, h6 { margin-bottom:.35rem; }
+  p { margin-bottom:.5rem; }
+  hr { margin:.5rem 0; }
+  .progress-bar { background-color:#1f6f8b; }
+
   .ifr-project { color:var(--bs-secondary-color); font-weight:400; margin-left:.5rem; }
   .ifr-start { max-width:980px; margin:.75rem auto; padding:0 .75rem; }
   .ifr-recent a { display:block; padding:.1rem 0; word-break:break-all; }
@@ -271,8 +291,8 @@ app_server <- function(initial_project = NULL, user = default_user()) {
 
     shiny::observeEvent(input$show_log, {
       shiny::showModal(shiny::modalDialog(
-        title = "Change log", size = "xl", easyClose = TRUE,
-        if (is.null(project())) "Open a project to see its change log." else log_ui("log"),
+        title = "Session log", size = "xl", easyClose = TRUE,
+        if (is.null(project())) "Open a project to see its session log." else log_ui("log"),
         footer = shiny::modalButton("Close")
       ))
     })

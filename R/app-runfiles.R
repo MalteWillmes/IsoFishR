@@ -160,7 +160,7 @@ runfiles_server <- function(id, project) {
         title = sprintf("Remove %d run(s)?", length(ids)),
         shiny::p(paste(utils::head(ids, 20), collapse = ", "), if (length(ids) > 20) "\u2026"),
         shiny::p("Their regions and edits are removed from the project. The runfiles are kept in ",
-                 "the project's raw/removed folder, and the removal is recorded in the change log."),
+                 "the project's raw/removed folder, and the removal is recorded in the session log."),
         footer = shiny::tagList(
           shiny::modalButton("Cancel"),
           shiny::actionButton(ns("remove_confirm"), "Remove", class = "btn-danger")

@@ -44,6 +44,15 @@ COLUMN_KEYS <- c(raw88 = "88Sr column", raw87 = "87 column", raw86 = "86Sr colum
 
 setting_input_id <- function(section, key) paste0("set_", section, "_", key)
 
+# The settings of some sections, optionally only some keys (in that order).
+settings_rows <- function(sections, keys = NULL) {
+  spec <- dplyr::filter(settings_spec(), .data$section %in% sections)
+  if (is.null(keys)) spec else spec[match(keys, spec$key), ]
+}
+
+# The settings shown in the Workspace's per-sample Reduction panel.
+SAMPLE_PANEL_KEYS <- c("run_speed_um_s", "raw88_min_v", "raw88_max_v", "outlier_sd", "ma_window")
+
 # One input per setting; `values` is the settings section to show.
 setting_input <- function(ns, section, key, label, type, choices, value) {
   id <- ns(setting_input_id(section, key))
@@ -56,8 +65,8 @@ setting_input <- function(ns, section, key, label, type, choices, value) {
   )
 }
 
-settings_inputs <- function(ns, settings, sections) {
-  spec <- dplyr::filter(settings_spec(), .data$section %in% sections)
+settings_inputs <- function(ns, settings, sections, keys = NULL) {
+  spec <- settings_rows(sections, keys)
   purrr::pmap(spec, \(section, key, label, type, choices) {
     setting_input(ns, section, key, label, type, choices, settings[[section]][[key]])
   })
@@ -70,8 +79,8 @@ column_inputs <- function(ns, columns) {
 }
 
 # Read the inputs of the given sections back into a nested settings list.
-settings_from_inputs <- function(input, settings, sections) {
-  spec <- dplyr::filter(settings_spec(), .data$section %in% sections)
+settings_from_inputs <- function(input, settings, sections, keys = NULL) {
+  spec <- settings_rows(sections, keys)
   for (i in seq_len(nrow(spec))) {
     s <- spec$section[i]
     k <- spec$key[i]
@@ -88,8 +97,8 @@ settings_from_inputs <- function(input, settings, sections) {
   settings
 }
 
-update_settings_inputs <- function(session, settings, sections) {
-  spec <- dplyr::filter(settings_spec(), .data$section %in% sections)
+update_settings_inputs <- function(session, settings, sections, keys = NULL) {
+  spec <- settings_rows(sections, keys)
   for (i in seq_len(nrow(spec))) {
     s <- spec$section[i]
     k <- spec$key[i]

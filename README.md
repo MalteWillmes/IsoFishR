@@ -26,7 +26,7 @@ The app opens in your web browser. To stop it, click **Quit IsoFishR** (top righ
 
 ## The six steps
 
-The app guides you through a project from left to right. **Quit IsoFishR** and the **Change log** are always at the top right. Everything is saved as you work, and a project reopens on the step you last worked on.
+The app guides you through a project from left to right. **Quit IsoFishR** and the **Session log** are always at the top right. Everything is saved as you work, and a project reopens on the step you last worked on.
 
 1. **Project.** Create a new project (a folder you choose, e.g. in Dropbox or on a shared drive) or open an existing one; recent projects are listed. Pick the instrument preset when creating a project.
 2. **Settings.** Check the runfile layout first.
@@ -46,9 +46,9 @@ The app guides you through a project from left to right. **Quit IsoFishR** and t
 5. **Workspace.** Large plots of <sup>87</sup>Sr/<sup>86</sup>Sr, total Sr, <sup>83</sup>Kr and <sup>85</sup>Rb/<sup>88</sup>Sr for each sample. A badge shows whether the values are corrected to the reference material or uncorrected. When the calibration changes, the plots update.
    - **Selecting a range:** drag across the plot. The footer shows the range's mean ± 2 SE.
    - **Edit:** trim, add the selection as a named region, reverse the profile, or detect changepoints.
-   - **Reduction:** change settings for one sample only.
+   - **Reduction:** change the run speed, 88Sr limits, outlier rejection or moving average window for one sample only.
    - **Notes:** status, flag and comment. "Mark reviewed and go to next" steps through the samples.
-6. **Export.** Choose the files to write. They go to a new dated folder inside the project; earlier exports are kept.
+6. **Export.** One button writes all results (excluded samples left out) to a new dated folder inside the project; earlier exports are kept. From R, `export_project()` can write a chosen subset.
 
 Each sample keeps its own SE. The uncertainty of the correction, from the primary measurements and the accepted value, is reported separately and in a combined SE. Without a primary reference material, all values stay uncorrected.
 
@@ -105,7 +105,7 @@ close_project(p)
 
 - **One workspace:** data reduction and analysis share a single screen, and you can move back and forth freely.
 - **Non-destructive edits:** trims, regions and setting changes are stored as choices, not baked into the data, so they can always be undone or changed.
-- **Change log:** every choice is recorded in the project's change log.
+- **Session log:** every choice is recorded in the project's session log (log.csv).
 - **Projects anywhere:** projects live in any folder, not inside the app.
 - **Faster:** reduction is several times faster, and only samples whose data or settings changed are reprocessed.
 - **v1 bugs fixed:**

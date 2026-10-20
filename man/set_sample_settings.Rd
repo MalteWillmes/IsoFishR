@@ -14,15 +14,16 @@ sample_settings(project, sample_id)
 
 \item{sample_id}{One sample ID.}
 
-\item{...}{Named reduction settings, e.g. \code{blank_time_s = 25}.}
+\item{...}{Named reduction settings, e.g. \code{blank_time_s = 25}, or
+\code{run_speed_um_s}.}
 }
 \value{
 \code{set_sample_settings()}: the updated project.
 \code{sample_settings()}: a settings list.
 }
 \description{
-\code{set_sample_settings()} overrides project reduction settings for one
-sample (e.g. a different blank time). Pass \code{NULL} to go back to the
-project value. \code{sample_settings()} returns the settings a sample is
-reduced with.
+\code{set_sample_settings()} overrides project reduction settings, or the run
+speed, for one sample (e.g. a different blank time). Pass \code{NULL} to go
+back to the project value. \code{sample_settings()} returns the settings a
+sample is reduced with.
 }

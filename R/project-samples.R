@@ -214,14 +214,15 @@ update_sample <- function(project, sample_id, ...) {
 
 #' Per-sample reduction settings
 #'
-#' `set_sample_settings()` overrides project reduction settings for one
-#' sample (e.g. a different blank time). Pass `NULL` to go back to the
-#' project value. `sample_settings()` returns the settings a sample is
-#' reduced with.
+#' `set_sample_settings()` overrides project reduction settings, or the run
+#' speed, for one sample (e.g. a different blank time). Pass `NULL` to go
+#' back to the project value. `sample_settings()` returns the settings a
+#' sample is reduced with.
 #'
 #' @param project A project from [open_project()].
 #' @param sample_id One sample ID.
-#' @param ... Named reduction settings, e.g. `blank_time_s = 25`.
+#' @param ... Named reduction settings, e.g. `blank_time_s = 25`, or
+#'   `run_speed_um_s`.
 #' @return `set_sample_settings()`: the updated project.
 #'   `sample_settings()`: a settings list.
 #' @export
@@ -229,10 +230,10 @@ set_sample_settings <- function(project, sample_id, ...) {
   check_writable(project)
   i <- sample_index(project, sample_id)
   changes <- list(...)
-  defaults <- project$settings$reduction
+  defaults <- override_defaults(project$settings)
   unknown <- setdiff(names(changes), names(defaults))
   if (length(unknown) > 0) {
-    stop("Unknown reduction setting(s): ", paste(unknown, collapse = ", "), call. = FALSE)
+    stop("Unknown sample setting(s): ", paste(unknown, collapse = ", "), call. = FALSE)
   }
 
   old <- parse_overrides(project$samples$settings[i])
@@ -241,7 +242,7 @@ set_sample_settings <- function(project, sample_id, ...) {
     new[[key]] <- if (is.null(changes[[key]])) NULL else coerce_like(changes[[key]], defaults[[key]])
   }
   # Validate the combination before saving anything.
-  merge_settings(project$settings, list(reduction = new))
+  merge_settings(project$settings, overrides_to_settings(new))
 
   log <- purrr::map(names(changes), \(key) {
     if (identical(old[[key]], new[[key]])) return(NULL)
@@ -257,8 +258,7 @@ set_sample_settings <- function(project, sample_id, ...) {
 #' @export
 sample_settings <- function(project, sample_id) {
   i <- sample_index(project, sample_id)
-  merge_settings(project$settings,
-                 list(reduction = parse_overrides(project$samples$settings[i])))
+  merge_settings(project$settings, overrides_to_settings(parse_overrides(project$samples$settings[i])))
 }
 
 #' Set the regions of a sample

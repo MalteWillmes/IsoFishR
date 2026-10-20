@@ -129,7 +129,7 @@ print.isofishr_project <- function(x, ...) {
   invisible(x)
 }
 
-#' Read the project change log
+#' Read the project session log
 #'
 #' @param project A project from [open_project()].
 #' @return A tibble with one row per recorded change.
