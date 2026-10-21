@@ -34,7 +34,7 @@ export_server <- function(id, project) {
       p <- shiny::req(project())
       ids <- export_samples(p, FALSE)$sample_id
       shiny::req(length(ids) > 0)
-      shiny::withProgress(message = "Reducing samples", project_data(p, ids))
+      with_reduction_progress(project_data(p, ids), "Reducing samples")
     })
 
     preview_table <- function(x) {
@@ -67,7 +67,7 @@ export_server <- function(id, project) {
     })
 
     shiny::observeEvent(input$export, {
-      dir <- shiny::withProgress(message = "Exporting", try_notify(
+      dir <- with_reduction_progress(message = "Exporting", try_notify(
         export_project(project()),
         success = "Exported."
       ))

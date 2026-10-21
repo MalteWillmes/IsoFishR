@@ -283,8 +283,14 @@ calibration_server <- function(id, project) {
     })
 
     # ---- correction and results ----
-    model <- shiny::reactive(calibration_model(shiny::req(project())))
-    results <- shiny::reactive(reference_material_results(shiny::req(project())))
+    model <- shiny::reactive({
+      p <- shiny::req(project())
+      with_reduction_progress(calibration_model(p), "Reducing reference material runs")
+    })
+    results <- shiny::reactive({
+      p <- shiny::req(project())
+      with_reduction_progress(reference_material_results(p), "Reducing reference material runs")
+    })
 
     output$correction_note <- shiny::renderUI({
       m <- model()

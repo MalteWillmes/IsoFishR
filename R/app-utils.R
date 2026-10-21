@@ -142,6 +142,21 @@ remember_project <- function(path) {
   }, silent = TRUE)
 }
 
+# Evaluate `expr` with a progress bar that counts the runs being reduced
+# ("Reducing run 37 of 204"). Runs that are already cached are not counted,
+# so the bar only fills when there is real work.
+with_reduction_progress <- function(expr, message = "Reducing") {
+  old <- progress_env$hook
+  on.exit(progress_env$hook <- old, add = TRUE)
+  shiny::withProgress(message = message, value = 0, {
+    progress_env$hook <- function(done, total, sample_id) {
+      shiny::setProgress(value = (done - 1) / total,
+                         detail = sprintf("run %d of %d (%s)", done, total, sample_id))
+    }
+    force(expr)
+  })
+}
+
 # Run a project change; show errors as notifications instead of crashing the
 # app. Returns the result, or NULL on error.
 try_notify <- function(expr, success = NULL) {

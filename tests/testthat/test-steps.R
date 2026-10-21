@@ -72,3 +72,21 @@ test_that("custom 87Sr/86Sr lines are parsed and kept with the last step", {
   expect_true(all(c("0.70920", "0.71050") %in% vapply(b$x$data, \(t) t$name %||% "", "")))
   expect_true(b$x$config$scrollZoom)
 })
+
+test_that("reduction progress counts only the runs that are not cached", {
+  p <- create_project(file.path(withr::local_tempdir(), "P"), user = "tester")
+  p <- suppressMessages(add_runfiles(p, example_runfiles()[1:3]))
+  calls <- list()
+  progress_env$hook <- function(done, total, id) calls[[length(calls) + 1]] <<- c(done, total)
+  withr::defer(progress_env$hook <- NULL)
+
+  ids <- p$samples$sample_id
+  project_data(p, ids[1])
+  expect_equal(calls, list(c(1L, 1L)))
+  calls <- list()
+  project_data(p, ids)                      # the first is cached now
+  expect_equal(calls, list(c(1L, 2L), c(2L, 2L)))
+  calls <- list()
+  project_data(p, ids)                      # all cached: no progress
+  expect_length(calls, 0)
+})

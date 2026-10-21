@@ -244,7 +244,7 @@ workspace_server <- function(id, project) {
     sample_data <- shiny::reactive({
       key <- shiny::req(data_key())
       p <- shiny::isolate(project())
-      shiny::withProgress(message = "Reducing", value = 0.5, {
+      with_reduction_progress({
         data <- project_data(p, key$sample_id)
       })
       if (key$edits$cp_enabled && nrow(data) > 2) {

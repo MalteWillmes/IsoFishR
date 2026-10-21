@@ -29,12 +29,26 @@ project_data <- function(project, sample_ids = NULL, edited = TRUE, calibrate = 
   runs <- if (baseline_mode) project_runs(project)
   baselines <- if (baseline_mode) project_baselines(project)
 
-  results <- purrr::map(sample_ids, \(id) {
-    if (!baseline_mode) return(reduce_project_sample(project, id))
+  # Blanks from baseline runs, per sample (NULL: the run's own blank).
+  blanks <- purrr::map(sample_ids, \(id) {
+    if (!baseline_mode) return(NULL)
     run <- runs[runs$sample_id == id, ]
-    b <- interpolate_baseline(baselines, run$session, run$acquired, id)
-    res <- reduce_project_sample(project, id, blank = b$blank)
-    res$warnings <- c(res$warnings, b$note)
+    interpolate_baseline(baselines, run$session, run$acquired, id)
+  })
+  # Report progress for the runs that have to be reduced (not cached).
+  todo <- !vapply(seq_along(sample_ids), \(i) {
+    file.exists(sample_cache_path(project, sample_ids[i], blanks[[i]]$blank))
+  }, logical(1))
+  done <- 0L
+
+  results <- purrr::map(seq_along(sample_ids), \(i) {
+    id <- sample_ids[i]
+    if (todo[i]) {
+      done <<- done + 1L
+      report_progress(done, sum(todo), id)
+    }
+    res <- reduce_project_sample(project, id, blank = blanks[[i]]$blank)
+    res$warnings <- c(res$warnings, blanks[[i]]$note)
     res
   })
   data <- purrr::list_rbind(purrr::map(results, "data"))
@@ -57,7 +71,9 @@ project_regions <- function(project, sample_ids = NULL) {
   summarise_regions(data, project$regions)
 }
 
-reduce_project_sample <- function(project, sample_id, blank = NULL) {
+# Where a sample's reduced data is cached: named by the sample and by
+# everything the reduction depends on.
+sample_cache_path <- function(project, sample_id, blank = NULL) {
   i <- sample_index(project, sample_id)
   settings <- sample_settings(project, sample_id)
   key <- rlang::hash(list(
@@ -68,9 +84,25 @@ reduce_project_sample <- function(project, sample_id, blank = NULL) {
     blank = blank,
     version = isofishr_version()
   ))
+  file.path(project_file(project$path, "cache"), paste0(rlang::hash(sample_id), "_", key, ".rds"))
+}
+
+# Progress reporting for long reductions. The app sets a hook (see
+# with_reduction_progress()); otherwise nothing is reported.
+progress_env <- new.env(parent = emptyenv())
+
+report_progress <- function(done, total, sample_id) {
+  hook <- progress_env$hook
+  if (is.function(hook)) try(hook(done, total, sample_id), silent = TRUE)
+  invisible()
+}
+
+reduce_project_sample <- function(project, sample_id, blank = NULL) {
+  i <- sample_index(project, sample_id)
+  settings <- sample_settings(project, sample_id)
+  cache_path <- sample_cache_path(project, sample_id, blank)
+  cache_dir <- dirname(cache_path)
   prefix <- paste0(rlang::hash(sample_id), "_")
-  cache_dir <- project_file(project$path, "cache")
-  cache_path <- file.path(cache_dir, paste0(prefix, key, ".rds"))
 
   if (file.exists(cache_path)) {
     cached <- tryCatch(readRDS(cache_path), error = function(e) NULL)
