@@ -347,7 +347,7 @@ test_that("the export record says when there is no calibration", {
   expect_true(any(grepl("None: all samples use the project settings.", md, fixed = TRUE)))
 })
 
-test_that("rockfish and NanoSr runs are recognised, and need a value", {
+test_that("rockfish and NanoSr runs are recognised with their default values", {
   runs <- data.frame(id = c("RF_1", "p1_rf2", "surf_fish", "SrNano_1", "nanoSr_2", "SRN3",
                             "fish1", "SBO_1"),
                      minute = seq(0, 70, by = 10), ratio = 0.709)
@@ -356,8 +356,9 @@ test_that("rockfish and NanoSr runs are recognised, and need a value", {
   expect_equal(found$RF, c("RF_1", "p1_rf2"))          # not "surf_fish"
   expect_equal(found$NanoSr, c("SrNano_1", "nanoSr_2", "SRN3"))
   expect_equal(found$SBO, "SBO_1")
-  expect_true(is.na(default_rm_value("RF")))
-  expect_error(apply_reference_suggestion(p, "RF"), "Enter the accepted")
+  expect_equal(default_rm_value("RF"), 0.70918)
+  expect_equal(default_rm_value("NanoSr"), 0.70795)
+  expect_error(apply_reference_suggestion(p, "Other"), "Enter the accepted")
   p <- apply_reference_suggestion(p, "NanoSr", value = 0.7075)
   expect_equal(p$samples$reference_material[p$samples$run_type == "reference"], rep("NanoSr", 3))
   expect_equal(p$reference_materials$value, 0.7075)

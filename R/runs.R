@@ -259,14 +259,14 @@ apply_reference_suggestion <- function(project, name = "SBO", value = default_rm
 #' Default reference materials
 #'
 #' Reference materials IsoFishR recognises in run names, with default
-#' accepted 87Sr/86Sr values set by the IsoFishR authors where there is one.
+#' accepted 87Sr/86Sr values set by the IsoFishR authors.
 #' They are only used to suggest marking runs (see
 #' [suggest_reference_runs()]); the value is entered or changed when the
 #' suggestion is applied, and afterwards under Calibration.
 #'
 #' @return A tibble with `name`, `pattern` (regular expression matched
 #'   against run names, ignoring case), `codes` (the name codes, for
-#'   messages) and `value` (`NA` when there is no default).
+#'   messages) and `value`.
 #' @export
 default_reference_materials <- function() {
   tibble::tribble(
@@ -275,8 +275,8 @@ default_reference_materials <- function() {
     "GSFR",   "gsfr",               "GSFR",                  0.70918,
     # Rockfish otolith: "rf" at the start of a name or after a separator
     # (e.g. RF_1, p1_rf2), not inside a word.
-    "RF",     "(^|[^a-z])rf",       "rf",                    NA_real_,
-    "NanoSr", "nano|srn",           "srn, nano or srnano",   NA_real_
+    "RF",     "(^|[^a-z])rf",       "rf",                    0.70918,
+    "NanoSr", "nano|srn",           "srn, nano or srnano",   0.70795
   )
 }
 
