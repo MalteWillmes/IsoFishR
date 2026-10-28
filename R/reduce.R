@@ -188,7 +188,7 @@ subtract_blank <- function(data, blank) {
 #'   corrected ratio; `sr84_sr86_mb` is 84Sr/86Sr corrected for mass bias
 #'   (v1 only reported the uncorrected `sr84_sr86`).
 #' @export
-correct_ratios <- function(data, sr86_sr88_ref = 0.1194, rb85_rb87 = 2.59712) {
+correct_ratios <- function(data, sr86_sr88_ref = 0.1194, rb85_rb87 = 2.59265) {
   data |>
     dplyr::mutate(
       sr86_sr88 = raw86 / raw88,

@@ -40,7 +40,9 @@ default_settings <- function() {
       raw88_min_v = 0.5,
       raw88_max_v = 9.8,
       sr86_sr88_ref = 0.1194,
-      rb85_rb87 = 2.59712,
+      # Natural 85Rb/87Rb: NIST (Catanzaro et al. 1969), as in iolite (87Rb/85Rb =
+      # 0.38571). Earlier versions used 2.59712.
+      rb85_rb87 = 2.59265,
       outlier_sd = 3,
       outlier_window = 20L,
       smoothing = "ma_spline",

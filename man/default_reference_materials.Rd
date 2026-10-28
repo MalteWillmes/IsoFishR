@@ -7,12 +7,14 @@
 default_reference_materials()
 }
 \value{
-A tibble with \code{name} (also the text looked for in run names) and
-\code{value}.
+A tibble with \code{name}, \code{pattern} (regular expression matched
+against run names, ignoring case), \code{codes} (the name codes, for
+messages) and \code{value} (\code{NA} when there is no default).
 }
 \description{
 Reference materials IsoFishR recognises in run names, with default
-accepted 87Sr/86Sr values set by the IsoFishR authors. They are only used
-to suggest marking runs (see \code{\link[=suggest_reference_runs]{suggest_reference_runs()}}); the value can be
-changed when the suggestion is applied, and afterwards under Calibration.
+accepted 87Sr/86Sr values set by the IsoFishR authors where there is one.
+They are only used to suggest marking runs (see
+\code{\link[=suggest_reference_runs]{suggest_reference_runs()}}); the value is entered or changed when the
+suggestion is applied, and afterwards under Calibration.
 }

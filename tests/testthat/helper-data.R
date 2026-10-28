@@ -17,7 +17,7 @@ make_raw <- function(sample_id = "s1", n = 200, sr87_sr86 = 0.7092, beta = -1.6,
   # measured = true / (mass ratio)^beta
   sr86 <- sr88 * sr86_sr88_true / (m[["sr86"]] / m[["sr88"]])^beta
   sr87 <- sr86 * rep_len(sr87_sr86, n) / (m[["sr87"]] / m[["sr86"]])^beta
-  rb87 <- (raw85 / 2.59712) * (m[["rb85"]] / m[["rb87"]])^beta
+  rb87 <- (raw85 / 2.59265) * (m[["rb85"]] / m[["rb87"]])^beta
   sr84 <- sr86 * 0.0565 / (m[["sr84"]] / m[["sr86"]])^beta
 
   d <- tibble::tibble(

@@ -9,20 +9,23 @@ suggest_reference_runs(project, pattern = "SBO")
 
 apply_reference_suggestion(
   project,
-  pattern = "SBO",
-  name = pattern,
-  value = default_rm_value(name)
+  name = "SBO",
+  value = default_rm_value(name),
+  pattern = default_rm_pattern(name)
 )
 }
 \arguments{
 \item{project}{A project from \code{\link[=open_project]{open_project()}}.}
 
-\item{pattern}{Text to look for in run names.}
+\item{pattern}{Text (a regular expression) to look for in run names,
+ignoring case. For the default reference materials it comes from
+\code{\link[=default_reference_materials]{default_reference_materials()}}.}
 
 \item{name}{Reference material name.}
 
 \item{value}{Accepted 87Sr/86Sr used when the reference material is not
-yet defined (defaults: \code{\link[=default_reference_materials]{default_reference_materials()}}).}
+yet defined (defaults: \code{\link[=default_reference_materials]{default_reference_materials()}}; required for
+reference materials without a default).}
 }
 \value{
 \code{suggest_reference_runs()}: sample IDs of matching runs that are

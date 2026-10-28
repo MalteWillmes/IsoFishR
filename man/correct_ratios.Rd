@@ -4,7 +4,7 @@
 \alias{correct_ratios}
 \title{Rb interference and mass bias correction}
 \usage{
-correct_ratios(data, sr86_sr88_ref = 0.1194, rb85_rb87 = 2.59712)
+correct_ratios(data, sr86_sr88_ref = 0.1194, rb85_rb87 = 2.59265)
 }
 \arguments{
 \item{data}{Blank-corrected cycle data.}

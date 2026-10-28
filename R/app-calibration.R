@@ -127,13 +127,16 @@ calibration_server <- function(id, project) {
       if (length(found) == 0) return(NULL)
       rms <- p$reference_materials
       no_primary <- !nzchar(p$settings$calibration$primary)
+      defaults <- default_reference_materials()
+      rm_codes <- as.list(stats::setNames(defaults$codes, defaults$name))
       shiny::tagList(purrr::imap(found, \(ids, name) {
         value <- if (name %in% rms$name) rms$value[rms$name == name] else default_rm_value(name)
         shiny::div(
           class = "alert alert-info d-flex flex-wrap align-items-end gap-3 py-2",
           shiny::div(
             class = "flex-grow-1",
-            shiny::strong(sprintf("%d run(s) have %s in their name", length(ids), name)),
+            shiny::strong(sprintf("%d run(s) have %s in their name", length(ids),
+                                  rm_codes[[name]] %||% name)),
             sprintf(" (%s). Mark them as the reference material %s?",
                     paste(utils::head(ids, 6), collapse = ", "), name),
             if (length(ids) > 6) "\u2026",
@@ -156,7 +159,7 @@ calibration_server <- function(id, project) {
           return()
         }
         change(\(p) {
-          p <- apply_reference_suggestion(p, pattern = name, value = v)
+          p <- apply_reference_suggestion(p, name = name, value = v)
           rms <- p$reference_materials
           if (!isTRUE(all.equal(rms$value[rms$name == name], v))) {
             p <- set_reference_material(p, name, v, rms$uncertainty_2s[rms$name == name],

@@ -223,10 +223,13 @@ parse_time <- function(x) {
 #' primary reference material if none is set.
 #'
 #' @param project A project from [open_project()].
-#' @param pattern Text to look for in run names.
+#' @param pattern Text (a regular expression) to look for in run names,
+#'   ignoring case. For the default reference materials it comes from
+#'   [default_reference_materials()].
 #' @param name Reference material name.
 #' @param value Accepted 87Sr/86Sr used when the reference material is not
-#'   yet defined (defaults: [default_reference_materials()]).
+#'   yet defined (defaults: [default_reference_materials()]; required for
+#'   reference materials without a default).
 #' @return `suggest_reference_runs()`: sample IDs of matching runs that are
 #'   still samples. `apply_reference_suggestion()`: the updated project.
 #' @export
@@ -237,11 +240,14 @@ suggest_reference_runs <- function(project, pattern = "SBO") {
 
 #' @rdname suggest_reference_runs
 #' @export
-apply_reference_suggestion <- function(project, pattern = "SBO", name = pattern,
-                                       value = default_rm_value(name)) {
+apply_reference_suggestion <- function(project, name = "SBO", value = default_rm_value(name),
+                                       pattern = default_rm_pattern(name)) {
   ids <- suggest_reference_runs(project, pattern)
   if (!name %in% project$reference_materials$name) {
-    project <- set_reference_material(project, name, value, note = "suggested default")
+    if (is.na(value)) {
+      stop("Enter the accepted 87Sr/86Sr of ", name, ".", call. = FALSE)
+    }
+    project <- set_reference_material(project, name, value, note = "suggested from run names")
   }
   if (length(ids) > 0) project <- set_run_type(project, ids, "reference", name)
   if (!nzchar(project$settings$calibration$primary)) {
@@ -253,19 +259,32 @@ apply_reference_suggestion <- function(project, pattern = "SBO", name = pattern,
 #' Default reference materials
 #'
 #' Reference materials IsoFishR recognises in run names, with default
-#' accepted 87Sr/86Sr values set by the IsoFishR authors. They are only used
-#' to suggest marking runs (see [suggest_reference_runs()]); the value can be
-#' changed when the suggestion is applied, and afterwards under Calibration.
+#' accepted 87Sr/86Sr values set by the IsoFishR authors where there is one.
+#' They are only used to suggest marking runs (see
+#' [suggest_reference_runs()]); the value is entered or changed when the
+#' suggestion is applied, and afterwards under Calibration.
 #'
-#' @return A tibble with `name` (also the text looked for in run names) and
-#'   `value`.
+#' @return A tibble with `name`, `pattern` (regular expression matched
+#'   against run names, ignoring case), `codes` (the name codes, for
+#'   messages) and `value` (`NA` when there is no default).
 #' @export
 default_reference_materials <- function() {
   tibble::tribble(
-    ~name,  ~value,
-    "SBO",  0.70918,
-    "GSFR", 0.70918
+    ~name,    ~pattern,             ~codes,                  ~value,
+    "SBO",    "sbo",                "SBO",                   0.70918,
+    "GSFR",   "gsfr",               "GSFR",                  0.70918,
+    # Rockfish otolith: "rf" at the start of a name or after a separator
+    # (e.g. RF_1, p1_rf2), not inside a word.
+    "RF",     "(^|[^a-z])rf",       "rf",                    NA_real_,
+    "NanoSr", "nano|srn",           "srn, nano or srnano",   NA_real_
   )
+}
+
+# The run name pattern of a reference material (its name if it isn't one of
+# the defaults).
+default_rm_pattern <- function(name) {
+  d <- default_reference_materials()
+  if (name %in% d$name) d$pattern[d$name == name] else name
 }
 
 # The default accepted value of a reference material (NA if there is none).
@@ -278,8 +297,14 @@ default_rm_value <- function(name) {
 # list (only reference materials with matching runs).
 reference_suggestions <- function(project) {
   defaults <- default_reference_materials()
-  ids <- purrr::map(defaults$name, \(nm) suggest_reference_runs(project, nm)) |>
+  ids <- purrr::map(defaults$pattern, \(pattern) suggest_reference_runs(project, pattern)) |>
     rlang::set_names(defaults$name)
+  # A run matching several patterns goes to the first.
+  seen <- character()
+  for (nm in names(ids)) {
+    ids[[nm]] <- setdiff(ids[[nm]], seen)
+    seen <- c(seen, ids[[nm]])
+  }
   purrr::keep(ids, \(x) length(x) > 0)
 }
 

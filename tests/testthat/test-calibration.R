@@ -346,3 +346,19 @@ test_that("the export record says when there is no calibration", {
   expect_true(any(grepl("**Primary reference material:** none", md, fixed = TRUE)))
   expect_true(any(grepl("None: all samples use the project settings.", md, fixed = TRUE)))
 })
+
+test_that("rockfish and NanoSr runs are recognised, and need a value", {
+  runs <- data.frame(id = c("RF_1", "p1_rf2", "surf_fish", "SrNano_1", "nanoSr_2", "SRN3",
+                            "fish1", "SBO_1"),
+                     minute = seq(0, 70, by = 10), ratio = 0.709)
+  p <- synthetic_project(runs)
+  found <- reference_suggestions(p)
+  expect_equal(found$RF, c("RF_1", "p1_rf2"))          # not "surf_fish"
+  expect_equal(found$NanoSr, c("SrNano_1", "nanoSr_2", "SRN3"))
+  expect_equal(found$SBO, "SBO_1")
+  expect_true(is.na(default_rm_value("RF")))
+  expect_error(apply_reference_suggestion(p, "RF"), "Enter the accepted")
+  p <- apply_reference_suggestion(p, "NanoSr", value = 0.7075)
+  expect_equal(p$samples$reference_material[p$samples$run_type == "reference"], rep("NanoSr", 3))
+  expect_equal(p$reference_materials$value, 0.7075)
+})
