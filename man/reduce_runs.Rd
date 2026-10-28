@@ -4,7 +4,7 @@
 \alias{reduce_runs}
 \title{Reduce laser-ablation Sr isotope data}
 \usage{
-reduce_runs(raw, settings = default_settings(), blank = NULL)
+reduce_runs(raw, settings = default_settings(), blank = NULL, trims = NULL)
 }
 \arguments{
 \item{raw}{Raw cycle data from \code{\link[=read_runfiles]{read_runfiles()}}.}
@@ -16,10 +16,18 @@ blank: a data frame with \code{sample_id} and \code{blk88} to \code{blk83}, e.g.
 interpolated from baseline runs (see \code{\link[=project_baselines]{project_baselines()}}). When given,
 the start of each run is not treated as blank; laser-off cycles are
 removed by the 88Sr threshold.}
+
+\item{trims}{Optional trims: a data frame with \code{sample_id}, \code{trim_start_s}
+and \code{trim_end_s}, seconds removed after the first and before the last
+cycle of the run (see \code{\link[=apply_edits]{apply_edits()}}). They are applied before outlier
+rejection and smoothing, so trimmed data never affects the result.}
 }
 \value{
 A list with \code{data} (one row per integrated cycle) and \code{blank}
 (mean blank voltages per sample, or \code{NULL} without blank correction).
+\code{data} includes \code{run_start_s} and \code{run_end_s} (time of the run's first
+and last cycle) and \code{profile_start_s} and \code{profile_end_s} (first and
+last cycle passing the thresholds, before trims).
 }
 \description{
 Runs the full data reduction for one or more samples: integration, blank

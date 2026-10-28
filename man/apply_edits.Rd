@@ -10,10 +10,17 @@ apply_edits(data, edits = NULL)
 \item{data}{Reduced data (\code{reduce_runs()$data}).}
 
 \item{edits}{A data frame with one row per edited sample and columns
-\code{sample_id}, \code{trim_start_s}, \code{trim_end_s} (seconds removed from the start
-and end of the profile), \code{reverse} (flip the distance axis) and \code{rezero}
-(measure distance from the first kept point). Missing columns and
-samples without a row use no trim, no reversal and \code{rezero = TRUE}.}
+\code{sample_id}, \code{trim_start_s}, \code{trim_end_s} (seconds removed after the
+run's first cycle and before its last; see below), \code{reverse} (flip the
+distance axis) and \code{rezero} (measure distance from the first kept
+point). Missing columns and samples without a row use no trim, no
+reversal and \code{rezero = TRUE}.
+
+Trims are counted from the run's first and last cycle (\code{run_start_s} and
+\code{run_end_s} in reduced data), not from the first point passing the 88Sr
+thresholds, so a trim stays on the same part of the sample when reduction
+settings change. \code{\link[=project_data]{project_data()}} applies them during the reduction, before
+outlier rejection and smoothing; applying them again here changes nothing.}
 }
 \value{
 The edited data, sorted by sample and distance.

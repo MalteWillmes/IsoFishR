@@ -43,7 +43,9 @@ read_acquisition_times <- function(paths, import = default_settings()$import) {
   line_no <- as.integer(import$timestamp_line %||% 0L)
   if (is.na(line_no) || line_no < 1) return(as.POSIXct(rep(NA_real_, length(paths)), tz = "UTC"))
   text <- vapply(paths, \(p) {
-    x <- readLines(p, n = line_no, warn = FALSE)
+    # A missing or unreadable file just has no time (it is reported when
+    # the run is reduced); it must not stop the project from opening.
+    x <- tryCatch(read_text_lines(p, n = line_no), error = function(e) character())
     if (length(x) < line_no) NA_character_ else x[[line_no]]
   }, character(1), USE.NAMES = FALSE)
   text <- trimws(gsub("[,\t]+", " ", gsub("\"", "", text)))
@@ -108,11 +110,22 @@ read_cycles <- function(path, import, skip) {
   if (nrow(raw) == 0) NULL else raw
 }
 
+# Lines of a text file as valid UTF-8. Instrument headers can contain
+# Latin-1 characters (e.g. "\u00b5V", "\u00b0"), which would make text functions fail
+# in a UTF-8 session; every byte is valid Latin-1, so converting from it
+# never fails (the numbers and timestamps that are read are plain ASCII).
+read_text_lines <- function(path, n = -1L) {
+  lines <- readLines(path, n = n, warn = FALSE)
+  bad <- !validUTF8(lines)
+  lines[bad] <- iconv(lines[bad], from = "latin1", to = "UTF-8")
+  lines
+}
+
 # For each line of a runfile: does it have numbers in all the columns the
 # import settings use?
 data_lines <- function(path, import) {
   cols <- unlist(import$columns)
-  lines <- readLines(path, warn = FALSE)
+  lines <- read_text_lines(path)
   fields <- strsplit(gsub("\"", "", lines), import$sep, fixed = TRUE)
   vapply(fields, \(f) {
     length(f) >= max(cols) && !anyNA(suppressWarnings(as.numeric(f[cols])))

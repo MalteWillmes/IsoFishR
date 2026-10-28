@@ -88,8 +88,15 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
   # share one R process, so the process ID alone is not enough).
   token <- rlang::hash(list(user, Sys.getpid(), Sys.time(), stats::runif(1)))
   if (!read_only) acquire_lock(path, user, token, force)
+  # If the project can't be read, release the lock again rather than leaving
+  # it "in use" for everyone.
+  opened <- FALSE
+  on.exit(if (!opened && !read_only) unlink(project_file(path, ".lock")), add = TRUE)
 
-  structure(
+  # Earlier versions set the spline's basis size; the spline now sets it
+  # itself.
+  yml$reduction$spline_k <- NULL
+  p <- structure(
     list(
       path = path,
       meta = yml$project,
@@ -106,6 +113,58 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
     class = "isofishr_project"
   ) |>
     fill_acquisition_times()
+  if (isTRUE((yml$project$format %||% 1L) < 2L)) p <- convert_trims_v1(p)
+  opened <- TRUE
+  p
+}
+
+# Format 1 projects counted trims from the first and last point passing the
+# 88Sr thresholds; they are now counted from the run's first and last cycle,
+# so they stay put when reduction settings change. Converts them, using the
+# current settings, and marks the project as format 2.
+convert_trims_v1 <- function(project) {
+  s <- project$samples
+  todo <- which(s$run_type != "baseline" & (s$trim_start_s > 0 | s$trim_end_s > 0))
+  log <- list()
+  for (i in todo) {
+    id <- s$sample_id[i]
+    b <- tryCatch(profile_bounds(project, id), error = function(e) NULL)
+    if (is.null(b)) next
+    new_start <- if (s$trim_start_s[i] > 0) s$trim_start_s[i] + b$profile_start - b$run_start else 0
+    new_end <- if (s$trim_end_s[i] > 0) s$trim_end_s[i] + b$run_end - b$profile_end else 0
+    log[[length(log) + 1]] <- log_entry(
+      project$user, "convert_trims", id, "trim_start_s;trim_end_s",
+      paste(s$trim_start_s[i], s$trim_end_s[i], sep = ";"), paste(new_start, new_end, sep = ";"))
+    project$samples$trim_start_s[i] <- new_start
+    project$samples$trim_end_s[i] <- new_end
+  }
+  project$meta$format <- PROJECT_FORMAT
+  if (!project$read_only) {
+    if (length(log) > 0) {
+      write_table_file(project$samples, project_file(project$path, "samples.csv"))
+      try(append_log(project_file(project$path, "log.csv"), dplyr::bind_rows(log)), silent = TRUE)
+    }
+    write_yaml_file(c(list(project = project$meta), project$settings),
+                    project_file(project$path, "project.yml"))
+  }
+  project
+}
+
+# Times of a run's first and last cycle and of the first and last cycle
+# passing the thresholds, with the sample's current settings.
+profile_bounds <- function(project, sample_id) {
+  i <- sample_index(project, sample_id)
+  s <- sample_settings(project, sample_id)
+  r <- s$reduction
+  raw <- read_runfiles(project_file(project$path, project$samples$runfile[i]), s$import, sample_id)
+  d <- integrate_cycles(raw, r$integration)
+  if (isTRUE(r$blank_correction) && project$settings$calibration$baseline != "baseline_runs") {
+    d <- dplyr::filter(d, time_s > r$blank_time_s)
+  }
+  d <- dplyr::filter(d, raw88 >= r$raw88_min_v, raw88 <= r$raw88_max_v)
+  if (nrow(d) == 0) return(NULL)
+  list(run_start = min(raw$time_s), run_end = max(raw$time_s),
+       profile_start = min(d$time_s), profile_end = max(d$time_s))
 }
 
 #' @rdname project

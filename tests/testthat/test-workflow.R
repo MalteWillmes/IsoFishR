@@ -11,7 +11,8 @@ test_that("a project can be built up over several sessions and exported", {
   p <- create_project(path, user = "alice")
   p <- add_runfiles(p, files[1:2])
   id1 <- p$samples$sample_id[1]
-  p <- update_sample(p, id1, trim_start_s = 15, status = "reviewed", comment = "clear natal region")
+  p <- update_sample(p, id1, trim_start_s = profile_trim(p, id1, 15), status = "reviewed",
+                     comment = "clear natal region")
   p <- set_regions(p, id1, data.frame(region = c("natal", "marine"), start_s = c(250, 900),
                                        end_s = c(350, 1100)))
   first_regions <- summarise_project_regions(p)

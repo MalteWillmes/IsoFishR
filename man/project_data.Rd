@@ -12,7 +12,8 @@ project_data(project, sample_ids = NULL, edited = TRUE, calibrate = TRUE)
 \item{sample_ids}{Samples to return; defaults to all runs that are not
 excluded or baseline runs.}
 
-\item{edited}{Apply trims, reversal and re-zeroing from \code{samples.csv}.}
+\item{edited}{Apply trims (before outlier rejection and smoothing, so trimmed
+data never affects them), reversal and re-zeroing from \code{samples.csv}.}
 
 \item{calibrate}{Apply the reference material correction (see
 \code{\link[=calibration_model]{calibration_model()}}). The 87Sr/86Sr columns are then corrected, and
@@ -28,7 +29,7 @@ character vector named by sample.
 \description{
 Reduces each sample with its own settings and applies its trims and
 direction. Results are cached in the project's \verb{cache/} folder, keyed by
-the raw file, the sample's import and reduction settings, the run speed
+the raw file, the sample's import and reduction settings, its trims, the run speed
 and the IsoFishR version. A sample is only reduced again when one of
 those changes, so adding samples or changing one sample's settings does
 not reprocess the others.

@@ -36,6 +36,19 @@ summarise_project_samples <- function(project, data = NULL, include_excluded = F
   if (nrow(samples) == 0) stop("The project has no samples to summarise.", call. = FALSE)
   data <- data %||% project_data(project, samples$sample_id)
   speed <- purrr::map_dbl(samples$sample_id, \(id) sample_settings(project, id)$sample$run_speed_um_s)
+  # Trims as micrometres cut from the profile, as shown in the app.
+  run_times <- if ("run_start_s" %in% names(data)) {
+    dplyr::summarise(data, run_start = run_start_s[1], run_end = run_end_s[1],
+                     profile_start = profile_start_s[1], profile_end = profile_end_s[1],
+                     .by = sample_id)
+  }
+  trim_um <- function(ids, start_s, end_s, which) {
+    purrr::pmap_dbl(list(ids, start_s, end_s, speed[match(ids, samples$sample_id)]), \(id, a, b, v) {
+      tm <- if (!is.null(run_times)) run_times[run_times$sample_id == id, ]
+      if (is.null(tm) || nrow(tm) == 0) return(if (which == "start") a * v else b * v)
+      trims_to_um(a, b, tm, v)[[which]]
+    })
+  }
 
   stats <- data |>
     dplyr::summarise(
@@ -61,7 +74,8 @@ summarise_project_samples <- function(project, data = NULL, include_excluded = F
       reference_material = .data$reference_material, session = .data$session.y,
       acquired = .data$acquired, status = .data$status, flag = .data$flag,
       comment = .data$comment, added = .data$added, added_by = .data$added_by,
-      trim_start_um = .data$trim_start_s * speed, trim_end_um = .data$trim_end_s * speed,
+      trim_start_um = trim_um(.data$sample_id, .data$trim_start_s, .data$trim_end_s, "start"),
+      trim_end_um = trim_um(.data$sample_id, .data$trim_start_s, .data$trim_end_s, "end"),
       reverse = .data$reverse,
       setting_overrides = .data$settings
     ) |>

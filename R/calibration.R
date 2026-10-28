@@ -33,9 +33,9 @@ project_baselines <- function(project) {
     s <- sample_settings(project, sample_id)
     row <- project$samples[i, ]
     raw <- read_runfiles(project_file(project$path, row$runfile), s$import, sample_id)
-    d <- integrate_cycles(raw, s$reduction$integration)
-    d <- dplyr::filter(d, time_s >= min(time_s) + row$trim_start_s,
-                       time_s <= max(time_s) - row$trim_end_s)
+    d <- integrate_cycles(raw, s$reduction$integration) |>
+      dplyr::mutate(run_start_s = min(raw$time_s), run_end_s = max(raw$time_s)) |>
+      trim_runs(row[c("sample_id", "trim_start_s", "trim_end_s")])
     tibble::tibble(sample_id = sample_id, session = session, acquired = acquired,
                    n_cycles = nrow(d), blk88 = mean(d$raw88), blk87 = mean(d$raw87),
                    blk86 = mean(d$raw86), blk85 = mean(d$raw85), blk84 = mean(d$raw84),
@@ -115,7 +115,7 @@ build_calibration_model <- function(project, cal, rm) {
   runs <- project_runs(project)
   prim <- dplyr::filter(runs, .data$rm_role == "primary", .data$status != "excluded",
                         !is.na(.data$acquired))
-  points <- tibble::tibble(sample_id = character(), session = character(), time = double(),
+  points <- tibble::tibble(sample_id = character(), session = character(), time = double(), start = double(),
                            measured = double(), se = double(), n = integer(),
                            factor = double(), u_rel = double())
   if (nrow(prim) > 0) {
@@ -126,16 +126,22 @@ build_calibration_model <- function(project, cal, rm) {
         n = sum(!is.na(sr87_sr86)),
         se = stats::sd(sr87_sr86, na.rm = TRUE) / sqrt(n),
         mid_s = (min(time_s) + max(time_s)) / 2,
+        start_s = min(time_s),
         .by = sample_id
       ) |>
       dplyr::inner_join(dplyr::select(prim, "sample_id", "session", "acquired"), by = "sample_id") |>
       dplyr::transmute(
         sample_id, session = .data$session,
         time = as.numeric(.data$acquired) + .data$mid_s,
+        start = as.numeric(.data$acquired) + .data$start_s,
         measured = .data$measured, se = .data$se, n = .data$n,
         factor = rm$value / .data$measured,
         u_rel = .data$se / .data$measured
       ) |>
+      # A standard without usable points (all rejected, or a single point
+      # with no SE) can't calibrate anything; it would turn the session's
+      # correction into NaN.
+      dplyr::filter(is.finite(.data$factor), is.finite(.data$u_rel)) |>
       dplyr::arrange(.data$time)
   }
   list(primary = rm$name, accepted = rm$value, uncertainty_2s = rm$uncertainty_2s,
@@ -178,7 +184,11 @@ correction_at <- function(model, session, t) {
     w <- pmin(pmax((t - tp[i]) / (tp[i + 1] - tp[i]), 0), 1)
     u <- sqrt(((1 - w) * up[i])^2 + (w * up[i + 1])^2)
   } else if (fit == "step") {
-    i <- pmax(findInterval(t, tp), 1)
+    # Compared with the standards' start times, so every point of a
+    # standard run gets that standard's own factor (its midpoint would split
+    # the run). Before the first standard, the first one is used.
+    starts <- if ("start" %in% names(pts)) pts$start else tp
+    i <- pmax(findInterval(t, starts), 1)
     f <- fp[i]
     u <- up[i]
   } else if (fit == "mean") {
@@ -186,9 +196,16 @@ correction_at <- function(model, session, t) {
     u <- rep(stats::sd(fp) / mean(fp) / sqrt(n), length(t))
   } else {
     sp <- stats::smooth.spline(tp, fp)
-    f <- stats::predict(sp, t)$y
+    # Held constant outside the standards, like the other fits (a spline
+    # would carry on along its end slope).
+    f <- stats::predict(sp, pmin(pmax(t, min(tp)), max(tp)))$y
     resid <- (fp - stats::predict(sp, tp)$y) / fp
-    u <- rep(sqrt(sum(resid^2) / max(n - sp$df, 1)) / sqrt(n), length(t))
+    u_resid <- sqrt(sum(resid^2) / max(n - sp$df, 1)) / sqrt(n)
+    # A spline through (nearly) every standard has no residuals to estimate
+    # its uncertainty from; it is then at least that of the standards
+    # themselves, averaged over the spline's effective number of parameters.
+    u_floor <- sqrt(mean(up^2) * min(sp$df, n) / n)
+    u <- rep(max(u_resid, u_floor), length(t))
   }
   list(factor = f, u_rel = sqrt(u^2 + u_rm^2), status = status)
 }
@@ -252,8 +269,8 @@ apply_calibration <- function(data, project, model) {
 #' corrected mean 87Sr/86Sr, standard errors with and without the correction
 #' uncertainty, and the deviation from the accepted value. For secondary
 #' reference materials this is the accuracy check of the correction; primary
-#' runs are corrected to their accepted value by construction (exactly so
-#' with the linear and step fits).
+#' runs are corrected to close to their accepted value by construction (exactly
+#' so with the step fit; within a run the other fits can vary slightly).
 #'
 #' @param project A project from [open_project()].
 #' @return A tibble.

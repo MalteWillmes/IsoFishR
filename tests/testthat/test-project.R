@@ -229,7 +229,7 @@ test_that("project_data reduces with per-sample settings, applies edits and cach
                          dplyr::filter(d, sample_id == ids[2])$sr87_sr86_ma))
 
   # Edits are applied on top of the cached reduction
-  p <- update_sample(p, ids[1], trim_start_s = 20)
+  p <- update_sample(p, ids[1], trim_start_s = profile_trim(p, ids[1], 20))
   d3 <- project_data(p, ids[1])
   expect_equal(min(d3$time_s), min(dplyr::filter(d, sample_id == ids[1])$time_s) + 20,
                tolerance = 0.5)

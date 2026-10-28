@@ -42,10 +42,14 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
   detail <- rep("", n)
 
   # Files that can't be added at all.
-  bad_name <- grepl("[\\\\/:*?\"<>|]", sample_ids) | !nzchar(trimws(sample_ids))
+  bad_name <- is.na(sample_ids) | grepl("[\\\\/:*?\"<>|]", sample_ids) |
+    !nzchar(trimws(dplyr::coalesce(sample_ids, "")))
+  sample_ids[is.na(sample_ids)] <- ""
   result[bad_name] <- "failed"
-  detail[bad_name] <- "the name contains characters that are not allowed (\\ / : * ? \" < > |)"
-  dup_name <- duplicated(sample_ids) & is.na(result)
+  detail[bad_name] <- "the name is empty or contains characters that are not allowed (\\ / : * ? \" < > |)"
+  # Names are compared ignoring case: on Windows (and macOS) "Fish01" and
+  # "fish01" would be the same raw file.
+  dup_name <- duplicated(tolower(sample_ids)) & is.na(result)
   result[dup_name] <- "skipped"
   detail[dup_name] <- "another file in this batch has the same name"
 
@@ -53,12 +57,14 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
   identical_file <- (md5 %in% project$samples$md5 | duplicated(md5)) & is.na(result)
   result[identical_file] <- "skipped"
   detail[identical_file] <- "identical file already in the project"
-  existing <- match(sample_ids, project$samples$sample_id)
+  existing <- match(tolower(sample_ids), tolower(project$samples$sample_id))
   name_taken <- !is.na(existing) & is.na(result)
   if (mode == "add") {
     result[name_taken] <- "skipped"
     detail[name_taken] <- "a run with this name is already in the project (choose Replace to update it)"
   }
+  # A replaced run keeps its name as it is in the project.
+  sample_ids[name_taken] <- project$samples$sample_id[existing[name_taken]]
 
   # Read each remaining file on its own, so one bad file doesn't stop the rest.
   for (i in which(is.na(result))) {
@@ -86,6 +92,28 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
   }
   runfiles <- file.path("raw", paste0(sample_ids, tolower(file_ext_dot(source_names))))
 
+  # Files are copied one at a time, and everything done to raw/ is recorded
+  # so it can be undone if the project tables can't be saved.
+  copied <- character()                      # new files in raw/
+  moved <- list()                            # old files moved to raw/removed/
+  log <- list()
+  copy_in <- function(i) {
+    target <- project_file(project$path, runfiles[i])
+    if (file.exists(target)) {
+      # Left over from an earlier, interrupted import of the same file: use it.
+      unused <- !tolower(runfiles[i]) %in% tolower(project$samples$runfile)
+      if (unused && identical(unname(tools::md5sum(target)), md5[i])) return(TRUE)
+      return(FALSE)
+    }
+    ok <- isTRUE(file.copy(paths[i], target, overwrite = FALSE))
+    if (ok) copied <<- c(copied, target)
+    ok
+  }
+  undo <- function() {
+    unlink(copied)
+    for (m in rev(moved)) file.rename(m$to, m$from)
+  }
+
   # Replace: move the old file aside, then copy in the new one.
   if (any(replace)) {
     removed_dir <- project_file(project$path, "raw", "removed")
@@ -94,16 +122,23 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
     for (i in which(replace)) {
       j <- existing[i]
       old <- project$samples[j, ]
-      moved <- file.path("raw", "removed",
-                         unique_file(removed_dir, paste0(stamp, "_", basename(old$runfile))))
-      if (file.exists(project_file(project$path, old$runfile)) &&
-          !file.rename(project_file(project$path, old$runfile), project_file(project$path, moved))) {
-        result[i] <- "failed"
-        detail[i] <- paste0("could not move the old file '", old$runfile, "' (is it open in another program?)")
-        next
+      old_path <- project_file(project$path, old$runfile)
+      moved_rel <- file.path("raw", "removed",
+                             unique_file(removed_dir, paste0(stamp, "_", basename(old$runfile))))
+      moved_path <- project_file(project$path, moved_rel)
+      if (file.exists(old_path)) {
+        if (!file.rename(old_path, moved_path)) {
+          result[i] <- "failed"
+          detail[i] <- paste0("could not move the old file '", old$runfile, "' (is it open in another program?)")
+          next
+        }
+        moved[[length(moved) + 1]] <- list(from = old_path, to = moved_path)
       }
-      if (!file.copy(paths[i], project_file(project$path, runfiles[i]), overwrite = FALSE)) {
-        file.rename(project_file(project$path, moved), project_file(project$path, old$runfile))
+      if (!copy_in(i)) {
+        if (file.exists(moved_path)) {
+          file.rename(moved_path, old_path)
+          moved[[length(moved)]] <- NULL
+        }
         result[i] <- "failed"
         detail[i] <- "could not copy the file into the project"
         next
@@ -119,20 +154,22 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
       }
       project$regions <- dplyr::filter(project$regions, .data$sample_id != old$sample_id)
       result[i] <- "replaced"
-      append_log(project_file(project$path, "log.csv"),
-                 log_entry(project$user, "replace_runfile", old$sample_id, "runfile",
-                           paste0(old$source, " (", moved, ")"),
-                           paste0(source_names[i], " (edits and regions cleared)")))
+      log[[length(log) + 1]] <- log_entry(project$user, "replace_runfile", old$sample_id, "runfile",
+                                          paste0(old$source, " (", moved_rel, ")"),
+                                          paste0(source_names[i], " (edits and regions cleared)"))
     }
   }
 
   if (any(is_new)) {
-    copied <- file.copy(paths[is_new], project_file(project$path, runfiles[is_new]), overwrite = FALSE)
-    new_idx <- which(is_new)
-    result[new_idx[!copied]] <- "failed"
-    detail[new_idx[!copied]] <- "could not copy the file into the project"
-    add <- new_idx[copied]
-    result[add] <- "added"
+    for (i in which(is_new)) {
+      if (copy_in(i)) {
+        result[i] <- "added"
+      } else {
+        result[i] <- "failed"
+        detail[i] <- "could not copy the file into the project"
+      }
+    }
+    add <- which(is_new & result == "added")
     if (length(add) > 0) {
       new_rows <- tibble::tibble(
         sample_id = sample_ids[add], runfile = runfiles[add], source = source_names[add],
@@ -140,15 +177,23 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
       )
       new_rows$acquired <- acquired[add]
       project$samples <- dplyr::bind_rows(project$samples, new_rows)
-      append_log(project_file(project$path, "log.csv"),
-                 log_entry(project$user, "add_sample", sample_ids[add], new = source_names[add]))
+      log[[length(log) + 1]] <- log_entry(project$user, "add_sample", sample_ids[add],
+                                          new = source_names[add])
     }
   }
   if (any(result %in% c("added", "replaced"))) {
-    write_table_file(project$samples, project_file(project$path, "samples.csv"))
-  }
-  if (any(result == "replaced")) {
-    write_table_file(project$regions, project_file(project$path, "regions.csv"))
+    tryCatch({
+      write_table_file(project$samples, project_file(project$path, "samples.csv"))
+      if (any(result == "replaced")) {
+        write_table_file(project$regions, project_file(project$path, "regions.csv"))
+      }
+    }, error = function(e) {
+      # Leave raw/ as it was, so the project stays consistent and the import
+      # can simply be tried again.
+      undo()
+      stop(conditionMessage(e), " No runfiles were added or replaced.", call. = FALSE)
+    })
+    append_log(project_file(project$path, "log.csv"), purrr::list_rbind(log))
   }
 
   report <- tibble::tibble(file = source_names, sample_id = sample_ids, result = result,
@@ -363,22 +408,41 @@ remove_samples <- function(project, sample_ids) {
   stamp <- format(Sys.time(), "%Y%m%d%H%M%S")
   rows <- dplyr::filter(project$samples, .data$sample_id %in% sample_ids)
 
+  # All or nothing: if one file can't be moved (e.g. open in another
+  # program) or the tables can't be saved, the files already moved are put
+  # back, so the project never lists a sample whose file is gone.
   moved_to <- file.path("raw", "removed", paste0(stamp, "_", basename(rows$runfile)))
+  moved <- list()
+  put_back <- function() for (m in rev(moved)) file.rename(m$to, m$from)
   for (i in seq_len(nrow(rows))) {
     moved_to[i] <- file.path("raw", "removed", unique_file(removed_dir, basename(moved_to[i])))
     from <- project_file(project$path, rows$runfile[i])
-    if (file.exists(from) && !file.rename(from, project_file(project$path, moved_to[i]))) {
-      stop("Could not move '", rows$runfile[i], "'. Is it open in another program?", call. = FALSE)
+    to <- project_file(project$path, moved_to[i])
+    if (file.exists(from)) {
+      if (!file.rename(from, to)) {
+        put_back()
+        stop("Could not move '", rows$runfile[i], "'. Is it open in another program? ",
+             "No samples were removed.", call. = FALSE)
+      }
+      moved[[length(moved) + 1]] <- list(from = from, to = to)
     }
-    cache <- list.files(project_file(project$path, "cache"),
-                        pattern = paste0("^", rlang::hash(rows$sample_id[i]), "_"), full.names = TRUE)
-    unlink(cache)
   }
 
   project$samples <- dplyr::filter(project$samples, !.data$sample_id %in% sample_ids)
   project$regions <- dplyr::filter(project$regions, !.data$sample_id %in% sample_ids)
-  write_table_file(project$samples, project_file(project$path, "samples.csv"))
-  write_table_file(project$regions, project_file(project$path, "regions.csv"))
+  tryCatch(write_table_file(project$samples, project_file(project$path, "samples.csv")),
+           error = function(e) {
+             put_back()
+             stop(conditionMessage(e), " No samples were removed.", call. = FALSE)
+           })
+  # Regions of samples no longer in the project are ignored everywhere, so a
+  # regions.csv that can't be saved now is only tidied up later.
+  tryCatch(write_table_file(project$regions, project_file(project$path, "regions.csv")),
+           error = function(e) rlang::warn(conditionMessage(e), class = "isofishr_warning"))
+  for (id in rows$sample_id) {
+    unlink(list.files(project_file(project$path, "cache"),
+                      pattern = paste0("^", rlang::hash(id), "_"), full.names = TRUE))
+  }
   append_log(project_file(project$path, "log.csv"),
              log_entry(project$user, "remove_sample", rows$sample_id, "runfile",
                        old = rows$runfile, new = moved_to))

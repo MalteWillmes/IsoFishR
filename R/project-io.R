@@ -5,7 +5,9 @@
 # written to a temporary name and then renamed, so an interrupted save (or a
 # Dropbox sync in the middle of a write) never leaves a half-written file.
 
-PROJECT_FORMAT <- 1L
+# 2: trims are counted from the run's first and last cycle (format 1: from the
+# first and last point passing the 88Sr thresholds); converted when opened.
+PROJECT_FORMAT <- 2L
 
 project_file <- function(path, ...) file.path(path, ...)
 
@@ -99,7 +101,9 @@ write_table_file <- function(x, path) {
 
 write_yaml_file <- function(x, path) {
   tmp <- paste0(path, ".tmp")
-  yaml::write_yaml(x, tmp)
+  # Full precision: the default (7 digits) would round settings such as
+  # 85Rb/87Rb when the project is saved.
+  yaml::write_yaml(x, tmp, precision = 15)
   if (!file.rename(tmp, path)) {
     unlink(tmp)
     stop("Could not save '", basename(path), "'.", call. = FALSE)
@@ -110,7 +114,19 @@ write_yaml_file <- function(x, path) {
 append_log <- function(path, entries) {
   if (nrow(entries) == 0) return(invisible(path))
   entries <- dplyr::mutate(entries, dplyr::across(dplyr::everything(), as.character))
-  readr::write_csv(entries, path, append = file.exists(path), na = "")
+  # The change itself is already saved when it is logged, so a log that
+  # can't be written (e.g. log.csv open in Excel) must not turn it into an
+  # error: the app would then keep the old state and overwrite the saved
+  # change with the next edit. Warn instead.
+  ok <- tryCatch({
+    readr::write_csv(entries, path, append = file.exists(path), na = "")
+    TRUE
+  }, error = function(e) FALSE)
+  if (!ok) {
+    rlang::warn(paste0("The change was saved, but could not be added to the session log (",
+                       basename(path), "). Is it open in another program?"),
+                class = "isofishr_warning")
+  }
   invisible(path)
 }
 

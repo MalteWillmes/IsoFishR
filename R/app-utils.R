@@ -164,6 +164,9 @@ try_notify <- function(expr, success = NULL) {
     out <- withCallingHandlers(expr, message = function(m) {
       shiny::showNotification(conditionMessage(m), type = "message")
       invokeRestart("muffleMessage")
+    }, isofishr_warning = function(w) {
+      shiny::showNotification(conditionMessage(w), type = "warning", duration = 10)
+      invokeRestart("muffleWarning")
     })
     if (!is.null(success)) shiny::showNotification(success, type = "message", duration = 3)
     out

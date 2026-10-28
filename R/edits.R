@@ -8,10 +8,17 @@
 #'
 #' @param data Reduced data (`reduce_runs()$data`).
 #' @param edits A data frame with one row per edited sample and columns
-#'   `sample_id`, `trim_start_s`, `trim_end_s` (seconds removed from the start
-#'   and end of the profile), `reverse` (flip the distance axis) and `rezero`
-#'   (measure distance from the first kept point). Missing columns and
-#'   samples without a row use no trim, no reversal and `rezero = TRUE`.
+#'   `sample_id`, `trim_start_s`, `trim_end_s` (seconds removed after the
+#'   run's first cycle and before its last; see below), `reverse` (flip the
+#'   distance axis) and `rezero` (measure distance from the first kept
+#'   point). Missing columns and samples without a row use no trim, no
+#'   reversal and `rezero = TRUE`.
+#'
+#' Trims are counted from the run's first and last cycle (`run_start_s` and
+#' `run_end_s` in reduced data), not from the first point passing the 88Sr
+#' thresholds, so a trim stays on the same part of the sample when reduction
+#' settings change. [project_data()] applies them during the reduction, before
+#' outlier rejection and smoothing; applying them again here changes nothing.
 #' @return The edited data, sorted by sample and distance.
 #' @export
 apply_edits <- function(data, edits = NULL) {
@@ -25,13 +32,9 @@ apply_edits <- function(data, edits = NULL) {
   edits <- dplyr::select(edits, "sample_id", dplyr::all_of(names(defaults)))
 
   data |>
-    dplyr::left_join(edits, by = "sample_id") |>
-    tidyr::replace_na(defaults) |>
-    dplyr::filter(
-      time_s >= min(time_s) + trim_start_s,
-      time_s <= max(time_s) - trim_end_s,
-      .by = sample_id
-    ) |>
+    trim_runs(edits) |>
+    dplyr::left_join(dplyr::select(edits, "sample_id", "reverse", "rezero"), by = "sample_id") |>
+    tidyr::replace_na(defaults[c("reverse", "rezero")]) |>
     dplyr::mutate(
       distance_um = dplyr::if_else(rezero, distance_um - min(distance_um), distance_um),
       distance_um = dplyr::if_else(reverse, max(distance_um) + min(distance_um) - distance_um,
@@ -39,7 +42,7 @@ apply_edits <- function(data, edits = NULL) {
       .by = sample_id
     ) |>
     dplyr::arrange(factor(sample_id, levels = unique(sample_id)), distance_um) |>
-    dplyr::select(-dplyr::all_of(names(defaults)))
+    dplyr::select(-"reverse", -"rezero")
 }
 
 #' Summarise regions of a profile
@@ -99,4 +102,24 @@ find_changepoints <- function(data, method = "PELT", penalty = 5e-5,
       cp_mean = dplyr::if_else(is.na(cp_segment), NA_real_, mean(.data[[value]], na.rm = TRUE)),
       .by = c(sample_id, cp_segment)
     )
+}
+
+# Trims shown to users: micrometres cut from the start and end of the
+# profile (the cycles passing the thresholds). `times` has the run's
+# `run_start`, `run_end`, `profile_start` and `profile_end` (s).
+trims_to_um <- function(trim_start_s, trim_end_s, times, speed) {
+  c(start = max(0, times$run_start + trim_start_s - times$profile_start) * speed,
+    end = max(0, times$profile_end - (times$run_end - trim_end_s)) * speed)
+}
+
+# The stored trim (s after the run's first cycle, or before its last) for
+# `um` micrometres cut from the start or end of the profile. 0 means no trim.
+um_to_trims <- function(um, which = c("start", "end"), times, speed) {
+  which <- match.arg(which)
+  if (um <= 0) return(0)
+  if (which == "start") {
+    times$profile_start - times$run_start + um / speed
+  } else {
+    times$run_end - times$profile_end + um / speed
+  }
 }

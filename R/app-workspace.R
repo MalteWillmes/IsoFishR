@@ -380,8 +380,6 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(sample_row(), {
       row <- sample_row()
       speed <- run_speed()
-      shiny::updateNumericInput(session, "trim_start_um", value = round(row$trim_start_s * speed, 1))
-      shiny::updateNumericInput(session, "trim_end_um", value = round(row$trim_end_s * speed, 1))
       shiny::updateCheckboxInput(session, "rezero", value = row$rezero)
       shiny::updateCheckboxInput(session, "reverse", value = row$reverse)
       shiny::updateCheckboxInput(session, "cp_enabled", value = row$cp_enabled)
@@ -405,10 +403,33 @@ workspace_server <- function(id, project) {
       }
     }
 
-    shiny::observeEvent(input$trim_start_um, save_field("trim_start_s", input$trim_start_um / run_speed()),
-                        ignoreInit = TRUE)
-    shiny::observeEvent(input$trim_end_um, save_field("trim_end_s", input$trim_end_um / run_speed()),
-                        ignoreInit = TRUE)
+    # Trims are stored as seconds after the run's first cycle and before its
+    # last (see apply_edits()); the inputs show them in micrometres from the
+    # start and end of the profile.
+    run_times <- shiny::reactive({
+      d <- sample_data()
+      shiny::req(nrow(d) > 0, "run_start_s" %in% names(d))
+      list(run_start = d$run_start_s[1], run_end = d$run_end_s[1],
+           profile_start = d$profile_start_s[1], profile_end = d$profile_end_s[1])
+    })
+    shiny::observe({
+      tm <- run_times()
+      row <- shiny::isolate(sample_row())
+      um <- trims_to_um(row$trim_start_s, row$trim_end_s, tm, run_speed())
+      shiny::updateNumericInput(session, "trim_start_um", value = round(um[["start"]], 1))
+      shiny::updateNumericInput(session, "trim_end_um", value = round(um[["end"]], 1))
+    })
+    save_trim <- function(which, um) {
+      if (is.null(um) || is.na(um)) return()
+      tm <- run_times()
+      row <- shiny::isolate(sample_row())
+      shown <- trims_to_um(row$trim_start_s, row$trim_end_s, tm, run_speed())[[which]]
+      if (abs(shown - um) < 0.05) return()  # just the rounded value being shown
+      s <- um_to_trims(um, which, tm, run_speed())
+      save_field(if (which == "start") "trim_start_s" else "trim_end_s", s)
+    }
+    shiny::observeEvent(input$trim_start_um, save_trim("start", input$trim_start_um), ignoreInit = TRUE)
+    shiny::observeEvent(input$trim_end_um, save_trim("end", input$trim_end_um), ignoreInit = TRUE)
     shiny::observeEvent(input$rezero, save_field("rezero", input$rezero), ignoreInit = TRUE)
     shiny::observeEvent(input$reverse, save_field("reverse", input$reverse), ignoreInit = TRUE)
     shiny::observeEvent(input$cp_enabled, save_field("cp_enabled", input$cp_enabled), ignoreInit = TRUE)
@@ -422,10 +443,10 @@ workspace_server <- function(id, project) {
     shiny::observeEvent(input$trim_to_selection, {
       t <- selected_time()
       if (is.null(t)) return()
-      full <- project_data(project(), current(), edited = FALSE)
+      tm <- run_times()
       change(update_sample, current(),
-             trim_start_s = max(t[1] - min(full$time_s), 0),
-             trim_end_s = max(max(full$time_s) - t[2], 0))
+             trim_start_s = max(t[1] - tm$run_start, 0),
+             trim_end_s = max(tm$run_end - t[2], 0))
       selection(NULL)
     })
     shiny::observeEvent(input$trim_clear, {

@@ -7,7 +7,8 @@ export_fixture <- function(env = parent.frame()) {
   ids <- p$samples$sample_id
   p <- set_regions(p, ids[1], data.frame(region = c("core", "edge"), start_s = c(200, 1000),
                                          end_s = c(260, 1100)))
-  p <- update_sample(p, ids[1], trim_start_s = 10, comment = "good", cp_enabled = TRUE)
+  p <- update_sample(p, ids[1], trim_start_s = profile_trim(p, ids[1], 10), comment = "good",
+                     cp_enabled = TRUE)
   p <- set_sample_settings(p, ids[2], ma_window = 20)
   update_sample(p, ids[3], status = "excluded")
 }

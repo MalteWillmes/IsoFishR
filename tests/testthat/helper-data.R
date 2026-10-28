@@ -41,3 +41,10 @@ no_filter_settings <- function(...) {
   )
   merge_settings(default_settings(), list(reduction = reduction))
 }
+
+# The stored trim (s after the run's first cycle) that cuts `seconds` from
+# the start of the profile (the cycles passing the thresholds).
+profile_trim <- function(project, sample_id, seconds) {
+  b <- profile_bounds(project, sample_id)
+  b$profile_start - b$run_start + seconds
+}

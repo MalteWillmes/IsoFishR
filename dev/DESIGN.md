@@ -30,7 +30,7 @@ MyProject/
   exports/      generated tables and plots, with the settings used for each sample
   .lock         stops a second user editing at the same time (e.g. a shared Dropbox folder)
 ```
-Trims and regions are stored in **seconds of analysis time** and shown as distance, so they stay in the right place if the run speed is corrected later.
+Trims and regions are stored in **seconds of analysis time** and shown as distance, so they stay in the right place if the run speed is corrected later. Trims (`trim_start_s`, `trim_end_s`) are counted from the run's first and last raw cycle (project format 2), not from the first point passing the 88Sr thresholds, so changing thresholds, blank time or integration doesn't move them; the app shows them as µm cut from the profile (`trims_to_um()` / `um_to_trims()`). Format 1 projects are converted once on opening (`convert_trims_v1()`, logged as `convert_trims`). Trims are applied inside the reduction (`trim_runs()`, part of the cache key), before outlier rejection and smoothing, so trimmed data never affects them.
 
 ### Project API (implemented)
 | Function | What it does |
@@ -86,12 +86,12 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - **Baseline:** `calibration.baseline` is `per_run` (the run's own blank, as before) or `baseline_runs`. In the latter, the blank is the mean voltages of the session's baseline runs (after trims), interpolated linearly to each run's start time and held constant outside the bracketing runs. Without baseline runs in the session, the run falls back to its own blank with a warning.
 - **Correction:** each primary run gives measured = mean of its points (trims applied, outliers removed, uncorrected) at its midpoint time, and factor = accepted / measured. The factor is fitted per session with `calibration.fit`:
   - `linear`: approx, held constant at the ends.
-  - `spline`: smooth.spline, needs 4 or more runs, otherwise linear with a note.
-  - `step`: the previous primary run.
+  - `spline`: smooth.spline, needs 4 or more runs, otherwise linear with a note; held constant outside the standards.
+  - `step`: the most recent primary run, compared by start time, so a primary run is corrected only by its own factor.
   - `mean`: the session mean.
 
   The factor is evaluated at every point's own time (acquired + time_s) and multiplies all 87Sr/86Sr columns. Uncorrected values stay in `sr87_sr86_uncorrected`.
-- **Uncertainty** (relative, 1σ): the primary runs' SE/mean propagated through the interpolation weights (`linear`), that of the run used (`step`), sd/√n (`mean`), or residual-based (`spline`). The accepted value's uncertainty is added in quadrature. Reported as `correction_u_rel` (data) and `se_combined` = √(se² + (mean·u)²) (summaries).
+- **Uncertainty** (relative, 1σ): the primary runs' SE/mean propagated through the interpolation weights (`linear`), that of the run used (`step`), sd/√n (`mean`), or residual-based with a floor of the standards' own uncertainty × √(df/n) (`spline`, which otherwise collapses to zero when it passes through every standard). Standards without usable points (all rejected, or one point) are left out of the model. The accepted value's uncertainty is added in quadrature. Reported as `correction_u_rel` (data) and `se_combined` = √(se² + (mean·u)²) (summaries).
 - **QC:** `reference_material_results()` gives each standard run's measured and corrected mean and deviation in ppm. Within uncertainty means |dev| ≤ √((2·se_combined)² + accepted_2s²). `summarise_reference_materials()` gives per RM and session the runs, mean, 2 SD and deviation.
 - **Off by default:** with no primary set and per-run baselines, `project_data()` returns exactly the previous columns.
 - **App:**
@@ -129,7 +129,7 @@ Statistics come from the individual points (outliers removed), not the smoothed 
 |---|---|
 | `R/settings.R` | Default settings, validation, YAML input/output, v1 `_settings.csv` import |
 | `R/import.R` | `read_runfiles()` |
-| `R/reduce.R` | `reduce_runs()`: integration → blank → thresholds → distance → Rb and mass bias correction → outliers → smoothing (`SMOOTHING_METHODS`: none, ma, spline, ma_spline = default). `smooth_spline()`: adaptive penalised spline (`mgcv::bam`, `bs = "ad"`, fREML, weights = total Sr, k = n/10 within 10–80; `tp`/REML below 60 points; falls back to a line if the fit fails); edf in `sr87_sr86_spline_edf`. About 0.2–0.4 s per run, cached. `discrete = TRUE` was tried and rejected: it changed some fits. |
+| `R/reduce.R` | `reduce_runs()`: integration → blank → thresholds → distance → Rb and mass bias correction → trims → outliers (Hampel filter: deviation from the median of the neighbouring `window` cycles, without the cycle itself, over 1.4826 × MAD estimated over ≥201 cycles; about 0.3% false flags on pure noise, and it finds clusters of spikes that a rolling SD misses) → smoothing (`SMOOTHING_METHODS`: none, ma, spline, ma_spline = default). `smooth_spline()`: adaptive penalised spline (`mgcv::bam`, `bs = "ad"`, fREML, weights = total Sr, k = n/10 within 10–80; `tp`/REML below 60 points; falls back to a line if the fit fails); edf in `sr87_sr86_spline_edf`. About 0.2–0.4 s per run, cached. `discrete = TRUE` was tried and rejected: it changed some fits. |
 | `R/roll.R` | O(n) rolling mean, SD and median |
 | `R/edits.R` | `apply_edits()` (trim, reverse), `summarise_regions()`, `find_changepoints()` |
 | `R/project.R` | Create/open/close, lock, log |

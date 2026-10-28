@@ -2,7 +2,7 @@
 #'
 #' Reduces each sample with its own settings and applies its trims and
 #' direction. Results are cached in the project's `cache/` folder, keyed by
-#' the raw file, the sample's import and reduction settings, the run speed
+#' the raw file, the sample's import and reduction settings, its trims, the run speed
 #' and the IsoFishR version. A sample is only reduced again when one of
 #' those changes, so adding samples or changing one sample's settings does
 #' not reprocess the others.
@@ -10,7 +10,8 @@
 #' @param project A project from [open_project()].
 #' @param sample_ids Samples to return; defaults to all runs that are not
 #'   excluded or baseline runs.
-#' @param edited Apply trims, reversal and re-zeroing from `samples.csv`.
+#' @param edited Apply trims (before outlier rejection and smoothing, so trimmed
+#'   data never affects them), reversal and re-zeroing from `samples.csv`.
 #' @param calibrate Apply the reference material correction (see
 #'   [calibration_model()]). The 87Sr/86Sr columns are then corrected, and
 #'   `sr87_sr86_uncorrected`, `correction_factor`, `correction_u_rel` and
@@ -37,7 +38,7 @@ project_data <- function(project, sample_ids = NULL, edited = TRUE, calibrate = 
   })
   # Report progress for the runs that have to be reduced (not cached).
   todo <- !vapply(seq_along(sample_ids), \(i) {
-    file.exists(sample_cache_path(project, sample_ids[i], blanks[[i]]$blank))
+    file.exists(sample_cache_path(project, sample_ids[i], blanks[[i]]$blank, trimmed = edited))
   }, logical(1))
   done <- 0L
 
@@ -47,7 +48,7 @@ project_data <- function(project, sample_ids = NULL, edited = TRUE, calibrate = 
       done <<- done + 1L
       report_progress(done, sum(todo), id)
     }
-    res <- reduce_project_sample(project, id, blank = blanks[[i]]$blank)
+    res <- reduce_project_sample(project, id, blank = blanks[[i]]$blank, trimmed = edited)
     res$warnings <- c(res$warnings, blanks[[i]]$note)
     res
   })
@@ -71,9 +72,18 @@ project_regions <- function(project, sample_ids = NULL) {
   summarise_regions(data, project$regions)
 }
 
+# A sample's trims as reduce_runs() takes them, or NULL if it has none.
+sample_trims <- function(project, sample_id) {
+  row <- project$samples[sample_index(project, sample_id), ]
+  if (row$trim_start_s == 0 && row$trim_end_s == 0) return(NULL)
+  tibble::tibble(sample_id = sample_id, trim_start_s = row$trim_start_s,
+                 trim_end_s = row$trim_end_s)
+}
+
 # Where a sample's reduced data is cached: named by the sample and by
-# everything the reduction depends on.
-sample_cache_path <- function(project, sample_id, blank = NULL) {
+# everything the reduction depends on (including its trims, which are
+# applied before outlier rejection and smoothing).
+sample_cache_path <- function(project, sample_id, blank = NULL, trimmed = TRUE) {
   i <- sample_index(project, sample_id)
   settings <- sample_settings(project, sample_id)
   key <- rlang::hash(list(
@@ -82,6 +92,7 @@ sample_cache_path <- function(project, sample_id, blank = NULL) {
     reduction = settings$reduction,
     run_speed = settings$sample$run_speed_um_s,
     blank = blank,
+    trims = if (trimmed) sample_trims(project, sample_id),
     version = isofishr_version()
   ))
   file.path(project_file(project$path, "cache"), paste0(rlang::hash(sample_id), "_", key, ".rds"))
@@ -97,10 +108,10 @@ report_progress <- function(done, total, sample_id) {
   invisible()
 }
 
-reduce_project_sample <- function(project, sample_id, blank = NULL) {
+reduce_project_sample <- function(project, sample_id, blank = NULL, trimmed = TRUE) {
   i <- sample_index(project, sample_id)
   settings <- sample_settings(project, sample_id)
-  cache_path <- sample_cache_path(project, sample_id, blank)
+  cache_path <- sample_cache_path(project, sample_id, blank, trimmed)
   cache_dir <- dirname(cache_path)
   prefix <- paste0(rlang::hash(sample_id), "_")
 
@@ -113,7 +124,7 @@ reduce_project_sample <- function(project, sample_id, blank = NULL) {
   result <- withCallingHandlers({
     raw <- read_runfiles(project_file(project$path, project$samples$runfile[i]),
                          settings$import, sample_id)
-    reduce_runs(raw, settings, blank = blank)
+    reduce_runs(raw, settings, blank = blank, trims = if (trimmed) sample_trims(project, sample_id))
   }, warning = function(w) {
     warnings <<- c(warnings, conditionMessage(w))
     invokeRestart("muffleWarning")

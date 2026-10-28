@@ -9,7 +9,7 @@ reject_outliers(data, sd = 3, window = 20L)
 \arguments{
 \item{data}{Data from \code{\link[=correct_ratios]{correct_ratios()}}.}
 
-\item{sd}{Number of standard deviations; 0 turns rejection off.}
+\item{sd}{Number of (robust) standard deviations; 0 turns rejection off.}
 
 \item{window}{Rolling window width (cycles).}
 }
@@ -17,7 +17,17 @@ reject_outliers(data, sd = 3, window = 20L)
 \code{data} with \code{is_outlier} and \code{sr87_sr86_outlier} added.
 }
 \description{
-Flags cycles that deviate from the rolling median by more than \code{sd}
-rolling standard deviations. Rejected values move from \code{sr87_sr86} to
-\code{sr87_sr86_outlier}.
+Flags cycles that deviate by more than \code{sd} robust standard deviations
+from the median of their neighbours (the \code{window} cycles around them,
+without the cycle itself). The robust standard deviation is 1.4826 times
+the median absolute deviation from that median, taken over a wider window
+(at least 201 cycles, or the whole run if shorter) so it is stable.
+}
+\details{
+A rolling standard deviation (as in v1) is inflated by the outliers
+themselves: clusters of spikes, and single spikes in short windows, could
+not be found. With pure noise this filter flags close to the expected
+share of points (0.27\% at 3 SD). Where the robust spread is zero (many
+identical values) the ordinary standard deviation is used. Rejected values
+move from \code{sr87_sr86} to \code{sr87_sr86_outlier}.
 }

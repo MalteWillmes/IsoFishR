@@ -22,13 +22,22 @@ MASS <- c(
 #'   interpolated from baseline runs (see [project_baselines()]). When given,
 #'   the start of each run is not treated as blank; laser-off cycles are
 #'   removed by the 88Sr threshold.
+#' @param trims Optional trims: a data frame with `sample_id`, `trim_start_s`
+#'   and `trim_end_s`, seconds removed after the first and before the last
+#'   cycle of the run (see [apply_edits()]). They are applied before outlier
+#'   rejection and smoothing, so trimmed data never affects the result.
 #' @return A list with `data` (one row per integrated cycle) and `blank`
 #'   (mean blank voltages per sample, or `NULL` without blank correction).
+#'   `data` includes `run_start_s` and `run_end_s` (time of the run's first
+#'   and last cycle) and `profile_start_s` and `profile_end_s` (first and
+#'   last cycle passing the thresholds, before trims).
 #' @export
-reduce_runs <- function(raw, settings = default_settings(), blank = NULL) {
+reduce_runs <- function(raw, settings = default_settings(), blank = NULL, trims = NULL) {
   check_settings(settings)
   r <- settings$reduction
 
+  run_range <- dplyr::summarise(raw, run_start_s = min(time_s), run_end_s = max(time_s),
+                                .by = sample_id)
   data <- integrate_cycles(raw, r$integration)
 
   if (!is.null(blank)) {
@@ -46,10 +55,14 @@ reduce_runs <- function(raw, settings = default_settings(), blank = NULL) {
   }
 
   data <- data |>
+    dplyr::left_join(run_range, by = "sample_id") |>
     dplyr::mutate(
       distance_um = (time_s - min(time_s)) * settings$sample$run_speed_um_s,
+      profile_start_s = min(time_s),
+      profile_end_s = max(time_s),
       .by = sample_id
     ) |>
+    trim_runs(trims) |>
     correct_ratios(r$sr86_sr88_ref, r$rb85_rb87) |>
     reject_outliers(r$outlier_sd, r$outlier_window) |>
     smooth_ma(r$ma_window)
@@ -67,6 +80,30 @@ reduce_runs <- function(raw, settings = default_settings(), blank = NULL) {
   ))
 
   list(data = data, blank = blank)
+}
+
+# Keep only the cycles inside each run's trims. Trims are counted from the
+# run's first and last cycle (`run_start_s`, `run_end_s`, or the data's own
+# first and last time without them), so they stay on the same part of the
+# sample when the thresholds, blank time or integration change.
+trim_runs <- function(data, trims = NULL) {
+  if (is.null(trims) || nrow(trims) == 0 || nrow(data) == 0) return(data)
+  trims <- tibble::tibble(
+    sample_id = trims$sample_id,
+    .trim_start = dplyr::coalesce(as.numeric(trims$trim_start_s %||% 0), 0),
+    .trim_end = dplyr::coalesce(as.numeric(trims$trim_end_s %||% 0), 0)
+  )
+  if (!"run_start_s" %in% names(data)) {
+    data <- dplyr::mutate(data, run_start_s = min(time_s), run_end_s = max(time_s), .by = sample_id)
+  }
+  data |>
+    dplyr::left_join(trims, by = "sample_id") |>
+    dplyr::filter(
+      is.na(.data$.trim_start) |
+        (time_s >= .data$run_start_s + .data$.trim_start &
+           time_s <= .data$run_end_s - .data$.trim_end)
+    ) |>
+    dplyr::select(-".trim_start", -".trim_end")
 }
 
 #' Average consecutive cycles
@@ -169,12 +206,21 @@ correct_ratios <- function(data, sr86_sr88_ref = 0.1194, rb85_rb87 = 2.59712) {
 
 #' Reject outliers in 87Sr/86Sr
 #'
-#' Flags cycles that deviate from the rolling median by more than `sd`
-#' rolling standard deviations. Rejected values move from `sr87_sr86` to
-#' `sr87_sr86_outlier`.
+#' Flags cycles that deviate by more than `sd` robust standard deviations
+#' from the median of their neighbours (the `window` cycles around them,
+#' without the cycle itself). The robust standard deviation is 1.4826 times
+#' the median absolute deviation from that median, taken over a wider window
+#' (at least 201 cycles, or the whole run if shorter) so it is stable.
+#'
+#' A rolling standard deviation (as in v1) is inflated by the outliers
+#' themselves: clusters of spikes, and single spikes in short windows, could
+#' not be found. With pure noise this filter flags close to the expected
+#' share of points (0.27% at 3 SD). Where the robust spread is zero (many
+#' identical values) the ordinary standard deviation is used. Rejected values
+#' move from `sr87_sr86` to `sr87_sr86_outlier`.
 #'
 #' @param data Data from [correct_ratios()].
-#' @param sd Number of standard deviations; 0 turns rejection off.
+#' @param sd Number of (robust) standard deviations; 0 turns rejection off.
 #' @param window Rolling window width (cycles).
 #' @return `data` with `is_outlier` and `sr87_sr86_outlier` added.
 #' @export
@@ -184,8 +230,9 @@ reject_outliers <- function(data, sd = 3, window = 20L) {
   }
   data |>
     dplyr::mutate(
-      .median = roll_median(sr87_sr86, window, partial = FALSE),
-      .sd = roll_stats(sr87_sr86, window, partial = FALSE)$sd,
+      .median = roll_median_others(sr87_sr86, window),
+      .sd = robust_spread(sr87_sr86 - .data$.median, max(201L, 5L * as.integer(window))),
+      .sd = dplyr::if_else(.data$.sd > 0, .data$.sd, stats::sd(sr87_sr86 - .data$.median, na.rm = TRUE)),
       .by = sample_id
     ) |>
     dplyr::mutate(

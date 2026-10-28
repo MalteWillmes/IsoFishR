@@ -11,7 +11,8 @@ utils::globalVariables(c(
   "sr86_sr88", "mass_bias", "rb87", "sr87", "sr87_sr86", "sr87_sr86_rb",
   "sr87_sr86_outlier", "sr87_sr86_ma", "sr87_sr86_ma_sd", "sr87_sr86_ma_se",
   "sr87_sr86_ma_n", "sr87_sr86_spline", "sr87_sr86_spline_se", "sr87_sr86_spline_edf", "sr87_sr86_value",
-  "is_outlier", "trim_start_s", "trim_end_s", "reverse", "rezero",
+  "is_outlier", "trim_start_s", "trim_end_s", "reverse", "rezero", "run_start_s", "run_end_s",
+  "profile_start_s", "profile_end_s",
   "region", "start_s", "end_s", "cp_segment", "cp_mean", "sr84_sr86", "sd", "n",
   "n_points", "segment", "y", "outlier"
 ))

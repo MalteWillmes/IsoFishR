@@ -296,15 +296,20 @@ reference_suggestions <- function(project) {
 #' @export
 find_runfiles <- function(dir, import = default_settings()$import) {
   ext <- sub("^[.]", "", import$extension %||% "run")
+  # "x/" and "x" give the same folder names (but a drive root keeps its "/").
+  if (!grepl("^([A-Za-z]:)?[/\\]+$", dir)) dir <- sub("[/\\]+$", "", dir)
   paths <- list.files(dir, pattern = paste0("[.]", ext, "$"), recursive = TRUE,
                       full.names = TRUE, ignore.case = TRUE)
   ids <- tools::file_path_sans_ext(basename(paths))
+  # Names differing only in case count as the same: they would be the same
+  # raw file on Windows.
+  key <- tolower(ids)
   tibble::tibble(
     path = paths,
     file = basename(paths),
     sample_id = ids,
     folder = dirname(substring(paths, nchar(dir) + 2)),
-    duplicate = ids %in% ids[duplicated(ids)]
+    duplicate = key %in% key[duplicated(key)]
   ) |>
     dplyr::arrange(.data$folder, .data$file)
 }

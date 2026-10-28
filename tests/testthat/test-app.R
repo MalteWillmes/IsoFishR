@@ -36,7 +36,8 @@ test_that("workspace edits are saved to the project", {
 
     # 100 µm trim at the default 10 µm/s run speed = 10 s
     session$setInputs(trim_start_um = 100)
-    expect_equal(rv()$samples$trim_start_s[1], 10)
+    expect_equal(rv()$samples$trim_start_s[1], profile_trim(rv(), rv()$samples$sample_id[1], 10),
+                 tolerance = 1e-6)
     expect_equal(min(sample_data()$distance_um), 0)
 
     # Selecting the second sample must not copy values from the first

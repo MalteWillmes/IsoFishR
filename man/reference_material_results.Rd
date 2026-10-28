@@ -24,6 +24,6 @@ One row per reference material run: the measured (uncorrected) and
 corrected mean 87Sr/86Sr, standard errors with and without the correction
 uncertainty, and the deviation from the accepted value. For secondary
 reference materials this is the accuracy check of the correction; primary
-runs are corrected to their accepted value by construction (exactly so
-with the linear and step fits).
+runs are corrected to close to their accepted value by construction (exactly
+so with the step fit; within a run the other fits can vary slightly).
 }

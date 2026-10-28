@@ -141,7 +141,7 @@ SMOOTHING_METHODS <- c("none", "ma", "spline", "ma_spline")
 #' @export
 write_settings <- function(settings, path) {
   check_settings(settings)
-  yaml::write_yaml(settings, path)
+  yaml::write_yaml(settings, path, precision = 15)
   invisible(path)
 }
 

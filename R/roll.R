@@ -64,6 +64,43 @@ roll_median <- function(x, width, partial = TRUE) {
   out
 }
 
+# Robust standard deviation of residuals `r` (1.4826 x median absolute
+# value), rolling over `width` values, or over all of them if fewer.
+robust_spread <- function(r, width) {
+  n <- length(r)
+  if (n == 0) return(numeric())
+  a <- abs(r)
+  width <- as.integer(width)
+  if (width %% 2L == 0L) width <- width + 1L
+  if (n <= width) return(rep(1.4826 * stats::median(a, na.rm = TRUE), n))
+  1.4826 * roll_median(a, width, partial = FALSE)
+}
+
+# Rolling median of each value's neighbours, leaving the value itself out
+# (so an outlier doesn't pull its own reference towards it). Windows at the
+# ends are shifted inwards to keep their full width.
+roll_median_others <- function(x, width) {
+  n <- length(x)
+  if (n < 2) return(rep(NA_real_, n))
+  width <- min(as.integer(width), n)
+  b <- roll_bounds(n, width)
+  full <- (b$hi - b$lo + 1L) == width
+  if (any(full)) {
+    first <- which(full)[1]
+    last <- utils::tail(which(full), 1)
+    b$lo[seq_len(first - 1L)] <- b$lo[first]
+    b$hi[seq_len(first - 1L)] <- b$hi[first]
+    if (last < n) {
+      b$lo[(last + 1L):n] <- b$lo[last]
+      b$hi[(last + 1L):n] <- b$hi[last]
+    }
+  }
+  vapply(seq_len(n), \(i) {
+    w <- x[setdiff(b$lo[i]:b$hi[i], i)]
+    if (all(is.na(w))) NA_real_ else stats::median(w, na.rm = TRUE)
+  }, numeric(1))
+}
+
 # Replace values outside the `keep` range with the first/last kept value.
 # Falls back to the unchanged values if no window is complete.
 extend_ends <- function(x, keep) {
