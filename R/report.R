@@ -98,10 +98,11 @@ report_markdown <- function(report) {
 # Settings as one table per section, labelled as in the app.
 settings_markdown <- function(settings) {
   spec <- settings_spec()
-  sections <- c(reduction = "Data reduction", sample = "Samples and laser",
+  sections <- c(reduction = "Data reduction", qc = "Krypton warnings", sample = "Samples and laser",
                 import = "Runfile import", regions = "Regions")
   purrr::imap(sections, \(title, section) {
     values <- settings[[section]]
+    if (length(values) == 0) return(NULL)  # e.g. a record written before the section existed
     keys <- names(values)
     labels <- spec$label[match(paste(section, keys), paste(spec$section, spec$key))]
     extra <- c(preset = "Instrument preset", columns = "Column numbers",

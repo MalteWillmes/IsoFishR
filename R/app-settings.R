@@ -18,6 +18,8 @@ settings_spec <- function() {
       c("Moving average + spline" = "ma_spline", "Moving average" = "ma", "Spline" = "spline",
         "None" = "none"),
     "reduction", "ma_window",        "Moving average window (points)",    "integer", NULL,
+    "qc",        "kr83_max_v",       "Kr warning: max 83Kr (V)",          "numeric", NULL,
+    "qc",        "kr86_max_pct",     "Kr warning: max 86Kr (% of mass 86)", "numeric", NULL,
     "sample",    "run_speed_um_s",   "Run speed (\u00b5m/s)",             "numeric", NULL,
     "sample",    "analysis_type",    "Analysis type",                     "choice",
       c("Line" = "line", "Spot" = "spot"),

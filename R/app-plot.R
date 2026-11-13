@@ -27,13 +27,16 @@ TOGGLE_TRACES <- c(points = "Data", outliers = "Outliers", seawater = "Seawater"
 #' @param source plotly event source ID.
 #' @param lines 87Sr/86Sr values to mark with labelled horizontal lines
 #'   (e.g. values of known habitats).
+#' @param kr_limits Krypton warning levels (`kr83_max_v`, `kr86_max_pct`; the
+#'   project's `settings$qc`), drawn as dashed lines on the Kr panels.
 #' @param smoothing The sample's smoothing method (see [default_settings()]):
 #'   which smoothed lines to draw. By default worked out from `data`.
 #' @return A built plotly object (see [plotly::plotly_build()]).
 #' @export
 profile_plot <- function(data, regions = NULL,
                          show = c("points", "outliers", "ma", "spline", "band", "strips"),
-                         source = "profile", lines = numeric(), smoothing = NULL) {
+                         source = "profile", lines = numeric(), smoothing = NULL,
+                         kr_limits = default_settings()$qc) {
   has_spline <- "sr87_sr86_spline" %in% names(data) && any(!is.na(data$sr87_sr86_spline))
   smoothing <- smoothing %||% if (isTRUE(all.equal(data$sr87_sr86_value, data$sr87_sr86))) {
     "none"
@@ -63,7 +66,8 @@ profile_plot <- function(data, regions = NULL,
     up = round(if (draw_spline) spline + 2 * spline_se else data$sr87_sr86_ma_ci95_up, 6),
     cp = if ("cp_mean" %in% names(data)) round(data$cp_mean, 6) else NA_real_,
     total_sr = signif(data$total_sr, 4),
-    kr83 = signif(data$raw83, 4),
+    kr83 = signif(if ("kr83_v" %in% names(data)) data$kr83_v else data$raw83, 4),
+    kr86 = signif(if ("kr86_pct" %in% names(data)) data$kr86_pct else NA_real_, 4),
     rb85_sr88 = signif(data$rb85_sr88, 4)
   )
   hover <- "%{x:.0f} \u00b5m<br>%{y:.5f}<extra></extra>"
@@ -127,19 +131,27 @@ profile_plot <- function(data, regions = NULL,
   plots <- list(main)
   heights <- 1
   if ("strips" %in% show) {
-    strip <- function(y, title, colour, fmt) {
-      plotly::plot_ly(d, x = ~x, source = source) |>
+    strip <- function(y, title, colour, fmt, limit = NULL) {
+      p <- plotly::plot_ly(d, x = ~x, source = source) |>
         plotly::add_trace(y = y, type = "scattergl", mode = "markers",
                           marker = list(color = colour, size = 3), showlegend = FALSE,
-                          hovertemplate = paste0("%{y:", fmt, "}<extra>", title, "</extra>")) |>
-        plotly::layout(yaxis = list(title = title, exponentformat = "e"))
+                          hovertemplate = paste0("%{y:", fmt, "}<extra>", title, "</extra>"))
+      if (!is.null(limit)) {
+        # Krypton warning level
+        p <- plotly::add_lines(p, x = range(d$x), y = rep(limit, 2), showlegend = FALSE,
+                               line = list(color = "#b2182b", dash = "dash", width = 1),
+                               hovertemplate = paste0("Warning level ", format(limit),
+                                                      "<extra></extra>"))
+      }
+      plotly::layout(p, yaxis = list(title = title, exponentformat = "e"))
     }
     plots <- c(plots, list(
       strip(~total_sr, "Total Sr (V)", "#d62728", ".2f"),
-      strip(~kr83, "<sup>83</sup>Kr (V)", "#2ca02c", ".5f"),
+      strip(~kr83, "<sup>83</sup>Kr (V)", "#2ca02c", ".2e", kr_limits$kr83_max_v),
+      strip(~kr86, "<sup>86</sup>Kr (% of 86)", "#1b9e77", ".2f", kr_limits$kr86_max_pct),
       strip(~rb85_sr88, "<sup>85</sup>Rb/<sup>88</sup>Sr", "#ff7f0e", ".5f")
     ))
-    heights <- c(0.4, 0.2, 0.2, 0.2)
+    heights <- c(0.36, 0.16, 0.16, 0.16, 0.16)
   }
 
   p <- plotly::subplot(plots, nrows = length(plots), shareX = TRUE, titleY = TRUE,

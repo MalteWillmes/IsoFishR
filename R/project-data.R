@@ -80,6 +80,10 @@ sample_trims <- function(project, sample_id) {
                  trim_end_s = row$trim_end_s)
 }
 
+# Raised when the reduced data gains or changes columns (3: krypton
+# monitoring), so caches written before are not used.
+REDUCED_FORMAT <- 3L
+
 # Where a sample's reduced data is cached: named by the sample and by
 # everything the reduction depends on (including its trims, which are
 # applied before outlier rejection and smoothing).
@@ -93,7 +97,8 @@ sample_cache_path <- function(project, sample_id, blank = NULL, trimmed = TRUE) 
     run_speed = settings$sample$run_speed_um_s,
     blank = blank,
     trims = if (trimmed) sample_trims(project, sample_id),
-    version = isofishr_version()
+    version = isofishr_version(),
+    format = REDUCED_FORMAT
   ))
   file.path(project_file(project$path, "cache"), paste0(rlang::hash(sample_id), "_", key, ".rds"))
 }

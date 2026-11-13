@@ -49,10 +49,10 @@ reduce_runs <- function(raw, settings = default_settings(), blank = NULL, trims 
 
   # Thresholds are applied to the uncorrected 88Sr signal, as in v1.
   data <- dplyr::filter(data, raw88 >= r$raw88_min_v, raw88 <= r$raw88_max_v)
-
   if (!is.null(blank)) {
     data <- subtract_blank(data, blank)
   }
+  data <- krypton_signals(data)
 
   data <- data |>
     dplyr::left_join(run_range, by = "sample_id") |>
@@ -151,6 +151,21 @@ summarise_blank <- function(data, blank_time_s, raw88_min_v) {
       .by = sample_id
     ) |>
     dplyr::rename_with(\(x) sub("^raw", "blk", x), raw88:raw83)
+}
+
+# Natural 86Kr/83Kr (17.279% / 11.500%, IUPAC abundances).
+KR86_KR83 <- 1.50252
+
+# Krypton monitoring, from the blank-subtracted signals (raw instrument
+# signals can carry a baseline offset, e.g. about -0.006 V on every mass in
+# Nu runfiles, so only the change from the gas blank shows krypton):
+# `kr83_v`, the 83Kr signal (V), and `kr86_pct`, the 86Kr share of the mass
+# 86 signal (86Kr + 86Sr, %), with 86Kr estimated from 83Kr and the natural
+# ratio.
+krypton_signals <- function(data) {
+  dplyr::mutate(data,
+                kr83_v = raw83,
+                kr86_pct = 100 * KR86_KR83 * raw83 / raw86)
 }
 
 subtract_blank <- function(data, blank) {

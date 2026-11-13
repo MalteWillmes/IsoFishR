@@ -27,6 +27,7 @@ workspace_ui <- function(id) {
           class = "d-flex align-items-center gap-3 flex-wrap",
           shiny::textOutput(ns("sample_title"), inline = TRUE),
           shiny::uiOutput(ns("calibration_badge"), inline = TRUE),
+          shiny::uiOutput(ns("kr_badge"), inline = TRUE),
           shiny::div(
             class = "ms-auto",
             shiny::checkboxGroupInput(
@@ -170,6 +171,7 @@ workspace_server <- function(id, project) {
     # selection and scroll position are kept.
     output$samples <- DT::renderDT({
       data <- shiny::isolate(table_data())
+      known_ids(data$Sample)
       selected <- match(shiny::isolate(current()) %||% NA_character_, data$Sample)
       if (is.na(selected)) selected <- if (nrow(data) > 0) 1L else NULL
       DT::datatable(
@@ -183,11 +185,22 @@ workspace_server <- function(id, project) {
     })
     table_proxy <- DT::dataTableProxy("samples")
 
+    # Sample IDs last shown in the table, to notice newly added runs.
+    known_ids <- shiny::reactiveVal(NULL)
+
     shiny::observeEvent(table_data(), {
+      ids <- table_data()$Sample
       DT::replaceData(table_proxy, table_data(), rownames = FALSE, resetPaging = FALSE,
                       clearSelection = "none")
-      # Rows may have been added or removed, so re-select by sample ID.
-      i <- match(shiny::isolate(current()) %||% NA_character_, table_data()$Sample)
+      # After runfiles are added, show the first new one; otherwise keep the
+      # selected sample, or show the first one if none is selected.
+      before <- shiny::isolate(known_ids())
+      added <- if (is.null(before)) character() else setdiff(ids, before)
+      known_ids(ids)
+      id <- if (length(added) > 0) added[1] else shiny::isolate(current())
+      i <- match(id %||% NA_character_, ids)
+      if (is.na(i) && length(ids) > 0) i <- 1L
+      if (!is.na(i)) current(ids[i]) else current(NULL)
       DT::selectRows(table_proxy, if (is.na(i)) NULL else i)
     }, ignoreInit = TRUE)
 
@@ -265,6 +278,20 @@ workspace_server <- function(id, project) {
       paste0(row$sample_id, if (row$status == "excluded") " (excluded)")
     })
 
+    # Krypton warning levels; a reactiveVal so only a change to them (not any
+    # project change) redraws the plot.
+    qc_limits <- shiny::reactiveVal(default_settings()$qc)
+    shiny::observe(qc_limits(shiny::req(project())$settings$qc))
+
+    output$kr_badge <- shiny::renderUI({
+      k <- krypton_summary(sample_data(), qc_limits())
+      shiny::req(nrow(k) == 1, isTRUE(k$kr_flag))
+      shiny::span(class = "badge text-bg-danger",
+                  title = "Krypton above the warning levels set under Settings",
+                  sprintf("Kr high: 83Kr up to %.1e V, 86Kr up to %.2f%%",
+                          k$kr83_max_v, k$kr86_max_pct))
+    })
+
     # Whether the plotted 87Sr/86Sr is corrected to the primary reference
     # material (Calibration step) or raw.
     output$calibration_badge <- shiny::renderUI({
@@ -318,7 +345,8 @@ workspace_server <- function(id, project) {
         }
       ))
       p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"),
-                        lines = ratio_lines(), smoothing = shiny::isolate(data_key())$reduction$smoothing)
+                        lines = ratio_lines(), smoothing = shiny::isolate(data_key())$reduction$smoothing,
+                        kr_limits = qc_limits())
       toggle_idx(toggle_trace_indices(p))
       plot_renders(shiny::isolate(plot_renders()) + 1L)
       plot_ready(TRUE)

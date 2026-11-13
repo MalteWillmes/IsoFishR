@@ -376,3 +376,49 @@ test_that("the moving average and the spline can be shown separately", {
   expect_length(idx[names(idx) == "ma"], 1)
   expect_length(idx[names(idx) == "spline"], 1)
 })
+
+test_that("krypton is monitored from the measured signals and flagged above the warning levels", {
+  raw <- read_runfiles(salmon_files(1))
+  d <- reduce_runs(raw)$data
+  expect_true(all(c("kr83_v", "kr86_pct") %in% names(d)))
+  # Measured before blank subtraction: 86Kr share from 83Kr and the natural ratio
+  i <- which(!is.na(d$kr83_v))[10]
+  expect_equal(d$kr86_pct[i], 100 * 1.50252 * d$kr83_v[i] / (d$raw86[i] + 0), tolerance = 0.5)
+  k <- krypton_summary(d, list(kr83_max_v = 1, kr86_max_pct = 100))
+  expect_false(k$kr_flag)
+  k2 <- krypton_summary(d, list(kr83_max_v = max(d$kr83_v) / 2, kr86_max_pct = 100))
+  expect_true(k2$kr_flag)
+  expect_equal(k2$kr83_max_v, max(d$kr83_v))
+
+  b <- plotly::plotly_build(profile_plot(d, kr_limits = list(kr83_max_v = 0.002, kr86_max_pct = 1)))
+  warn <- Filter(\(t) grepl("Warning level", t$hovertemplate %||% ""), b$x$data)
+  expect_length(warn, 2)
+  expect_equal(unique(unlist(warn[[1]]$y)), 0.002)
+})
+
+test_that("samples.csv and profiles.csv carry the krypton warnings", {
+  p <- app_project()
+  p <- update_project_settings(p, list(qc = list(kr83_max_v = 1e-9)))
+  s <- summarise_project_samples(p)
+  expect_true(all(s$kr_flag))
+  expect_true(all(c("kr83_max_v", "kr86_max_pct") %in% names(s)))
+  expect_true("kr86_pct" %in% names(project_profiles(p)))
+  expect_error(update_project_settings(p, list(qc = list(kr86_max_pct = 0))), "kr86_max_pct")
+})
+
+test_that("after adding runfiles the workspace shows the first new profile", {
+  path <- file.path(withr::local_tempdir(), "Empty")
+  p <- create_project(path, user = "tester")
+  withr::defer(close_project(p))
+  rv <- shiny::reactiveVal(p)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    session$flushReact()
+    expect_null(current())
+    rv(suppressMessages(add_runfiles(rv(), salmon_files(2))))
+    session$flushReact()
+    expect_equal(current(), rv()$samples$sample_id[1])
+    rv(suppressMessages(add_runfiles(rv(), salmon_files(3)[3])))
+    session$flushReact()
+    expect_equal(current(), rv()$samples$sample_id[3])
+  })
+})

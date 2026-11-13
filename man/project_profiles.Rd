@@ -28,6 +28,7 @@ Columns: \code{sample_id}, \code{distance_um}, \code{time_s}, \code{sr87_sr86} (
 \code{sr87_sr86_spline_se} (spline and its SE), each filled when the sample's
 smoothing method (in \code{smoothing}) uses it, \code{region} (region name(s) the point falls
 in, separated by \verb{;}), \code{cp_segment} and \code{cp_mean} (for samples with
-changepoints enabled), and the signal columns \code{total_sr_v}, \code{kr83_v},
+changepoints enabled), and the signal columns \code{total_sr_v}, \code{kr83_v} (blank-
+subtracted), \code{kr86_pct} (86Kr as \% of mass 86),
 \code{rb85_sr88} and \code{sr84_sr86}.
 }

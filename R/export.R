@@ -82,6 +82,7 @@ summarise_project_samples <- function(project, data = NULL, include_excluded = F
     dplyr::left_join(add_correction(stats, data), by = "sample_id") |>
     dplyr::left_join(n_regions, by = "sample_id") |>
     dplyr::left_join(cp, by = "sample_id") |>
+    dplyr::left_join(krypton_summary(data, project$settings$qc), by = "sample_id") |>
     dplyr::mutate(dplyr::across(c("n_regions", "n_cp_segments"), \(x) dplyr::coalesce(x, 0L))) |>
     dplyr::relocate("setting_overrides", .after = dplyr::last_col())
 }
@@ -167,7 +168,8 @@ project_settings_table <- function(project, include_excluded = FALSE) {
 #' `sr87_sr86_spline_se` (spline and its SE), each filled when the sample's
 #' smoothing method (in `smoothing`) uses it, `region` (region name(s) the point falls
 #' in, separated by `;`), `cp_segment` and `cp_mean` (for samples with
-#' changepoints enabled), and the signal columns `total_sr_v`, `kr83_v`,
+#' changepoints enabled), and the signal columns `total_sr_v`, `kr83_v` (blank-
+#' subtracted), `kr86_pct` (86Kr as % of mass 86),
 #' `rb85_sr88` and `sr84_sr86`.
 #'
 #' @inheritParams project_summaries
@@ -226,7 +228,8 @@ project_profiles <- function(project, data = NULL, include_excluded = FALSE) {
       cp_segment = .data$cp_segment,
       cp_mean = .data$cp_mean,
       total_sr_v = .data$total_sr,
-      kr83_v = raw83,
+      kr83_v = .data$kr83_v,
+      kr86_pct = .data$kr86_pct,
       rb85_sr88 = .data$rb85_sr88,
       sr84_sr86
     )
@@ -322,10 +325,11 @@ round_summary <- function(x) {
                                     "sr87_sr86_ma", "sr87_sr86_spline", "cp_mean", "sr84_sr86", "measured",
                                     "accepted")), \(v) round(v, 6)),
       dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_ma_se", "sr87_sr86_spline_se",
-                                    "rb85_sr88", "kr83_v", "deviation", "accepted_2s")),
+                                    "rb85_sr88", "kr83_v", "kr83_max_v", "deviation", "accepted_2s")),
                     \(v) round(v, 7)),
       dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),
       dplyr::across(dplyr::any_of("deviation_ppm"), \(v) round(v, 1)),
+      dplyr::across(dplyr::any_of(c("kr86_pct", "kr86_max_pct")), \(v) round(v, 3)),
       dplyr::across(dplyr::any_of("total_sr_v"), \(v) round(v, 5)),
       dplyr::across(dplyr::matches("_um$|_s$") & dplyr::where(is.double), \(v) round(v, 1))
     )
@@ -451,7 +455,7 @@ export_report <- function(project, files = character(), include_excluded = FALSE
       primary = if (nzchar(cal$primary)) describe_rm(cal$primary),
       secondary = purrr::map(secondary, describe_rm)
     ),
-    settings = project$settings[c("sample", "import", "reduction", "regions")],
+    settings = project$settings[c("sample", "import", "reduction", "qc", "regions")],
     sample_setting_overrides = as.list(rlang::set_names(overrides$settings, overrides$sample_id))
   )
 }

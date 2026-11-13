@@ -38,7 +38,7 @@ project_settings_server <- function(id, project) {
       shown_preset(s$import$preset %||% "")
       bslib::layout_columns(
         col_widths = c(4, 4, 4),
-        bslib::card(bslib::card_header("Data reduction"), settings_inputs(ns, s, "reduction")),
+        bslib::card(bslib::card_header("Data reduction"), settings_inputs(ns, s, c("reduction", "qc"))),
         bslib::card(
           bslib::card_header("Samples and laser"),
           settings_inputs(ns, s, "sample"),
@@ -158,7 +158,7 @@ project_settings_server <- function(id, project) {
 
     shiny::observeEvent(input$save, {
       p <- project()
-      new <- settings_from_inputs(input, p$settings, c("reduction", "sample", "import"))
+      new <- settings_from_inputs(input, p$settings, c("reduction", "qc", "sample", "import"))
       new$import$preset <- input$import_preset %||% ""
       labels <- trimws(strsplit(input$region_labels %||% "", "\n")[[1]])
       new$regions$default_labels <- labels[nzchar(labels)]

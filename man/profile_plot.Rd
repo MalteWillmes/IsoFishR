@@ -10,7 +10,8 @@ profile_plot(
   show = c("points", "outliers", "ma", "spline", "band", "strips"),
   source = "profile",
   lines = numeric(),
-  smoothing = NULL
+  smoothing = NULL,
+  kr_limits = default_settings()$qc
 )
 }
 \arguments{
@@ -31,6 +32,9 @@ they can be switched on without rebuilding the plot.}
 
 \item{smoothing}{The sample's smoothing method (see \code{\link[=default_settings]{default_settings()}}):
 which smoothed lines to draw. By default worked out from \code{data}.}
+
+\item{kr_limits}{Krypton warning levels (\code{kr83_max_v}, \code{kr86_max_pct}; the
+project's \code{settings$qc}), drawn as dashed lines on the Kr panels.}
 }
 \value{
 A built plotly object (see \code{\link[plotly:plotly_build]{plotly::plotly_build()}}).
