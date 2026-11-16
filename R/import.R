@@ -26,34 +26,144 @@ read_runfiles <- function(paths, import = default_settings()$import,
 
 #' Read the acquisition time of runfiles
 #'
-#' Reads the date and time a run was started from its header, using the
-#' `timestamp_line` and `timestamp_format` of the import settings (for Nu
-#' Plasma files: line 45, e.g. `"08/12/2017","04:31:02 PM"`). Quotes are
-#' removed and commas or tabs between the date and time become spaces before
-#' the line is parsed with [base::strptime()] `format`. Times are treated as
-#' the instrument clock and returned in UTC, so daylight saving changes never
-#' reorder runs.
+#' Reads the date and time a run was started from its header line
+#' `timestamp_line` (for Nu Plasma files line 45, e.g.
+#' `"22/07/2025","11:06:47 AM"`). Quotes are removed and commas or tabs
+#' between the date and time become spaces.
+#'
+#' With `timestamp_format = "auto"` (the default) the line is read
+#' flexibly: day/month/year, month/day/year or year-month-day with `/`, `.`
+#' or `-`, 2- or 4-digit years, English month names (`8 Aug 2016`,
+#' `Aug 8, 2016`), and 12- or 24-hour times with or without seconds. Whether
+#' a numeric date is day- or month-first is decided from all the lines read
+#' together (and those in `context`): a first number above 12 means
+#' day-first, a second number above 12 month-first; if no date decides it,
+#' day-first is assumed, as Nu instruments write. Any other
+#' `timestamp_format` is used with [base::strptime()], and lines it can't
+#' read are then read automatically.
+#'
+#' Times are treated as the instrument clock and returned in UTC, so
+#' daylight saving changes never reorder runs.
 #'
 #' @param paths Paths to runfiles.
 #' @param import The `import` section of a settings list.
+#' @param context Paths of other runfiles of the same project, used only to
+#'   decide the day/month order (e.g. the runs already in the project when
+#'   adding a few new ones).
 #' @return A POSIXct vector (`NA` where there is no timestamp line or it
-#'   could not be parsed).
+#'   could not be read).
 #' @export
-read_acquisition_times <- function(paths, import = default_settings()$import) {
+read_acquisition_times <- function(paths, import = default_settings()$import,
+                                   context = character()) {
   line_no <- as.integer(import$timestamp_line %||% 0L)
-  if (is.na(line_no) || line_no < 1) return(as.POSIXct(rep(NA_real_, length(paths)), tz = "UTC"))
+  if (length(paths) == 0 || is.na(line_no) || line_no < 1) {
+    return(as.POSIXct(rep(NA_real_, length(paths)), tz = "UTC"))
+  }
+  text <- timestamp_text(paths, line_no)
+  fmt <- import$timestamp_format %||% "auto"
+  out <- as.POSIXct(rep(NA_real_, length(text)), tz = "UTC")
+  if (!identical(fmt, "auto") && nzchar(fmt)) {
+    # Parse in the C locale so "AM"/"PM" and month names work on any system.
+    old <- Sys.getlocale("LC_TIME")
+    on.exit(Sys.setlocale("LC_TIME", old), add = TRUE)
+    Sys.setlocale("LC_TIME", "C")
+    out <- as.POSIXct(strptime(text, fmt, tz = "UTC"))
+  }
+  todo <- is.na(out) & !is.na(text)
+  if (any(todo)) {
+    order <- date_order(c(text, if (length(context)) timestamp_text(context, line_no)))
+    out[todo] <- parse_timestamps(text[todo], order)
+  }
+  out
+}
+
+# The timestamp line of each file, with quotes removed and separators
+# between the date and time turned into spaces (NA if missing or unreadable;
+# a missing file just has no time and must not stop a project opening).
+timestamp_text <- function(paths, line_no) {
+  # A date and a time on one line (numeric date, or a month name).
+  looks_like_time <- function(x) {
+    grepl("\\d{1,2}:\\d{2}", x) &
+      (grepl(NUM_DATE, x) | grepl("(?i)\\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\b", x, perl = TRUE))
+  }
   text <- vapply(paths, \(p) {
-    # A missing or unreadable file just has no time (it is reported when
-    # the run is reduced); it must not stop the project from opening.
-    x <- tryCatch(read_text_lines(p, n = line_no), error = function(e) character())
-    if (length(x) < line_no) NA_character_ else x[[line_no]]
+    # A header with missing or extra lines moves the timestamp: if the
+    # expected line has none, the nearest line that does is used.
+    x <- tryCatch(read_text_lines(p, n = line_no + 20L), error = function(e) character())
+    if (length(x) == 0) return(NA_character_)
+    if (length(x) >= line_no && looks_like_time(x[[line_no]])) return(x[[line_no]])
+    hits <- which(looks_like_time(x))
+    if (length(hits) == 0) return(NA_character_)
+    x[[hits[which.min(abs(hits - line_no))]]]
   }, character(1), USE.NAMES = FALSE)
-  text <- trimws(gsub("[,\t]+", " ", gsub("\"", "", text)))
-  # Parse in the C locale so "AM"/"PM" and month names work on any system.
-  old <- Sys.getlocale("LC_TIME")
-  on.exit(Sys.setlocale("LC_TIME", old), add = TRUE)
-  Sys.setlocale("LC_TIME", "C")
-  as.POSIXct(strptime(text, import$timestamp_format, tz = "UTC"))
+  text <- trimws(gsub("[,\t;]+", " ", gsub("\"", "", text)))
+  text[!nzchar(text)] <- NA_character_
+  text
+}
+
+NUM_DATE <- "(\\d{1,4})[/.-](\\d{1,2})[/.-](\\d{2,4})"
+
+# "dmy" or "mdy" for the numeric dates in `text` (see read_acquisition_times()).
+date_order <- function(text) {
+  m <- regmatches(text, regexec(NUM_DATE, text))
+  m <- m[lengths(m) == 4]
+  if (length(m) == 0) return("dmy")
+  a <- as.integer(vapply(m, `[`, "", 2))
+  b <- as.integer(vapply(m, `[`, "", 3))
+  year_first <- nchar(vapply(m, `[`, "", 2)) == 4
+  a <- a[!year_first]
+  b <- b[!year_first]
+  if (any(a > 12, na.rm = TRUE)) "dmy" else if (any(b > 12, na.rm = TRUE)) "mdy" else "dmy"
+}
+
+# Parse timestamp text without a fixed format (see read_acquisition_times()).
+parse_timestamps <- function(text, order = "dmy") {
+  months <- tolower(month.abb)
+  one <- function(x) {
+    if (is.na(x)) return(NA_real_)
+    y <- mo <- d <- NA_integer_
+    num <- regmatches(x, regexec(NUM_DATE, x))[[1]]
+    if (length(num) == 4) {
+      p <- as.integer(num[2:4])
+      if (nchar(num[2]) == 4) {
+        y <- p[1]; mo <- p[2]; d <- p[3]
+      } else if (order == "mdy") {
+        mo <- p[1]; d <- p[2]; y <- p[3]
+      } else {
+        d <- p[1]; mo <- p[2]; y <- p[3]
+      }
+      rest <- sub(NUM_DATE, " ", x)
+    } else {
+      # Month names: "8 Aug 2016", "08-Aug-2016", "Aug 8 2016", "August 8, 2016"
+      word <- regmatches(x, regexpr("[A-Za-z]{3,9}", x))
+      mo <- if (length(word)) match(substr(tolower(word), 1, 3), months) else NA_integer_
+      if (is.na(mo)) return(NA_real_)
+      no_time <- gsub("\\d{1,2}:\\d{2}(:\\d{2}(\\.\\d+)?)?", " ", x)
+      nums <- as.integer(regmatches(no_time, gregexpr("\\d{1,4}", no_time))[[1]])
+      if (length(nums) < 2) return(NA_real_)
+      y <- nums[nchar(nums) == 4][1] %|% nums[length(nums)]
+      d <- setdiff(nums, y)[1]
+      rest <- no_time <- x
+    }
+    if (!is.na(y) && y < 100) y <- y + 2000L
+    tm <- regmatches(rest, regexec("(\\d{1,2}):(\\d{2})(?::(\\d{2}(?:\\.\\d+)?))?\\s*([AaPp][Mm])?",
+                                   rest, perl = TRUE))[[1]]
+    h <- mi <- 0
+    s <- 0
+    if (length(tm) == 5) {
+      h <- as.integer(tm[2])
+      mi <- as.integer(tm[3])
+      s <- if (nzchar(tm[4])) as.numeric(tm[4]) else 0
+      ampm <- toupper(tm[5])
+      if (ampm == "PM" && h < 12) h <- h + 12L
+      if (ampm == "AM" && h == 12) h <- 0L
+    }
+    if (anyNA(c(y, mo, d)) || mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) {
+      return(NA_real_)
+    }
+    as.numeric(ISOdatetime(y, mo, d, h, mi, s, tz = "UTC"))
+  }
+  as.POSIXct(vapply(text, one, numeric(1), USE.NAMES = FALSE), origin = "1970-01-01", tz = "UTC")
 }
 
 # Reads one runfile. If the header doesn't match the import settings (e.g. a

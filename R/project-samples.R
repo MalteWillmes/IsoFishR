@@ -84,7 +84,9 @@ add_runfiles <- function(project, paths, sample_ids = NULL, source_names = basen
 
   acquired <- rep("", n)
   if (any(replace | is_new)) {
-    acquired[replace | is_new] <- format_time(read_acquisition_times(paths[replace | is_new], import))
+    # The project's other runs help decide whether dates are day- or month-first.
+    acquired[replace | is_new] <- format_time(read_acquisition_times(
+      paths[replace | is_new], import, context = project_file(project$path, project$samples$runfile)))
     no_time <- (replace | is_new) & !nzchar(acquired) & (import$timestamp_line %||% 0) > 0
     detail[no_time] <- trimws(paste(detail[no_time], if (any(no_time)) {
       "(no readable acquisition time: it can't be placed in the run sequence)"

@@ -4,23 +4,43 @@
 \alias{read_acquisition_times}
 \title{Read the acquisition time of runfiles}
 \usage{
-read_acquisition_times(paths, import = default_settings()$import)
+read_acquisition_times(
+  paths,
+  import = default_settings()$import,
+  context = character()
+)
 }
 \arguments{
 \item{paths}{Paths to runfiles.}
 
 \item{import}{The \code{import} section of a settings list.}
+
+\item{context}{Paths of other runfiles of the same project, used only to
+decide the day/month order (e.g. the runs already in the project when
+adding a few new ones).}
 }
 \value{
 A POSIXct vector (\code{NA} where there is no timestamp line or it
-could not be parsed).
+could not be read).
 }
 \description{
-Reads the date and time a run was started from its header, using the
-\code{timestamp_line} and \code{timestamp_format} of the import settings (for Nu
-Plasma files: line 45, e.g. \verb{"08/12/2017","04:31:02 PM"}). Quotes are
-removed and commas or tabs between the date and time become spaces before
-the line is parsed with \code{\link[base:strptime]{base::strptime()}} \code{format}. Times are treated as
-the instrument clock and returned in UTC, so daylight saving changes never
-reorder runs.
+Reads the date and time a run was started from its header line
+\code{timestamp_line} (for Nu Plasma files line 45, e.g.
+\verb{"22/07/2025","11:06:47 AM"}). Quotes are removed and commas or tabs
+between the date and time become spaces.
+}
+\details{
+With \code{timestamp_format = "auto"} (the default) the line is read
+flexibly: day/month/year, month/day/year or year-month-day with \code{/}, \code{.}
+or \code{-}, 2- or 4-digit years, English month names (\verb{8 Aug 2016},
+\verb{Aug 8, 2016}), and 12- or 24-hour times with or without seconds. Whether
+a numeric date is day- or month-first is decided from all the lines read
+together (and those in \code{context}): a first number above 12 means
+day-first, a second number above 12 month-first; if no date decides it,
+day-first is assumed, as Nu instruments write. Any other
+\code{timestamp_format} is used with \code{\link[base:strptime]{base::strptime()}}, and lines it can't
+read are then read automatically.
+
+Times are treated as the instrument clock and returned in UTC, so
+daylight saving changes never reorder runs.
 }

@@ -145,10 +145,17 @@ profile_plot <- function(data, regions = NULL,
       }
       plotly::layout(p, yaxis = list(title = title, exponentformat = "e"))
     }
+    # A warning line is drawn only when the data come within half of it: a
+    # line far above the data would squash normal variation to the bottom
+    # of the panel.
+    near <- function(values, limit) {
+      top <- suppressWarnings(max(values[is.finite(values)]))
+      if (is.finite(top) && top >= limit / 2) limit
+    }
     plots <- c(plots, list(
       strip(~total_sr, "Total Sr (V)", "#d62728", ".2f"),
-      strip(~kr83, "<sup>83</sup>Kr (V)", "#2ca02c", ".2e", kr_limits$kr83_max_v),
-      strip(~kr86, "<sup>86</sup>Kr (% of 86)", "#1b9e77", ".2f", kr_limits$kr86_max_pct),
+      strip(~kr83, "<sup>83</sup>Kr (V)", "#2ca02c", ".2e", near(d$kr83, kr_limits$kr83_max_v)),
+      strip(~kr86, "<sup>86</sup>Kr (% of 86)", "#1b9e77", ".2f", near(d$kr86, kr_limits$kr86_max_pct)),
       strip(~rb85_sr88, "<sup>85</sup>Rb/<sup>88</sup>Sr", "#ff7f0e", ".5f")
     ))
     heights <- c(0.36, 0.16, 0.16, 0.16, 0.16)

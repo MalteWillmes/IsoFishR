@@ -96,8 +96,9 @@ test_that("runfiles with a damaged header are read from where the data starts", 
   expect_equal(report$result, c("added", "added"))
   expect_match(report$detail[1], "data found from line 43 \\(expected line 47\\)")
   expect_match(report$detail[2], "data found from line 49")
-  # The damaged timestamp line is reported, the data is reduced normally
-  expect_match(report$detail[1], "no readable acquisition time")
+  # The timestamp is found on its shifted line, and the data is reduced normally
+  expect_false(grepl("no readable acquisition time", report$detail[1]))
+  expect_true(all(nzchar(p$samples$acquired)))
   expect_gt(nrow(project_data(p, "short_header")), 1000)
 })
 

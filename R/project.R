@@ -102,7 +102,9 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
       meta = yml$project,
       settings = merge_settings(default_settings(), yml[setdiff(names(yml), "project")]),
       samples = read_table_file(project_file(path, "samples.csv"), samples_template(),
-                                sample_defaults()),
+                                sample_defaults()) |>
+        # A trim cell left empty (e.g. edited by hand) means no trim.
+        dplyr::mutate(dplyr::across(c("trim_start_s", "trim_end_s"), \(x) dplyr::coalesce(x, 0))),
       regions = read_table_file(project_file(path, "regions.csv"), regions_template()),
       reference_materials = read_table_file(project_file(path, "reference_materials.csv"),
                                             reference_materials_template()),
@@ -114,6 +116,7 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
   ) |>
     fill_acquisition_times()
   if (isTRUE((yml$project$format %||% 1L) < 2L)) p <- convert_trims_v1(p)
+  p <- fix_nu_date_order(p)
   opened <- TRUE
   p
 }
@@ -125,28 +128,71 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
 convert_trims_v1 <- function(project) {
   s <- project$samples
   todo <- which(s$run_type != "baseline" & (s$trim_start_s > 0 | s$trim_end_s > 0))
+  new <- s
   log <- list()
+  failed <- character()
   for (i in todo) {
     id <- s$sample_id[i]
     b <- tryCatch(profile_bounds(project, id), error = function(e) NULL)
-    if (is.null(b)) next
-    new_start <- if (s$trim_start_s[i] > 0) s$trim_start_s[i] + b$profile_start - b$run_start else 0
-    new_end <- if (s$trim_end_s[i] > 0) s$trim_end_s[i] + b$run_end - b$profile_end else 0
+    if (is.null(b)) {
+      failed <- c(failed, id)
+      next
+    }
+    new$trim_start_s[i] <- if (s$trim_start_s[i] > 0) s$trim_start_s[i] + b$profile_start - b$run_start else 0
+    new$trim_end_s[i] <- if (s$trim_end_s[i] > 0) s$trim_end_s[i] + b$run_end - b$profile_end else 0
     log[[length(log) + 1]] <- log_entry(
       project$user, "convert_trims", id, "trim_start_s;trim_end_s",
-      paste(s$trim_start_s[i], s$trim_end_s[i], sep = ";"), paste(new_start, new_end, sep = ";"))
-    project$samples$trim_start_s[i] <- new_start
-    project$samples$trim_end_s[i] <- new_end
+      paste(s$trim_start_s[i], s$trim_end_s[i], sep = ";"),
+      paste(new$trim_start_s[i], new$trim_end_s[i], sep = ";"))
   }
+  # All or nothing: a run whose file can't be read keeps the whole project
+  # unconverted (and it is tried again on the next open), so no trim is ever
+  # left in the old meaning in a converted project, or converted twice.
+  if (length(failed) > 0) {
+    rlang::warn(paste0("The trims of this project couldn't be converted to the new format because ",
+                       "these runfiles can't be read: ", paste(failed, collapse = ", "),
+                       ". Trims are shown as before until the files are back."),
+                class = "isofishr_warning")
+    return(project)
+  }
+  project$samples <- new
   project$meta$format <- PROJECT_FORMAT
   if (!project$read_only) {
-    if (length(log) > 0) {
-      write_table_file(project$samples, project_file(project$path, "samples.csv"))
-      try(append_log(project_file(project$path, "log.csv"), dplyr::bind_rows(log)), silent = TRUE)
-    }
-    write_yaml_file(c(list(project = project$meta), project$settings),
-                    project_file(project$path, "project.yml"))
+    if (length(log) > 0) write_table_file(new, project_file(project$path, "samples.csv"))
+    # If the format can't be saved, put the old trims back so the next open
+    # converts them once, not twice.
+    tryCatch(write_yaml_file(c(list(project = project$meta), project$settings),
+                             project_file(project$path, "project.yml")),
+             error = function(e) {
+               if (length(log) > 0) write_table_file(s, project_file(project$path, "samples.csv"))
+               stop(e)
+             })
+    if (length(log) > 0) append_log(project_file(project$path, "log.csv"), dplyr::bind_rows(log))
   }
+  project
+}
+
+# Earlier versions of the Nu_UCDavis preset read the runfile date as
+# month/day/year, but Nu instruments write day/month/year: days after the
+# 12th could not be read and earlier ones had day and month swapped, which
+# put runs in the wrong order and sessions. Projects with that preset and
+# the old format are switched to day/month/year when opened, and all
+# acquisition times are read again (logged as a project setting change).
+NU_OLD_TIMESTAMP_FORMAT <- "%m/%d/%Y %I:%M:%S %p"
+
+fix_nu_date_order <- function(project) {
+  imp <- project$settings$import
+  if (!identical(imp$preset, "Nu_UCDavis") || !identical(imp$timestamp_format, NU_OLD_TIMESTAMP_FORMAT)) {
+    return(project)
+  }
+  new_format <- default_settings()$import$timestamp_format
+  if (project$read_only) {
+    project$settings$import$timestamp_format <- new_format
+    return(fill_acquisition_times(project, force = TRUE))
+  }
+  project <- update_project_settings(project, list(import = list(timestamp_format = new_format)))
+  rlang::inform(paste("Acquisition dates are now read as day/month/year (as Nu instruments",
+                      "write them); the run order and sessions were updated."))
   project
 }
 
@@ -162,7 +208,9 @@ profile_bounds <- function(project, sample_id) {
     d <- dplyr::filter(d, time_s > r$blank_time_s)
   }
   d <- dplyr::filter(d, raw88 >= r$raw88_min_v, raw88 <= r$raw88_max_v)
-  if (nrow(d) == 0) return(NULL)
+  # Without a profile (e.g. a baseline run, where nothing passes the 88Sr
+  # threshold) the run itself is the reference.
+  if (nrow(d) == 0) d <- raw
   list(run_start = min(raw$time_s), run_end = max(raw$time_s),
        profile_start = min(d$time_s), profile_end = max(d$time_s))
 }

@@ -75,7 +75,7 @@ project_regions <- function(project, sample_ids = NULL) {
 # A sample's trims as reduce_runs() takes them, or NULL if it has none.
 sample_trims <- function(project, sample_id) {
   row <- project$samples[sample_index(project, sample_id), ]
-  if (row$trim_start_s == 0 && row$trim_end_s == 0) return(NULL)
+  if (dplyr::coalesce(row$trim_start_s, 0) == 0 && dplyr::coalesce(row$trim_end_s, 0) == 0) return(NULL)
   tibble::tibble(sample_id = sample_id, trim_start_s = row$trim_start_s,
                  trim_end_s = row$trim_end_s)
 }

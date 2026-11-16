@@ -247,3 +247,122 @@ test_that("an empty or missing run name is refused, and folder names don't depen
   expect_equal(find_runfiles(paste0(dir, "/"))$folder, "day1")
   expect_equal(find_runfiles(dir)$folder, "day1")
 })
+
+# ---- second review (November 2026) and date reading ------------------------------
+
+test_that("acquisition dates are read flexibly, day- or month-first from the data", {
+  x <- c("22/07/2025 11:06:47 AM", "3.6.2025 15:42", "2025-06-03 15:42:02",
+         "8 Aug 2016 6:23 PM", "Aug 8, 2016 18:23:45", "08-Aug-16 12:00:00 AM", "garbage")
+  t <- format(parse_timestamps(x, "dmy"), "%Y-%m-%d %H:%M:%S")
+  expect_equal(t, c("2025-07-22 11:06:47", "2025-06-03 15:42:00", "2025-06-03 15:42:02",
+                    "2016-08-08 18:23:00", "2016-08-08 18:23:45", "2016-08-08 00:00:00", NA))
+  expect_equal(date_order(c("03/06/2025 1:00 PM", "13/06/2025 1:00 PM")), "dmy")
+  expect_equal(date_order(c("06/03/2025 1:00 PM", "06/13/2025 1:00 PM")), "mdy")
+  expect_equal(date_order("03/06/2025 1:00 PM"), "dmy")   # undecided: day-first, as Nu writes
+  expect_equal(format(parse_timestamps("12/31/2016 11:59:59 PM", "mdy")), "2016-12-31 23:59:59")
+})
+
+test_that("the timestamp is found when header lines are missing or added", {
+  lines <- readLines(fish(1))
+  f <- withr::local_tempfile(fileext = ".run")
+  writeLines(c(lines[1:20], "extra", "extra", lines[21:length(lines)]), f)
+  expect_equal(read_acquisition_times(f), read_acquisition_times(fish(1)))
+  expect_false(is.na(read_acquisition_times(fish(1))))
+})
+
+test_that("Nu_UCDavis projects saved with month/day dates are switched to automatic dates", {
+  p <- fresh_project()
+  p <- suppressMessages(add_runfiles(p, fish(2)))
+  right <- p$samples$acquired
+  yml <- yaml::read_yaml(project_file(p$path, "project.yml"))
+  yml$import$timestamp_format <- "%m/%d/%Y %I:%M:%S %p"
+  yaml::write_yaml(yml, project_file(p$path, "project.yml"))
+  s <- p$samples
+  s$acquired <- "2017-08-12 16:31:02"     # as the old format read 08/12/2017
+  write_table_file(s, project_file(p$path, "samples.csv"))
+  close_project(p)
+  expect_message(p2 <- open_project(p$path, user = "tester"), "day/month/year")
+  expect_equal(p2$settings$import$timestamp_format, "auto")
+  expect_equal(p2$samples$acquired, right)
+  expect_true(startsWith(right[1], "2017-12-08"))
+  close_project(p2)
+})
+
+test_that("trims are converted all or nothing when a runfile is missing", {
+  p <- fresh_project()
+  p <- suppressMessages(add_runfiles(p, fish(2)))
+  s <- p$samples
+  s$trim_start_s <- c(10, 5)
+  write_table_file(s, project_file(p$path, "samples.csv"))
+  yml <- yaml::read_yaml(project_file(p$path, "project.yml"))
+  yml$project$format <- 1L
+  yaml::write_yaml(yml, project_file(p$path, "project.yml"))
+  hidden <- paste0(project_file(p$path, s$runfile[1]), ".hidden")
+  file.rename(project_file(p$path, s$runfile[1]), hidden)
+  close_project(p)
+  expect_warning(p2 <- open_project(p$path, user = "tester"), "couldn't be converted",
+                 class = "isofishr_warning")
+  expect_equal(p2$samples$trim_start_s, c(10, 5))
+  expect_equal(yaml::read_yaml(project_file(p$path, "project.yml"))$project$format, 1L)
+  close_project(p2)
+  file.rename(hidden, project_file(p$path, s$runfile[1]))
+  p3 <- open_project(p$path, user = "tester")
+  expect_true(all(p3$samples$trim_start_s > c(10, 5)))
+  expect_equal(yaml::read_yaml(project_file(p$path, "project.yml"))$project$format, 2L)
+  close_project(p3)
+})
+
+test_that("an empty trim cell counts as no trim", {
+  p <- fresh_project()
+  p <- suppressMessages(add_runfiles(p, fish(1)))
+  s <- p$samples
+  s$trim_start_s <- NA
+  write_table_file(s, project_file(p$path, "samples.csv"))
+  close_project(p)
+  p2 <- open_project(p$path, user = "tester")
+  expect_equal(p2$samples$trim_start_s, 0)
+  expect_gt(nrow(project_data(p2, calibrate = FALSE)), 100)
+  close_project(p2)
+})
+
+test_that("the step fit works when start times and midpoints are in a different order", {
+  model <- list(accepted = 0.7, uncertainty_2s = NA_real_, fit = "step",
+                points = tibble::tibble(session = "S", time = c(100, 110), start = c(60, 50),
+                                        factor = c(1.01, 1.02), u_rel = c(1e-5, 1e-5)))
+  out <- correction_at(model, "S", c(55, 65, 200))
+  expect_equal(out$factor, c(1.02, 1.01, 1.01))
+})
+
+test_that("Mark as ... marks only the runs its suggestion lists, and names match as their own part", {
+  runs <- data.frame(id = c("sbo_nano", "nano_1", "RFID_7", "p1st002_rfo_beg", "RF_2", "usrn4"),
+                     minute = seq(0, 50, by = 10), ratio = 0.709)
+  p <- synthetic_project(runs)
+  found <- reference_suggestions(p)
+  expect_equal(found$SBO, "sbo_nano")
+  expect_equal(found$NanoSr, "nano_1")
+  expect_equal(found$RF, c("p1st002_rfo_beg", "RF_2"))   # not RFID_7
+  p <- apply_reference_suggestion(p, "NanoSr")
+  expect_equal(p$samples$sample_id[p$samples$run_type == "reference"], "nano_1")
+})
+
+test_that("Kr warning lines are drawn only when the data come near them", {
+  d <- reduce_runs(read_runfiles(fish(1)))$data
+  lines_in <- function(limits) {
+    b <- plotly::plotly_build(profile_plot(d, kr_limits = limits))
+    length(Filter(\(t) grepl("Warning level", t$hovertemplate %||% ""), b$x$data))
+  }
+  expect_equal(lines_in(list(kr83_max_v = 1, kr86_max_pct = 100)), 0)
+  top83 <- max(d$kr83_v, na.rm = TRUE)
+  expect_equal(lines_in(list(kr83_max_v = top83 * 1.5, kr86_max_pct = 100)), 1)
+})
+
+test_that("samples.csv gives the trim of a fully trimmed sample in micrometres from its profile", {
+  p <- fresh_project()
+  p <- suppressMessages(add_runfiles(p, fish(2)))
+  id <- p$samples$sample_id[1]
+  p <- update_sample(p, id, trim_start_s = 1e5)
+  s <- summarise_project_samples(p)
+  b <- profile_bounds(p, id)
+  expect_equal(s$trim_start_um[s$sample_id == id],
+               (b$run_start + 1e5 - b$profile_start) * p$settings$sample$run_speed_um_s)
+})

@@ -187,6 +187,15 @@ workspace_server <- function(id, project) {
 
     # Sample IDs last shown in the table, to notice newly added runs.
     known_ids <- shiny::reactiveVal(NULL)
+    # Recorded as soon as a project is opened, so runs added before the
+    # Workspace is first shown are recognised as new.
+    # (A reactiveVal ignores being set to the same value, so this only fires
+    # when another project is opened, not on every change to this one.)
+    project_path <- shiny::reactiveVal(NULL)
+    shiny::observe(project_path(project()$path), priority = 20)
+    shiny::observeEvent(project_path(), {
+      known_ids(shiny::isolate(project())$samples$sample_id)
+    }, priority = 10)
 
     shiny::observeEvent(table_data(), {
       ids <- table_data()$Sample
@@ -338,10 +347,16 @@ workspace_server <- function(id, project) {
       d <- sample_data()
       shiny::validate(shiny::need(
         nrow(d) > 0,
-        if (shiny::isolate(sample_row())$run_type == "baseline") {
-          "This is a baseline run: it is used for blank correction and has no 87Sr/86Sr profile."
-        } else {
-          "No data points pass the 88Sr thresholds; check the reduction settings."
+        {
+          row <- shiny::isolate(sample_row())
+          if (row$run_type == "baseline") {
+            paste("This is a baseline run: it is used for blank correction and has no 87Sr/86Sr",
+                  "profile. Its trims can still be set under Edit.")
+          } else if (row$trim_start_s > 0 || row$trim_end_s > 0) {
+            "The trims remove every point of this run; use Remove trims (Edit) to start again."
+          } else {
+            "No data points pass the 88Sr thresholds; check the reduction settings."
+          }
         }
       ))
       p <- profile_plot(d, sample_regions(), show = show, source = ns("profile"),
@@ -434,11 +449,18 @@ workspace_server <- function(id, project) {
     # Trims are stored as seconds after the run's first cycle and before its
     # last (see apply_edits()); the inputs show them in micrometres from the
     # start and end of the profile.
+    # From the reduced data when there is any; otherwise (a baseline run, or
+    # trims that remove everything) read from the runfile, so trims can still
+    # be set and shown.
     run_times <- shiny::reactive({
       d <- sample_data()
-      shiny::req(nrow(d) > 0, "run_start_s" %in% names(d))
-      list(run_start = d$run_start_s[1], run_end = d$run_end_s[1],
-           profile_start = d$profile_start_s[1], profile_end = d$profile_end_s[1])
+      if (nrow(d) > 0 && "run_start_s" %in% names(d)) {
+        return(list(run_start = d$run_start_s[1], run_end = d$run_end_s[1],
+                    profile_start = d$profile_start_s[1], profile_end = d$profile_end_s[1]))
+      }
+      key <- shiny::req(data_key())
+      shiny::req(tryCatch(profile_bounds(shiny::isolate(project()), key$sample_id),
+                          error = function(e) NULL))
     })
     shiny::observe({
       tm <- run_times()

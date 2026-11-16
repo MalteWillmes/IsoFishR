@@ -188,9 +188,13 @@ correction_at <- function(model, session, t) {
     # standard run gets that standard's own factor (its midpoint would split
     # the run). Before the first standard, the first one is used.
     starts <- if ("start" %in% names(pts)) pts$start else tp
-    i <- pmax(findInterval(t, starts), 1)
-    f <- fp[i]
-    u <- up[i]
+    # Points are ordered by midpoint; start times can be in another order
+    # (e.g. equal timestamps, different trims), and findInterval needs them
+    # sorted.
+    o <- order(starts)
+    i <- pmax(findInterval(t, starts[o]), 1)
+    f <- fp[o][i]
+    u <- up[o][i]
   } else if (fit == "mean") {
     f <- rep(mean(fp), length(t))
     u <- rep(stats::sd(fp) / mean(fp) / sqrt(n), length(t))

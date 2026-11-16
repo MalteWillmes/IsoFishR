@@ -12,7 +12,7 @@ write_runfile <- function(path, acquired, ratio = 0.7092, n = 300, dt = 0.2,
   cols <- c("raw88", "raw87", "raw86", "raw85", "raw84", "raw83")
   raw[cols] <- raw[cols] + blank_v
   header <- c(rep("\"header\"", 44),
-              sprintf("\"%s\",\"%s\"", format(acquired, "%m/%d/%Y", tz = "UTC"),
+              sprintf("\"%s\",\"%s\"", format(acquired, "%d/%m/%Y", tz = "UTC"),
                       format(acquired, "%I:%M:%S %p", tz = "UTC")),
               "\"Spare text\"")
   body <- sprintf("%s,%s,%s,%s,%s,%s,%d,\"%.1f\",0",

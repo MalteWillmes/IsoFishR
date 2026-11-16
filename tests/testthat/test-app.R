@@ -389,11 +389,12 @@ test_that("krypton is monitored from the measured signals and flagged above the 
   k2 <- krypton_summary(d, list(kr83_max_v = max(d$kr83_v) / 2, kr86_max_pct = 100))
   expect_true(k2$kr_flag)
   expect_equal(k2$kr83_max_v, max(d$kr83_v))
-
-  b <- plotly::plotly_build(profile_plot(d, kr_limits = list(kr83_max_v = 0.002, kr86_max_pct = 1)))
+  # Warning levels just above the data, so the lines are drawn
+  lim <- list(kr83_max_v = signif(max(d$kr83_v) * 1.2, 3), kr86_max_pct = signif(max(d$kr86_pct) * 1.2, 3))
+  b <- plotly::plotly_build(profile_plot(d, kr_limits = lim))
   warn <- Filter(\(t) grepl("Warning level", t$hovertemplate %||% ""), b$x$data)
   expect_length(warn, 2)
-  expect_equal(unique(unlist(warn[[1]]$y)), 0.002)
+  expect_equal(unique(unlist(warn[[1]]$y)), lim$kr83_max_v)
 })
 
 test_that("samples.csv and profiles.csv carry the krypton warnings", {
@@ -420,5 +421,24 @@ test_that("after adding runfiles the workspace shows the first new profile", {
     rv(suppressMessages(add_runfiles(rv(), salmon_files(3)[3])))
     session$flushReact()
     expect_equal(current(), rv()$samples$sample_id[3])
+  })
+})
+
+test_that("runs added right after opening a project are shown, and baseline trims can be set", {
+  p <- app_project()
+  rv <- shiny::reactiveVal(NULL)
+  shiny::testServer(workspace_server, args = list(project = rv), {
+    rv(p)
+    session$flushReact()
+    rv(suppressMessages(add_runfiles(rv(), salmon_files(3)[3])))
+    session$flushReact()
+    expect_equal(current(), rv()$samples$sample_id[3])
+
+    # A baseline run has no profile, but its trims can still be set in µm
+    id <- rv()$samples$sample_id[1]
+    rv(set_run_type(rv(), id, "baseline"))
+    current(id)
+    session$flushReact()
+    expect_false(is.null(run_times()))
   })
 })

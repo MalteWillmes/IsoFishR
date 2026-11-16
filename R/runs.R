@@ -242,7 +242,14 @@ suggest_reference_runs <- function(project, pattern = "SBO") {
 #' @export
 apply_reference_suggestion <- function(project, name = "SBO", value = default_rm_value(name),
                                        pattern = default_rm_pattern(name)) {
-  ids <- suggest_reference_runs(project, pattern)
+  # For the default reference materials, exactly the runs its suggestion
+  # lists (a run matching several patterns is listed under the first).
+  defaults <- default_reference_materials()
+  ids <- if (name %in% defaults$name && identical(pattern, default_rm_pattern(name))) {
+    reference_suggestions(project)[[name]] %||% character()
+  } else {
+    suggest_reference_runs(project, pattern)
+  }
   if (!name %in% project$reference_materials$name) {
     if (is.na(value)) {
       stop("Enter the accepted 87Sr/86Sr of ", name, ".", call. = FALSE)
@@ -273,10 +280,11 @@ default_reference_materials <- function() {
     ~name,    ~pattern,             ~codes,                  ~value,
     "SBO",    "sbo",                "SBO",                   0.70918,
     "GSFR",   "gsfr",               "GSFR",                  0.70918,
-    # Rockfish otolith: "rf" at the start of a name or after a separator
-    # (e.g. RF_1, p1_rf2), not inside a word.
-    "RF",     "(^|[^a-z])rf",       "rf",                    0.70918,
-    "NanoSr", "nano|srn",           "srn, nano or srnano",   0.70795
+    # Rockfish otolith: "rf" or "rfo" as its own part of the name (RF_1,
+    # p1st002_rfo_beg, p1_rf2), not inside a word (RFID, surf).
+    "RF",     "(^|[^a-z])rfo?([^a-z]|$)", "rf or rfo",       0.70918,
+    # NanoSr: srnano, nanosr, nano or srn as its own part of the name.
+    "NanoSr", "(^|[^a-z])(srnano|nanosr|nano|srn)([^a-z]|$)", "srn, nano or srnano", 0.70795
   )
 }
 

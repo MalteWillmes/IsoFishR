@@ -44,8 +44,12 @@ summarise_project_samples <- function(project, data = NULL, include_excluded = F
   }
   trim_um <- function(ids, start_s, end_s, which) {
     purrr::pmap_dbl(list(ids, start_s, end_s, speed[match(ids, samples$sample_id)]), \(id, a, b, v) {
+      if (a == 0 && b == 0) return(0)
       tm <- if (!is.null(run_times)) run_times[run_times$sample_id == id, ]
-      if (is.null(tm) || nrow(tm) == 0) return(if (which == "start") a * v else b * v)
+      # A sample whose trims remove every point has no reduced data: read
+      # the times from its runfile.
+      if (is.null(tm) || nrow(tm) == 0) tm <- tryCatch(profile_bounds(project, id), error = function(e) NULL)
+      if (is.null(tm)) return(NA_real_)
       trims_to_um(a, b, tm, v)[[which]]
     })
   }

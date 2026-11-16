@@ -30,7 +30,9 @@ default_settings <- function() {
       columns = list(raw88 = 1L, raw87 = 2L, raw86 = 3L, raw85 = 4L,
                      raw84 = 5L, raw83 = 6L, time_s = 8L),
       timestamp_line = 45L,
-      timestamp_format = "%m/%d/%Y %I:%M:%S %p",
+      # "auto": read flexibly (see read_acquisition_times()); Nu instruments
+      # write day/month/year, e.g. "22/07/2025","11:06:47 AM".
+      timestamp_format = "auto",
       extension = ".run"
     ),
     reduction = list(
