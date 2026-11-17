@@ -17,7 +17,8 @@ A tibble.
 
 \code{summarise_reference_materials()}: one row per reference material
 and session: number of runs, mean and SD of the run means before and after
-correction, accepted value and deviation in ppm (of the corrected mean).
+correction, accepted value, deviation in ppm (of the corrected mean) and
+the number of flagged runs (\code{runs_flagged}).
 }
 \description{
 One row per reference material run: the measured (uncorrected) and
@@ -26,4 +27,12 @@ uncertainty, and the deviation from the accepted value. For secondary
 reference materials this is the accuracy check of the correction; primary
 runs are corrected to close to their accepted value by construction (exactly
 so with the step fit; within a run the other fits can vary slightly).
+}
+\details{
+\code{rm_flag} marks runs more than \code{settings$qc$rm_max_dev} (default 0.0005)
+from their expected value, given as \code{check_deviation}. Secondary runs are
+checked on their corrected mean against the accepted value (\code{check_against = "accepted"}). Primary runs, which the correction pulls onto the accepted
+value, are checked on their measured mean against the median of the other
+primary runs in the session (\code{"session median"}); with one primary run in a
+session there is nothing to compare and the run is not flagged.
 }

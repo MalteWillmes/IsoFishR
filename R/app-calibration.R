@@ -89,6 +89,7 @@ calibration_ui <- function(id) {
         bslib::nav_panel(
           "Reference materials",
           shiny::uiOutput(ns("correction_note")),
+          shiny::uiOutput(ns("rm_warning")),
           shiny::radioButtons(ns("rm_x"), NULL, inline = TRUE,
                               c("Run order" = "order", "Acquisition time" = "time")),
           plotly::plotlyOutput(ns("rm_plot"), height = "560px"),
@@ -312,6 +313,24 @@ calibration_server <- function(id, project) {
       shiny::p(class = "ifr-muted", msg)
     })
 
+    output$rm_warning <- shiny::renderUI({
+      r <- results()
+      flagged <- r[r[["rm_flag"]] %in% TRUE, ]
+      if (nrow(flagged) == 0) return(NULL)
+      max_dev <- project()$settings$qc$rm_max_dev
+      shiny::div(
+        class = "alert alert-danger py-2",
+        shiny::strong(sprintf("%d reference material run(s) more than %s from the expected 87Sr/86Sr: ",
+                              nrow(flagged), fmt_plain(max_dev))),
+        paste(sprintf("%s (%s, %+.5f)", flagged$sample_id, flagged$reference_material,
+                      flagged$check_deviation), collapse = ", "),
+        shiny::div(class = "small",
+                   "Secondary runs are compared with the accepted value, primary runs (measured) with ",
+                   "the other primary runs of their session. Check them and exclude bad runs under ",
+                   "Assign runs; the warning level is under Settings.")
+      )
+    })
+
     output$rm_plot <- plotly::renderPlotly({
       m <- model()
       r <- results()
@@ -325,19 +344,24 @@ calibration_server <- function(id, project) {
       shiny::validate(shiny::need(nrow(s) > 0, "No reference material runs yet."))
       s <- dplyr::select(s, "reference_material", "role", "session", "runs", "mean_uncorrected",
                          "sd_uncorrected", "mean_corrected", "sd_corrected", "accepted",
-                         "deviation_ppm")
+                         "deviation_ppm", "runs_flagged")
       DT::datatable(round_summary(s), rownames = FALSE,
                     colnames = c("Reference material", "Role", "Session", "Runs", "Mean (uncorrected)",
                                  "SD (uncorrected)", "Mean (corrected)", "SD (corrected)",
-                                 "Accepted", "Deviation (ppm)"),
-                    options = list(dom = "t", paging = FALSE))
+                                 "Accepted", "Deviation (ppm)", "Flagged"),
+                    options = list(dom = "t", paging = FALSE)) |>
+        DT::formatStyle("runs_flagged", color = DT::styleInterval(0, c("inherit", "#c0392b")),
+                        fontWeight = DT::styleInterval(0, c("normal", "bold")))
     })
     output$rm_runs <- DT::renderDT({
       r <- results()
       shiny::validate(shiny::need(nrow(r) > 0, "No reference material runs yet."))
       r$acquired <- format_time(r$acquired)
       DT::datatable(round_summary(r), rownames = FALSE, filter = "top",
-                    options = list(pageLength = 25, dom = "tip", scrollX = TRUE))
+                    options = list(pageLength = 25, dom = "tip", scrollX = TRUE)) |>
+        # Per cell: the Bootstrap table background would cover a row colour.
+        DT::formatStyle(names(r), valueColumns = "rm_flag",
+                        backgroundColor = DT::styleEqual(TRUE, "#f8d7da"))
     })
   })
 }
@@ -372,6 +396,7 @@ reference_material_plot <- function(model, results, x = c("order", "time"), runs
                           format(results$acquired, "%Y-%m-%d %H:%M", tz = "UTC"))
   hover <- "%{text}<br>%{y:.6f}<extra></extra>"
   first_rm <- results$reference_material[1]
+  first_flagged <- results$reference_material[results[["rm_flag"]] %in% TRUE][1]
 
   panels <- purrr::map(unique(results$reference_material), \(rm_name) {
     d <- dplyr::filter(results, .data$reference_material == rm_name)
@@ -411,12 +436,25 @@ reference_material_plot <- function(model, results, x = c("order", "time"), runs
                                hovertemplate = paste0(avg$session[i], " average %{y:.6f}<extra></extra>"))
       }
     }
+    p <- plotly::add_markers(p, x = d[[xcol]], y = d$mean, name = "Corrected",
+                             legendgroup = "corrected", showlegend = rm_name == first_rm,
+                             error_y = list(type = "data", array = 2 * d$se_combined, color = "#1f6f8b"),
+                             marker = list(color = "#1f6f8b", size = 7),
+                             text = d$label, hovertemplate = hover)
+    # Flagged runs: a red ring around the value that was checked (measured
+    # for the primary, corrected for secondary reference materials).
+    flag <- d[d[["rm_flag"]] %in% TRUE, ]
+    if (nrow(flag) > 0) {
+      y <- if (d$role[1] == "primary") flag$measured else flag$mean
+      p <- plotly::add_markers(p, x = flag[[xcol]], y = y, name = "Flagged",
+                               legendgroup = "flagged", showlegend = identical(rm_name, first_flagged),
+                               marker = list(color = "rgba(0,0,0,0)", size = 15,
+                                             line = list(color = "#c0392b", width = 2.5)),
+                               text = paste0(flag$label, "<br>", sprintf("%+.5f", flag$check_deviation),
+                                             " from ", flag$check_against),
+                               hovertemplate = "%{text}<extra>Flagged</extra>")
+    }
     p |>
-      plotly::add_markers(x = d[[xcol]], y = d$mean, name = "Corrected",
-                          legendgroup = "corrected", showlegend = rm_name == first_rm,
-                          error_y = list(type = "data", array = 2 * d$se_combined, color = "#1f6f8b"),
-                          marker = list(color = "#1f6f8b", size = 7),
-                          text = d$label, hovertemplate = hover) |>
       plotly::layout(yaxis = list(title = paste0(rm_name, "<br>(", d$role[1], ")"),
                                   tickformat = ".5f"))
   })

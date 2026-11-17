@@ -276,6 +276,14 @@ apply_calibration <- function(data, project, model) {
 #' runs are corrected to close to their accepted value by construction (exactly
 #' so with the step fit; within a run the other fits can vary slightly).
 #'
+#' `rm_flag` marks runs more than `settings$qc$rm_max_dev` (default 0.0005)
+#' from their expected value, given as `check_deviation`. Secondary runs are
+#' checked on their corrected mean against the accepted value (`check_against
+#' = "accepted"`). Primary runs, which the correction pulls onto the accepted
+#' value, are checked on their measured mean against the median of the other
+#' primary runs in the session (`"session median"`); with one primary run in a
+#' session there is nothing to compare and the run is not flagged.
+#'
 #' @param project A project from [open_project()].
 #' @return A tibble.
 #' @export
@@ -315,17 +323,45 @@ reference_material_results <- function(project) {
       within_uncertainty = abs(.data$deviation) <=
         sqrt((2 * .data$se_combined)^2 + dplyr::coalesce(.data$accepted_2s, 0)^2)
     ) |>
+    rm_warning(project$settings$qc$rm_max_dev %||% default_settings()$qc$rm_max_dev) |>
     dplyr::arrange(.data$sequence) |>
     dplyr::select("sample_id", "sequence", "reference_material", "role", "session", "acquired", "n",
                   "measured", "mean", "se", "se_combined", "accepted", "accepted_2s",
-                  "deviation", "deviation_ppm", "within_uncertainty", "correction_factor",
-                  "correction_status")
+                  "deviation", "deviation_ppm", "within_uncertainty", "check_against",
+                  "check_deviation", "rm_flag", "correction_factor", "correction_status")
+}
+
+# Reference material warning: flags runs more than `max_dev` (87Sr/86Sr) from
+# their expected value. Secondary runs (and all runs while there is no
+# correction) are checked on their corrected mean against the accepted
+# value. Primary runs are corrected onto the accepted value by the fit, so
+# they are checked on their measured mean against the median of the other
+# primary runs of the session; a session with one primary run is not checked.
+rm_warning <- function(r, max_dev) {
+  loo_median <- function(x) {
+    if (length(x) < 2) return(rep(NA_real_, length(x)))
+    vapply(seq_along(x), \(i) stats::median(x[-i], na.rm = TRUE), numeric(1))
+  }
+  r |>
+    dplyr::mutate(
+      check_against = dplyr::if_else(.data$role == "primary", "session median", "accepted"),
+      check_deviation = dplyr::if_else(.data$role == "primary",
+                                       .data$measured - loo_median(.data$measured),
+                                       .data$mean - .data$accepted),
+      .by = c("reference_material", "session")
+    ) |>
+    dplyr::mutate(
+      check_deviation = dplyr::if_else(is.finite(.data$check_deviation), .data$check_deviation, NA_real_),
+      check_against = dplyr::if_else(is.na(.data$check_deviation), NA_character_, .data$check_against),
+      rm_flag = dplyr::coalesce(abs(.data$check_deviation) > max_dev, FALSE)
+    )
 }
 
 #' @rdname reference_material_results
 #' @return `summarise_reference_materials()`: one row per reference material
 #'   and session: number of runs, mean and SD of the run means before and after
-#'   correction, accepted value and deviation in ppm (of the corrected mean).
+#'   correction, accepted value, deviation in ppm (of the corrected mean) and
+#'   the number of flagged runs (`runs_flagged`).
 #' @export
 summarise_reference_materials <- function(project) {
   r <- reference_material_results(project)
@@ -342,6 +378,7 @@ summarise_reference_materials <- function(project) {
       accepted = dplyr::first(.data$accepted),
       deviation_ppm = (mean(.data$mean) / dplyr::first(.data$accepted) - 1) * 1e6,
       runs_within_uncertainty = sum(.data$within_uncertainty),
+      runs_flagged = sum(.data$rm_flag),
       .by = c("reference_material", "session")
     )
 }

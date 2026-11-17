@@ -53,11 +53,14 @@ default_settings <- function() {
     regions = list(
       default_labels = paste("Region", 1:8)
     ),
-    # Krypton warning levels: a sample is flagged when any point of its
-    # profile exceeds either. They only flag; the data are not changed.
+    # Warning levels. Krypton: a sample is flagged when any point of its
+    # profile exceeds either. Reference materials: a run is flagged when it
+    # is more than rm_max_dev (87Sr/86Sr) from its expected value (see
+    # reference_material_results()). They only flag; the data are not changed.
     qc = list(
       kr83_max_v = 0.001,
-      kr86_max_pct = 1
+      kr86_max_pct = 1,
+      rm_max_dev = 0.0005
     ),
     # Reference material correction (see calibrate_project()). It is off
     # until a primary reference material is chosen.
@@ -119,7 +122,7 @@ check_settings <- function(settings) {
   if (!is.numeric(cal$session_gap_h) || length(cal$session_gap_h) != 1 || cal$session_gap_h <= 0) {
     stop("calibration$session_gap_h must be a positive number of hours.", call. = FALSE)
   }
-  for (nm in c("kr83_max_v", "kr86_max_pct")) {
+  for (nm in c("kr83_max_v", "kr86_max_pct", "rm_max_dev")) {
     v <- settings$qc[[nm]]
     if (!is.numeric(v) || length(v) != 1 || is.na(v) || v <= 0) {
       stop("qc$", nm, " must be a single number > 0.", call. = FALSE)

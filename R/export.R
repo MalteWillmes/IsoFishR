@@ -329,7 +329,8 @@ round_summary <- function(x) {
                                     "sr87_sr86_ma", "sr87_sr86_spline", "cp_mean", "sr84_sr86", "measured",
                                     "accepted")), \(v) round(v, 6)),
       dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_ma_se", "sr87_sr86_spline_se",
-                                    "rb85_sr88", "kr83_v", "kr83_max_v", "deviation", "accepted_2s")),
+                                    "rb85_sr88", "kr83_v", "kr83_max_v", "deviation", "accepted_2s",
+                                    "check_deviation")),
                     \(v) round(v, 7)),
       dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),
       dplyr::across(dplyr::any_of("deviation_ppm"), \(v) round(v, 1)),
@@ -417,6 +418,8 @@ export_report <- function(project, files = character(), include_excluded = FALSE
         mean_corrected = mean(r$mean), sd_corrected = sd_or_na(r$mean),
         deviation_ppm = (mean(r$mean) / rm$value - 1) * 1e6,
         runs_within_uncertainty = sum(r$within_uncertainty),
+        runs_flagged = sum(r$rm_flag),
+        flagged_runs = r$sample_id[r$rm_flag],
         per_session = rm_summary |>
           dplyr::filter(.data$reference_material == name) |>
           dplyr::select("session", "runs", "mean_uncorrected", "sd_uncorrected",

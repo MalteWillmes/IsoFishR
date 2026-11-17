@@ -24,7 +24,8 @@ report_markdown <- function(report) {
       `Mean (corrected)` = purrr::map_chr(rms, \(r) fmt_ratio(r$mean_corrected)),
       `SD (corrected)` = purrr::map_chr(rms, \(r) fmt_small(r$sd_corrected)),
       `Deviation (ppm)` = purrr::map_chr(rms, \(r) fmt_num(r$deviation_ppm, 1)),
-      `Runs within uncertainty` = purrr::map_chr(rms, \(r) fmt_count(r$runs_within_uncertainty))
+      `Runs within uncertainty` = purrr::map_chr(rms, \(r) fmt_count(r$runs_within_uncertainty)),
+      `Runs flagged` = purrr::map_chr(rms, \(r) fmt_count(r$runs_flagged))
     ))
   } else {
     "No reference materials are defined."
@@ -82,6 +83,10 @@ report_markdown <- function(report) {
     "",
     rm_table,
     "",
+    if (length(flagged <- unlist(purrr::map(rms, "flagged_runs"))) > 0) {
+      c(paste0("Flagged (more than ", fmt_plain(report$settings$qc$rm_max_dev %||% NA),
+               " from the expected 87Sr/86Sr): ", paste(flagged, collapse = ", "), "."), "")
+    },
     if (nrow(per_session) > 0) c("### Per session", "", md_table(per_session), ""),
     "## Settings",
     "",
@@ -98,7 +103,7 @@ report_markdown <- function(report) {
 # Settings as one table per section, labelled as in the app.
 settings_markdown <- function(settings) {
   spec <- settings_spec()
-  sections <- c(reduction = "Data reduction", qc = "Krypton warnings", sample = "Samples and laser",
+  sections <- c(reduction = "Data reduction", qc = "Warnings", sample = "Samples and laser",
                 import = "Runfile import", regions = "Regions")
   purrr::imap(sections, \(title, section) {
     values <- settings[[section]]
@@ -111,6 +116,7 @@ settings_markdown <- function(settings) {
     shown <- vapply(values, \(v) {
       if (is.list(v)) paste(names(v), unlist(v), sep = " = ", collapse = ", ")
       else if (length(v) == 0 || (length(v) == 1 && is.na(v))) ""
+      else if (is.numeric(v)) paste(fmt_plain(v), collapse = ", ")
       else paste(v, collapse = ", ")
     }, character(1))
     c(paste("###", title), "", md_table(tibble::tibble(Setting = labels, Value = shown)), "")
@@ -132,4 +138,6 @@ md_table <- function(df) {
 fmt_ratio <- function(x) if (is.null(x) || is.na(x)) "-" else formatC(x, format = "f", digits = 6)
 fmt_small <- function(x) if (is.null(x) || is.na(x)) "-" else formatC(x, format = "g", digits = 3)
 fmt_num <- function(x, digits) if (is.null(x) || is.na(x)) "-" else formatC(x, format = "f", digits = digits)
+# Numbers without scientific notation (0.0005, not 5e-04).
+fmt_plain <- function(x) format(x, scientific = FALSE, trim = TRUE, digits = 15)
 fmt_count <- function(x) if (is.null(x) || is.na(x)) "-" else as.character(x)

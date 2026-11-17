@@ -95,7 +95,7 @@ The lock is advisory: Dropbox sync is not instant, so two people opening the sam
 - **QC:** `reference_material_results()` gives each standard run's measured and corrected mean and deviation in ppm. Within uncertainty means |dev| ≤ √((2·se_combined)² + accepted_2s²). `summarise_reference_materials()` gives per RM and session the runs, mean, 2 SD and deviation.
 - **Off by default:** with no primary set and per-run baselines, `project_data()` returns exactly the previous columns.
 - **App:**
-  - **Calibration page:** reference material editor; primary, fit, baseline and session-gap settings; the Runs table (multi-select, set type or session; the selection clears after each change because row clicks toggle); the correction plot; and the results tables.
+  - **Calibration page:** reference material editor; primary, fit, baseline and session-gap settings; the Runs table (multi-select, set type or session; the selection clears after each change because row clicks toggle); the correction plot; and the results tables. Reference material warning (`rm_warning()` in `reference_material_results()`, level `settings$qc$rm_max_dev`, default 0.0005): secondary runs (and all runs without a primary) compare the corrected mean with the accepted value; primary runs compare the measured mean with the leave-one-out median of the session's primary runs (not checked with one run). Shown as a red alert, red rings on the plot, highlighted rows and a Flagged count; only a flag, nothing is excluded.
   - **Workspace:** the plot's data key includes `calibration_inputs()`, so the plot follows calibration changes without recomputing on unrelated edits.
 
 ## Instrument import presets
