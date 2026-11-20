@@ -17,8 +17,10 @@ A tibble.
 
 \code{summarise_reference_materials()}: one row per reference material
 and session: number of runs, mean and SD of the run means before and after
-correction, accepted value, deviation in ppm (of the corrected mean) and
-the number of flagged runs (\code{runs_flagged}).
+correction, accepted value, deviation in ppm (of the corrected mean), the
+number of runs outside the accepted range (\code{runs_outside_range}) and
+\code{sd_flag}: the SD of the measured run means is above
+\code{settings$qc$rm_max_sd} (default 6.1e-5).
 }
 \description{
 One row per reference material run: the measured (uncorrected) and
@@ -29,10 +31,7 @@ runs are corrected to close to their accepted value by construction (exactly
 so with the step fit; within a run the other fits can vary slightly).
 }
 \details{
-\code{rm_flag} marks runs more than \code{settings$qc$rm_max_dev} (default 0.0005)
-from their expected value, given as \code{check_deviation}. Secondary runs are
-checked on their corrected mean against the accepted value (\code{check_against = "accepted"}). Primary runs, which the correction pulls onto the accepted
-value, are checked on their measured mean against the median of the other
-primary runs in the session (\code{"session median"}); with one primary run in a
-session there is nothing to compare and the run is not flagged.
+\code{outside_range} marks runs whose measured (uncorrected) mean is outside the
+reference material's accepted range (\code{range_min}, \code{range_max}, set per
+reference material; a missing limit is not checked).
 }

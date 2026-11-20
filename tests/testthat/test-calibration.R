@@ -321,9 +321,9 @@ test_that("export_report.md presents the record as readable Markdown", {
                         md, fixed = TRUE)))
   expect_true(any(grepl("**Primary reference material:** MMC", md, fixed = TRUE)))
   expect_true(any(grepl("**Secondary reference materials:** SEC", md, fixed = TRUE)))
-  # Reference material rows: name, role, accepted, 2s, runs, ...
-  expect_true(any(grepl("^\\| MMC \\| primary \\| 0\\.709180 \\| 2e-05 \\| 3 \\|", md)))
-  expect_true(any(grepl("^\\| SEC \\| secondary \\| 0\\.710300 \\| 4e-05 \\| 1 \\|", md)))
+  # Reference material rows: name, role, accepted, 2s, range, runs, ...
+  expect_true(any(grepl("^\\| MMC \\| primary \\| 0\\.709180 \\| 2e-05 \\| - \\| 3 \\|", md)))
+  expect_true(any(grepl("^\\| SEC \\| secondary \\| 0\\.710300 \\| 4e-05 \\| - \\| 1 \\|", md)))
   expect_true(any(grepl("| Integration (cycles per point) | 1 |", md, fixed = TRUE)))
   expect_true(any(grepl("| fish1 | ma_window=15 |", md, fixed = TRUE)))
   # Every table row has the same number of cells as its header

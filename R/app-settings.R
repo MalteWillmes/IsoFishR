@@ -20,7 +20,7 @@ settings_spec <- function() {
     "reduction", "ma_window",        "Moving average window (points)",    "integer", NULL,
     "qc",        "kr83_max_v",       "Kr warning: max 83Kr (V)",          "numeric", NULL,
     "qc",        "kr86_max_pct",     "Kr warning: max 86Kr (% of mass 86)", "numeric", NULL,
-    "qc",        "rm_max_dev",       "Reference material warning: max deviation (87Sr/86Sr)", "numeric", NULL,
+    "qc",        "rm_max_sd",        "Reference material warning: max SD of run means per session", "numeric", NULL,
     "sample",    "run_speed_um_s",   "Run speed (\u00b5m/s)",             "numeric", NULL,
     "sample",    "analysis_type",    "Analysis type",                     "choice",
       c("Line" = "line", "Spot" = "spot"),

@@ -10,7 +10,9 @@ set_reference_material(
   name,
   value,
   uncertainty_2s = NA_real_,
-  note = ""
+  note = "",
+  range_min = NULL,
+  range_max = NULL
 )
 
 remove_reference_material(project, name)
@@ -25,6 +27,12 @@ remove_reference_material(project, name)
 \item{uncertainty_2s}{Uncertainty of the accepted value (2 sigma).}
 
 \item{note}{Optional note, e.g. the source of the value.}
+
+\item{range_min, range_max}{Accepted range of the measured (uncorrected)
+run means; runs outside it are flagged (see
+\code{\link[=reference_material_results]{reference_material_results()}}). \code{NA} for no limit. \code{NULL} (the default)
+keeps the current range, or for a new reference material uses the
+default range of \code{\link[=default_reference_materials]{default_reference_materials()}} (if any).}
 }
 \value{
 The updated project.

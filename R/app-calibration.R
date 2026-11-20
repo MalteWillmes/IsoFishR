@@ -49,6 +49,11 @@ calibration_ui <- function(id) {
           shiny::numericInput(ns("rm_unc"), "\u00b1 (2\u03c3)", NA, step = 0.000001),
           shiny::textInput(ns("rm_note"), "Note / source")
         ),
+        bslib::layout_columns(
+          col_widths = c(6, 6),
+          shiny::numericInput(ns("rm_min"), "Range min (uncorrected)", NA, step = 0.0001),
+          shiny::numericInput(ns("rm_max"), "Range max (uncorrected)", NA, step = 0.0001)
+        ),
         shiny::div(
           class = "d-flex gap-2",
           shiny::actionButton(ns("rm_save"), "Save reference material", class = "btn-sm"),
@@ -175,16 +180,42 @@ calibration_server <- function(id, project) {
     output$rm_table <- shiny::renderTable({
       rms <- shiny::req(project())$reference_materials
       if (nrow(rms) == 0) return(data.frame(Note = "None defined yet"))
+      no_range <- is.na(rms$range_min) & is.na(rms$range_max)
       data.frame(Name = rms$name, Value = sprintf("%.6f", rms$value),
                  Unc = ifelse(is.na(rms$uncertainty_2s), "",
-                              format(rms$uncertainty_2s, digits = 3))) |>
-        stats::setNames(c("Name", "Value", "\u00b1 2s"))
+                              format(rms$uncertainty_2s, digits = 3)),
+                 Range = ifelse(no_range, "", paste0(ifelse(is.na(rms$range_min), "", format(rms$range_min)),
+                                                     "–",
+                                                     ifelse(is.na(rms$range_max), "", format(rms$range_max))))) |>
+        stats::setNames(c("Name", "Value", "\u00b1 2s", "Range"))
     }, spacing = "xs", width = "100%")
+
+    # Typing the name of an existing reference material fills in its values
+    # (for a new default reference material, its default value and range).
+    shiny::observeEvent(input$rm_name, {
+      name <- trimws(input$rm_name)
+      rms <- shiny::req(project())$reference_materials
+      defaults <- default_reference_materials()
+      if (!name %in% rms$name && name %in% defaults$name) {
+        d <- defaults[defaults$name == name, ]
+        shiny::updateNumericInput(session, "rm_value", value = d$value)
+        shiny::updateNumericInput(session, "rm_min", value = d$range_min)
+        shiny::updateNumericInput(session, "rm_max", value = d$range_max)
+      }
+      i <- match(name, rms$name)
+      shiny::req(!is.na(i))
+      shiny::updateNumericInput(session, "rm_value", value = rms$value[i])
+      shiny::updateNumericInput(session, "rm_unc", value = rms$uncertainty_2s[i])
+      shiny::updateTextInput(session, "rm_note", value = rms$note[i])
+      shiny::updateNumericInput(session, "rm_min", value = rms$range_min[i])
+      shiny::updateNumericInput(session, "rm_max", value = rms$range_max[i])
+    })
 
     shiny::observeEvent(input$rm_save, {
       shiny::req(nzchar(trimws(input$rm_name)))
-      change(set_reference_material, input$rm_name, input$rm_value,
-             if (is.null(input$rm_unc)) NA_real_ else input$rm_unc, input$rm_note %||% "")
+      num <- \(v) if (is.null(v) || is.na(v)) NA_real_ else v
+      change(set_reference_material, input$rm_name, input$rm_value, num(input$rm_unc),
+             input$rm_note %||% "", range_min = num(input$rm_min), range_max = num(input$rm_max))
     })
     shiny::observeEvent(input$rm_remove, {
       shiny::req(nzchar(trimws(input$rm_name)))
@@ -313,21 +344,32 @@ calibration_server <- function(id, project) {
       shiny::p(class = "ifr-muted", msg)
     })
 
+    rm_summary <- shiny::reactive(summarise_reference_materials(shiny::req(project())))
+
     output$rm_warning <- shiny::renderUI({
       r <- results()
-      flagged <- r[r[["rm_flag"]] %in% TRUE, ]
-      if (nrow(flagged) == 0) return(NULL)
-      max_dev <- project()$settings$qc$rm_max_dev
+      outside <- r[r[["outside_range"]] %in% TRUE, ]
+      s <- if (nrow(r) > 0) rm_summary() else NULL
+      high_sd <- if (!is.null(s)) s[s$sd_flag %in% TRUE, ] else NULL
+      if (nrow(outside) == 0 && NROW(high_sd) == 0) return(NULL)
       shiny::div(
         class = "alert alert-danger py-2",
-        shiny::strong(sprintf("%d reference material run(s) more than %s from the expected 87Sr/86Sr: ",
-                              nrow(flagged), fmt_plain(max_dev))),
-        paste(sprintf("%s (%s, %+.5f)", flagged$sample_id, flagged$reference_material,
-                      flagged$check_deviation), collapse = ", "),
+        if (nrow(outside) > 0) shiny::div(
+          shiny::strong(sprintf("%d run(s) with the uncorrected mean outside the accepted range: ",
+                                nrow(outside))),
+          paste(sprintf("%s (%s, %.5f; range %s)", outside$sample_id, outside$reference_material,
+                        outside$measured, purrr::map2_chr(outside$range_min, outside$range_max, format_range)),
+                collapse = ", ")
+        ),
+        if (NROW(high_sd) > 0) shiny::div(
+          shiny::strong(sprintf("SD of the uncorrected run means above %s: ",
+                                fmt_plain(project()$settings$qc$rm_max_sd))),
+          paste(sprintf("%s in %s (SD %.1e, %d runs)", high_sd$reference_material, high_sd$session,
+                        high_sd$sd_uncorrected, high_sd$runs), collapse = ", ")
+        ),
         shiny::div(class = "small",
-                   "Secondary runs are compared with the accepted value, primary runs (measured) with ",
-                   "the other primary runs of their session. Check them and exclude bad runs under ",
-                   "Assign runs; the warning level is under Settings.")
+                   "Check these runs and exclude bad ones under Assign runs. Set each reference ",
+                   "material's range in the panel on the left, and the SD limit under Settings.")
       )
     })
 
@@ -340,18 +382,22 @@ calibration_server <- function(id, project) {
     })
 
     output$rm_summary <- DT::renderDT({
-      s <- summarise_reference_materials(shiny::req(project()))
+      s <- rm_summary()
       shiny::validate(shiny::need(nrow(s) > 0, "No reference material runs yet."))
       s <- dplyr::select(s, "reference_material", "role", "session", "runs", "mean_uncorrected",
                          "sd_uncorrected", "mean_corrected", "sd_corrected", "accepted",
-                         "deviation_ppm", "runs_flagged")
+                         "deviation_ppm", "runs_outside_range", "sd_flag")
       DT::datatable(round_summary(s), rownames = FALSE,
                     colnames = c("Reference material", "Role", "Session", "Runs", "Mean (uncorrected)",
                                  "SD (uncorrected)", "Mean (corrected)", "SD (corrected)",
-                                 "Accepted", "Deviation (ppm)", "Flagged"),
-                    options = list(dom = "t", paging = FALSE)) |>
-        DT::formatStyle("runs_flagged", color = DT::styleInterval(0, c("inherit", "#c0392b")),
-                        fontWeight = DT::styleInterval(0, c("normal", "bold")))
+                                 "Accepted", "Deviation (ppm)", "Outside range", "sd_flag"),
+                    options = list(dom = "t", paging = FALSE,
+                                   columnDefs = list(list(targets = ncol(s) - 1, visible = FALSE)))) |>
+        DT::formatStyle("runs_outside_range", color = DT::styleInterval(0, c("inherit", "#c0392b")),
+                        fontWeight = DT::styleInterval(0, c("normal", "bold"))) |>
+        DT::formatStyle("sd_uncorrected", valueColumns = "sd_flag",
+                        color = DT::styleEqual(TRUE, "#c0392b"),
+                        fontWeight = DT::styleEqual(TRUE, "bold"))
     })
     output$rm_runs <- DT::renderDT({
       r <- results()
@@ -360,7 +406,7 @@ calibration_server <- function(id, project) {
       DT::datatable(round_summary(r), rownames = FALSE, filter = "top",
                     options = list(pageLength = 25, dom = "tip", scrollX = TRUE)) |>
         # Per cell: the Bootstrap table background would cover a row colour.
-        DT::formatStyle(names(r), valueColumns = "rm_flag",
+        DT::formatStyle(names(r), valueColumns = "outside_range",
                         backgroundColor = DT::styleEqual(TRUE, "#f8d7da"))
     })
   })
@@ -373,7 +419,9 @@ calibration_server <- function(id, project) {
 #' mean with 2 SE, the fitted correction line (by default the linear
 #' regression) and the corrected run means. For secondary reference
 #' materials: uncorrected and corrected run means, with the corrected session
-#' averages as horizontal lines. The accepted values are dashed lines.
+#' averages as horizontal lines. The accepted values are dashed lines, the
+#' accepted range of the uncorrected run means red dotted lines, and runs
+#' outside it are ringed in red.
 #'
 #' On a time axis, sessions that are days or months apart leave each
 #' session's lines too short to see; in run order (the default) every run
@@ -396,7 +444,9 @@ reference_material_plot <- function(model, results, x = c("order", "time"), runs
                           format(results$acquired, "%Y-%m-%d %H:%M", tz = "UTC"))
   hover <- "%{text}<br>%{y:.6f}<extra></extra>"
   first_rm <- results$reference_material[1]
-  first_flagged <- results$reference_material[results[["rm_flag"]] %in% TRUE][1]
+  first_flagged <- results$reference_material[results[["outside_range"]] %in% TRUE][1]
+  has_range <- !is.na(results[["range_min"]] %||% NA) | !is.na(results[["range_max"]] %||% NA)
+  first_range <- results$reference_material[has_range][1]
 
   panels <- purrr::map(unique(results$reference_material), \(rm_name) {
     d <- dplyr::filter(results, .data$reference_material == rm_name)
@@ -441,18 +491,24 @@ reference_material_plot <- function(model, results, x = c("order", "time"), runs
                              error_y = list(type = "data", array = 2 * d$se_combined, color = "#1f6f8b"),
                              marker = list(color = "#1f6f8b", size = 7),
                              text = d$label, hovertemplate = hover)
-    # Flagged runs: a red ring around the value that was checked (measured
-    # for the primary, corrected for secondary reference materials).
-    flag <- d[d[["rm_flag"]] %in% TRUE, ]
+    # Accepted range of the uncorrected run means: red dotted lines.
+    limits <- c(d[["range_min"]][1] %||% NA, d[["range_max"]][1] %||% NA)
+    for (lim in limits[!is.na(limits)]) {
+      p <- plotly::add_lines(p, x = range(d[[xcol]], na.rm = TRUE), y = rep(lim, 2),
+                             name = "Accepted range", legendgroup = "range",
+                             showlegend = identical(rm_name, first_range) && lim == limits[!is.na(limits)][1],
+                             line = list(color = "#c0392b", dash = "dot", width = 1),
+                             hovertemplate = paste0("Range limit ", fmt_plain(lim), "<extra></extra>"))
+    }
+    # Runs outside the range: a red ring around the uncorrected mean.
+    flag <- d[d[["outside_range"]] %in% TRUE, ]
     if (nrow(flag) > 0) {
-      y <- if (d$role[1] == "primary") flag$measured else flag$mean
-      p <- plotly::add_markers(p, x = flag[[xcol]], y = y, name = "Flagged",
+      p <- plotly::add_markers(p, x = flag[[xcol]], y = flag$measured, name = "Outside range",
                                legendgroup = "flagged", showlegend = identical(rm_name, first_flagged),
                                marker = list(color = "rgba(0,0,0,0)", size = 15,
                                              line = list(color = "#c0392b", width = 2.5)),
-                               text = paste0(flag$label, "<br>", sprintf("%+.5f", flag$check_deviation),
-                                             " from ", flag$check_against),
-                               hovertemplate = "%{text}<extra>Flagged</extra>")
+                               text = flag$label,
+                               hovertemplate = "%{text}<br>%{y:.6f}<extra>Outside range</extra>")
     }
     p |>
       plotly::layout(yaxis = list(title = paste0(rm_name, "<br>(", d$role[1], ")"),

@@ -54,7 +54,7 @@ EDITABLE_SAMPLE_FIELDS <- c("status", "flag", "comment", "trim_start_s", "trim_e
 
 reference_materials_template <- function() {
   tibble::tibble(name = character(), value = double(), uncertainty_2s = double(),
-                 note = character())
+                 note = character(), range_min = double(), range_max = double())
 }
 
 regions_template <- function() {
@@ -77,6 +77,10 @@ read_table_file <- function(path, template, defaults = list()) {
     double = readr::col_double(),
     integer = readr::col_integer()
   ))
+  # Only the columns the file has (older files lack columns added later).
+  header <- names(readr::read_csv(path, n_max = 0, col_types = readr::cols(.default = "c"),
+                                  progress = FALSE, show_col_types = FALSE))
+  spec <- spec[names(spec) %in% header]
   x <- readr::read_csv(path, col_types = do.call(readr::cols, spec), na = "",
                        progress = FALSE, show_col_types = FALSE)
   # Columns added in later versions get their default (or NA) values.

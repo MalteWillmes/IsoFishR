@@ -54,13 +54,14 @@ default_settings <- function() {
       default_labels = paste("Region", 1:8)
     ),
     # Warning levels. Krypton: a sample is flagged when any point of its
-    # profile exceeds either. Reference materials: a run is flagged when it
-    # is more than rm_max_dev (87Sr/86Sr) from its expected value (see
+    # profile exceeds either. Reference materials: a session is flagged when
+    # the SD of a reference material's measured run means exceeds rm_max_sd
+    # (runs outside a reference material's own range are flagged too; see
     # reference_material_results()). They only flag; the data are not changed.
     qc = list(
       kr83_max_v = 0.001,
       kr86_max_pct = 1,
-      rm_max_dev = 0.0005
+      rm_max_sd = 6.1e-5
     ),
     # Reference material correction (see calibrate_project()). It is off
     # until a primary reference material is chosen.
@@ -122,7 +123,7 @@ check_settings <- function(settings) {
   if (!is.numeric(cal$session_gap_h) || length(cal$session_gap_h) != 1 || cal$session_gap_h <= 0) {
     stop("calibration$session_gap_h must be a positive number of hours.", call. = FALSE)
   }
-  for (nm in c("kr83_max_v", "kr86_max_pct", "rm_max_dev")) {
+  for (nm in c("kr83_max_v", "kr86_max_pct", "rm_max_sd")) {
     v <- settings$qc[[nm]]
     if (!is.numeric(v) || length(v) != 1 || is.na(v) || v <= 0) {
       stop("qc$", nm, " must be a single number > 0.", call. = FALSE)
@@ -149,6 +150,7 @@ read_settings <- function(path) {
   # Earlier versions set the spline's basis size; the spline now sets it
   # itself.
   s$reduction$spline_k <- NULL
+  s$qc$rm_max_dev <- NULL
   merge_settings(default_settings(), s)
 }
 

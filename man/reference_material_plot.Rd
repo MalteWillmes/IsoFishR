@@ -26,7 +26,9 @@ For the primary reference material: each run's measured (uncorrected)
 mean with 2 SE, the fitted correction line (by default the linear
 regression) and the corrected run means. For secondary reference
 materials: uncorrected and corrected run means, with the corrected session
-averages as horizontal lines. The accepted values are dashed lines.
+averages as horizontal lines. The accepted values are dashed lines, the
+accepted range of the uncorrected run means red dotted lines, and runs
+outside it are ringed in red.
 }
 \details{
 On a time axis, sessions that are days or months apart leave each

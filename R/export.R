@@ -327,10 +327,9 @@ round_summary <- function(x) {
       dplyr::across(dplyr::any_of(c("mean", "mean_smoothed", "mean_uncorrected", "mean_corrected", "sr87_sr86",
                                     "sr87_sr86_outlier", "sr87_sr86_uncorrected",
                                     "sr87_sr86_ma", "sr87_sr86_spline", "cp_mean", "sr84_sr86", "measured",
-                                    "accepted")), \(v) round(v, 6)),
+                                    "accepted", "range_min", "range_max")), \(v) round(v, 6)),
       dplyr::across(dplyr::any_of(c("sd", "sd_uncorrected", "sd_corrected", "se", "se_combined", "sr87_sr86_ma_se", "sr87_sr86_spline_se",
-                                    "rb85_sr88", "kr83_v", "kr83_max_v", "deviation", "accepted_2s",
-                                    "check_deviation")),
+                                    "rb85_sr88", "kr83_v", "kr83_max_v", "deviation", "accepted_2s")),
                     \(v) round(v, 7)),
       dplyr::across(dplyr::any_of("correction_factor"), \(v) round(v, 8)),
       dplyr::across(dplyr::any_of("deviation_ppm"), \(v) round(v, 1)),
@@ -411,6 +410,7 @@ export_report <- function(project, files = character(), include_excluded = FALSE
     r <- if (is.null(rm_results)) rm_results else rm_results[rm_results$reference_material == name, ]
     sd_or_na <- function(x) if (length(x) > 1) stats::sd(x) else NA_real_
     out <- list(name = name, accepted = rm$value, accepted_2s = rm$uncertainty_2s, note = rm$note,
+                range_min = rm$range_min, range_max = rm$range_max,
                 runs = if (is.null(r)) 0L else nrow(r))
     if (!is.null(r) && nrow(r) > 0) {
       out <- c(out, list(
@@ -418,12 +418,12 @@ export_report <- function(project, files = character(), include_excluded = FALSE
         mean_corrected = mean(r$mean), sd_corrected = sd_or_na(r$mean),
         deviation_ppm = (mean(r$mean) / rm$value - 1) * 1e6,
         runs_within_uncertainty = sum(r$within_uncertainty),
-        runs_flagged = sum(r$rm_flag),
-        flagged_runs = r$sample_id[r$rm_flag],
+        runs_outside_range = sum(r$outside_range),
+        outside_range_runs = r$sample_id[r$outside_range],
         per_session = rm_summary |>
           dplyr::filter(.data$reference_material == name) |>
           dplyr::select("session", "runs", "mean_uncorrected", "sd_uncorrected",
-                        "mean_corrected", "sd_corrected", "deviation_ppm") |>
+                        "mean_corrected", "sd_corrected", "deviation_ppm", "sd_flag") |>
           purrr::transpose()
       ))
     }

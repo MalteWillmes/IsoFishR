@@ -96,6 +96,8 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
   # Earlier versions set the spline's basis size; the spline now sets it
   # itself.
   yml$reduction$spline_k <- NULL
+  # Briefly a deviation limit; replaced by per-material ranges and an SD limit.
+  yml$qc$rm_max_dev <- NULL
   p <- structure(
     list(
       path = path,
@@ -117,8 +119,29 @@ open_project <- function(path, user = default_user(), read_only = FALSE, force =
     fill_acquisition_times()
   if (isTRUE((yml$project$format %||% 1L) < 2L)) p <- convert_trims_v1(p)
   p <- fix_nu_date_order(p)
+  p <- add_default_rm_ranges(p)
   opened <- TRUE
   p
+}
+
+# Reference material tables written before accepted ranges existed: the
+# default reference materials (SBO, GSFR, RF) get their default range. Only
+# done once (when the file has no range columns), so a range removed later
+# stays removed.
+add_default_rm_ranges <- function(project) {
+  path <- project_file(project$path, "reference_materials.csv")
+  if (!file.exists(path)) return(project)
+  header <- strsplit(readLines(path, n = 1, warn = FALSE), ",", fixed = TRUE)[[1]]
+  if (length(header) == 0 || "range_min" %in% header) return(project)
+  rms <- project$reference_materials
+  for (i in seq_len(nrow(rms))) {
+    r <- default_rm_range(rms$name[i])
+    rms$range_min[i] <- r$range_min
+    rms$range_max[i] <- r$range_max
+  }
+  project$reference_materials <- rms
+  if (!project$read_only) write_table_file(rms, path)
+  project
 }
 
 # Format 1 projects counted trims from the first and last point passing the

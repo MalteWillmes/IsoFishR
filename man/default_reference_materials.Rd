@@ -9,7 +9,8 @@ default_reference_materials()
 \value{
 A tibble with \code{name}, \code{pattern} (regular expression matched
 against run names, ignoring case), \code{codes} (the name codes, for
-messages) and \code{value}.
+messages), \code{value}, and the accepted range of the measured run means
+(\code{range_min}, \code{range_max}; \code{NA} where there is no default).
 }
 \description{
 Reference materials IsoFishR recognises in run names, with default

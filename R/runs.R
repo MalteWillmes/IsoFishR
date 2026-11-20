@@ -130,9 +130,15 @@ set_session <- function(project, sample_ids, session) {
 #' @param value Accepted 87Sr/86Sr.
 #' @param uncertainty_2s Uncertainty of the accepted value (2 sigma).
 #' @param note Optional note, e.g. the source of the value.
+#' @param range_min,range_max Accepted range of the measured (uncorrected)
+#'   run means; runs outside it are flagged (see
+#'   [reference_material_results()]). `NA` for no limit. `NULL` (the default)
+#'   keeps the current range, or for a new reference material uses the
+#'   default range of [default_reference_materials()] (if any).
 #' @return The updated project.
 #' @export
-set_reference_material <- function(project, name, value, uncertainty_2s = NA_real_, note = "") {
+set_reference_material <- function(project, name, value, uncertainty_2s = NA_real_, note = "",
+                                   range_min = NULL, range_max = NULL) {
   check_writable(project)
   name <- trimws(name)
   if (!nzchar(name)) stop("The reference material needs a name.", call. = FALSE)
@@ -143,9 +149,18 @@ set_reference_material <- function(project, name, value, uncertainty_2s = NA_rea
     stop("The uncertainty must be 0 or more.", call. = FALSE)
   }
   rms <- project$reference_materials
-  new <- tibble::tibble(name = name, value = value, uncertainty_2s = as.numeric(uncertainty_2s),
-                        note = note)
   i <- match(name, rms$name)
+  keep <- function(arg, col) {
+    if (!is.null(arg)) return(as.numeric(arg))
+    if (!is.na(i)) rms[[col]][i] else default_rm_range(name)[[col]]
+  }
+  range_min <- keep(range_min, "range_min")
+  range_max <- keep(range_max, "range_max")
+  if (!is.na(range_min) && !is.na(range_max) && range_min >= range_max) {
+    stop("The range minimum must be smaller than the maximum.", call. = FALSE)
+  }
+  new <- tibble::tibble(name = name, value = value, uncertainty_2s = as.numeric(uncertainty_2s),
+                        note = note, range_min = range_min, range_max = range_max)
   old_text <- if (is.na(i)) "" else format_rm(rms[i, ])
   if (is.na(i)) rms <- dplyr::bind_rows(rms, new) else rms[i, ] <- new
   if (identical(old_text, format_rm(new))) return(project)
@@ -182,7 +197,16 @@ remove_reference_material <- function(project, name) {
 format_rm <- function(rm) {
   paste0(format(rm$value, digits = 7),
          if (!is.na(rm$uncertainty_2s)) paste0(" \u00b1 ", format(rm$uncertainty_2s, digits = 3)),
+         if (!is.na(rm$range_min %||% NA) || !is.na(rm$range_max %||% NA)) {
+           paste0(", range ", format_range(rm$range_min, rm$range_max))
+         },
          if (nzchar(rm$note)) paste0(" (", rm$note, ")"))
+}
+
+# "0.7088 to 0.7093", with "-" for a missing limit.
+format_range <- function(lo, hi) {
+  f <- \(x) if (is.na(x)) "-" else format(x, digits = 7, scientific = FALSE)
+  paste(f(lo), "to", f(hi))
 }
 
 # Read acquisition times from the raw files for runs that don't have one yet
@@ -273,19 +297,28 @@ apply_reference_suggestion <- function(project, name = "SBO", value = default_rm
 #'
 #' @return A tibble with `name`, `pattern` (regular expression matched
 #'   against run names, ignoring case), `codes` (the name codes, for
-#'   messages) and `value`.
+#'   messages), `value`, and the accepted range of the measured run means
+#'   (`range_min`, `range_max`; `NA` where there is no default).
 #' @export
 default_reference_materials <- function() {
   tibble::tribble(
-    ~name,    ~pattern,             ~codes,                  ~value,
-    "SBO",    "sbo",                "SBO",                   0.70918,
-    "GSFR",   "gsfr",               "GSFR",                  0.70918,
+    ~name,    ~pattern,             ~codes,                  ~value,  ~range_min, ~range_max,
+    "SBO",    "sbo",                "SBO",                   0.70918, 0.7088,     0.7093,
+    "GSFR",   "gsfr",               "GSFR",                  0.70918, 0.7088,     0.7093,
     # Rockfish otolith: "rf" or "rfo" as its own part of the name (RF_1,
     # p1st002_rfo_beg, p1_rf2), not inside a word (RFID, surf).
-    "RF",     "(^|[^a-z])rfo?([^a-z]|$)", "rf or rfo",       0.70918,
+    "RF",     "(^|[^a-z])rfo?([^a-z]|$)", "rf or rfo",       0.70918, 0.7088,     0.7093,
     # NanoSr: srnano, nanosr, nano or srn as its own part of the name.
-    "NanoSr", "(^|[^a-z])(srnano|nanosr|nano|srn)([^a-z]|$)", "srn, nano or srnano", 0.70795
+    "NanoSr", "(^|[^a-z])(srnano|nanosr|nano|srn)([^a-z]|$)", "srn, nano or srnano", 0.70795,
+    NA_real_, NA_real_
   )
+}
+
+# The default accepted range of a reference material (NA limits if none).
+default_rm_range <- function(name) {
+  d <- default_reference_materials()
+  i <- match(name, d$name)
+  list(range_min = d$range_min[i], range_max = d$range_max[i])
 }
 
 # The run name pattern of a reference material (its name if it isn't one of

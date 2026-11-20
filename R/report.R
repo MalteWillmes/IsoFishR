@@ -18,6 +18,11 @@ report_markdown <- function(report) {
       Role = purrr::map_chr(rms, "role"),
       Accepted = purrr::map_chr(rms, \(r) fmt_ratio(r$accepted)),
       `Accepted 2s` = purrr::map_chr(rms, \(r) fmt_small(r$accepted_2s)),
+      `Accepted range (uncorrected)` = purrr::map_chr(rms, \(r) {
+        lo <- r$range_min %||% NA
+        hi <- r$range_max %||% NA
+        if (is.na(lo) && is.na(hi)) "-" else format_range(lo, hi)
+      }),
       Runs = purrr::map_chr(rms, \(r) as.character(r$runs)),
       `Mean (uncorrected)` = purrr::map_chr(rms, \(r) fmt_ratio(r$mean_uncorrected)),
       `SD (uncorrected)` = purrr::map_chr(rms, \(r) fmt_small(r$sd_uncorrected)),
@@ -25,7 +30,7 @@ report_markdown <- function(report) {
       `SD (corrected)` = purrr::map_chr(rms, \(r) fmt_small(r$sd_corrected)),
       `Deviation (ppm)` = purrr::map_chr(rms, \(r) fmt_num(r$deviation_ppm, 1)),
       `Runs within uncertainty` = purrr::map_chr(rms, \(r) fmt_count(r$runs_within_uncertainty)),
-      `Runs flagged` = purrr::map_chr(rms, \(r) fmt_count(r$runs_flagged))
+      `Runs outside range` = purrr::map_chr(rms, \(r) fmt_count(r$runs_outside_range))
     ))
   } else {
     "No reference materials are defined."
@@ -34,7 +39,7 @@ report_markdown <- function(report) {
   per_session <- purrr::map(rms, \(r) purrr::map(r$per_session %||% list(), \(s) tibble::tibble(
     `Reference material` = r$name, Session = s$session, Runs = as.character(s$runs),
     `Mean (uncorrected)` = fmt_ratio(s$mean_uncorrected),
-    `SD (uncorrected)` = fmt_small(s$sd_uncorrected),
+    `SD (uncorrected)` = paste0(fmt_small(s$sd_uncorrected), if (isTRUE(s$sd_flag)) " (above limit)"),
     `Mean (corrected)` = fmt_ratio(s$mean_corrected),
     `SD (corrected)` = fmt_small(s$sd_corrected),
     `Deviation (ppm)` = fmt_num(s$deviation_ppm, 1)
@@ -83,11 +88,17 @@ report_markdown <- function(report) {
     "",
     rm_table,
     "",
-    if (length(flagged <- unlist(purrr::map(rms, "flagged_runs"))) > 0) {
-      c(paste0("Flagged (more than ", fmt_plain(report$settings$qc$rm_max_dev %||% NA),
-               " from the expected 87Sr/86Sr): ", paste(flagged, collapse = ", "), "."), "")
+    if (length(outside <- unlist(purrr::map(rms, "outside_range_runs"))) > 0) {
+      c(paste0("Runs with the uncorrected mean outside the accepted range: ",
+               paste(outside, collapse = ", "), "."), "")
     },
-    if (nrow(per_session) > 0) c("### Per session", "", md_table(per_session), ""),
+    if (nrow(per_session) > 0) {
+      c("### Per session", "", md_table(per_session), "",
+        if (any(grepl("above limit", per_session$`SD (uncorrected)`, fixed = TRUE))) {
+          c(paste0("Above limit: the SD of the uncorrected run means is above ",
+                   fmt_plain(report$settings$qc$rm_max_sd %||% NA), "."), "")
+        })
+    },
     "## Settings",
     "",
     settings_markdown(report$settings),

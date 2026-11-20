@@ -276,13 +276,9 @@ apply_calibration <- function(data, project, model) {
 #' runs are corrected to close to their accepted value by construction (exactly
 #' so with the step fit; within a run the other fits can vary slightly).
 #'
-#' `rm_flag` marks runs more than `settings$qc$rm_max_dev` (default 0.0005)
-#' from their expected value, given as `check_deviation`. Secondary runs are
-#' checked on their corrected mean against the accepted value (`check_against
-#' = "accepted"`). Primary runs, which the correction pulls onto the accepted
-#' value, are checked on their measured mean against the median of the other
-#' primary runs in the session (`"session median"`); with one primary run in a
-#' session there is nothing to compare and the run is not flagged.
+#' `outside_range` marks runs whose measured (uncorrected) mean is outside the
+#' reference material's accepted range (`range_min`, `range_max`, set per
+#' reference material; a missing limit is not checked).
 #'
 #' @param project A project from [open_project()].
 #' @return A tibble.
@@ -292,7 +288,7 @@ reference_material_results <- function(project) {
     dplyr::filter(.data$run_type == "reference", .data$status != "excluded")
   if (nrow(runs) == 0) {
     return(tibble::tibble(sample_id = character(), reference_material = character(),
-                          role = character(), session = character()))
+                          role = character(), session = character(), outside_range = logical()))
   }
   d <- project_data(project, runs$sample_id)
   if (!"correction_factor" %in% names(d)) {
@@ -314,58 +310,37 @@ reference_material_results <- function(project) {
     dplyr::inner_join(dplyr::select(runs, "sample_id", "sequence", "reference_material", role = "rm_role",
                                     "session", "acquired"), by = "sample_id") |>
     dplyr::left_join(dplyr::select(project$reference_materials, reference_material = "name",
-                                   accepted = "value", accepted_2s = "uncertainty_2s"),
+                                   accepted = "value", accepted_2s = "uncertainty_2s",
+                                   "range_min", "range_max"),
                      by = "reference_material") |>
     dplyr::mutate(
       se_combined = sqrt(.data$se^2 + (.data$mean * dplyr::coalesce(.data$correction_u_rel, 0))^2),
       deviation = .data$mean - .data$accepted,
       deviation_ppm = .data$deviation / .data$accepted * 1e6,
       within_uncertainty = abs(.data$deviation) <=
-        sqrt((2 * .data$se_combined)^2 + dplyr::coalesce(.data$accepted_2s, 0)^2)
+        sqrt((2 * .data$se_combined)^2 + dplyr::coalesce(.data$accepted_2s, 0)^2),
+      outside_range = dplyr::coalesce(.data$measured < .data$range_min, FALSE) |
+        dplyr::coalesce(.data$measured > .data$range_max, FALSE)
     ) |>
-    rm_warning(project$settings$qc$rm_max_dev %||% default_settings()$qc$rm_max_dev) |>
     dplyr::arrange(.data$sequence) |>
     dplyr::select("sample_id", "sequence", "reference_material", "role", "session", "acquired", "n",
                   "measured", "mean", "se", "se_combined", "accepted", "accepted_2s",
-                  "deviation", "deviation_ppm", "within_uncertainty", "check_against",
-                  "check_deviation", "rm_flag", "correction_factor", "correction_status")
-}
-
-# Reference material warning: flags runs more than `max_dev` (87Sr/86Sr) from
-# their expected value. Secondary runs (and all runs while there is no
-# correction) are checked on their corrected mean against the accepted
-# value. Primary runs are corrected onto the accepted value by the fit, so
-# they are checked on their measured mean against the median of the other
-# primary runs of the session; a session with one primary run is not checked.
-rm_warning <- function(r, max_dev) {
-  loo_median <- function(x) {
-    if (length(x) < 2) return(rep(NA_real_, length(x)))
-    vapply(seq_along(x), \(i) stats::median(x[-i], na.rm = TRUE), numeric(1))
-  }
-  r |>
-    dplyr::mutate(
-      check_against = dplyr::if_else(.data$role == "primary", "session median", "accepted"),
-      check_deviation = dplyr::if_else(.data$role == "primary",
-                                       .data$measured - loo_median(.data$measured),
-                                       .data$mean - .data$accepted),
-      .by = c("reference_material", "session")
-    ) |>
-    dplyr::mutate(
-      check_deviation = dplyr::if_else(is.finite(.data$check_deviation), .data$check_deviation, NA_real_),
-      check_against = dplyr::if_else(is.na(.data$check_deviation), NA_character_, .data$check_against),
-      rm_flag = dplyr::coalesce(abs(.data$check_deviation) > max_dev, FALSE)
-    )
+                  "deviation", "deviation_ppm", "within_uncertainty", "range_min", "range_max",
+                  "outside_range", "correction_factor", "correction_status")
 }
 
 #' @rdname reference_material_results
 #' @return `summarise_reference_materials()`: one row per reference material
 #'   and session: number of runs, mean and SD of the run means before and after
-#'   correction, accepted value, deviation in ppm (of the corrected mean) and
-#'   the number of flagged runs (`runs_flagged`).
+#'   correction, accepted value, deviation in ppm (of the corrected mean), the
+#'   number of runs outside the accepted range (`runs_outside_range`) and
+#'   `sd_flag`: the SD of the measured run means is above
+#'   `settings$qc$rm_max_sd` (default 6.1e-5).
 #' @export
 summarise_reference_materials <- function(project) {
   r <- reference_material_results(project)
   if (nrow(r) == 0) return(r)
+  max_sd <- project$settings$qc$rm_max_sd %||% default_settings()$qc$rm_max_sd
   sd_or_na <- function(x) if (length(x) > 1) stats::sd(x) else NA_real_
   r |>
     dplyr::summarise(
@@ -378,7 +353,8 @@ summarise_reference_materials <- function(project) {
       accepted = dplyr::first(.data$accepted),
       deviation_ppm = (mean(.data$mean) / dplyr::first(.data$accepted) - 1) * 1e6,
       runs_within_uncertainty = sum(.data$within_uncertainty),
-      runs_flagged = sum(.data$rm_flag),
+      runs_outside_range = sum(.data$outside_range),
       .by = c("reference_material", "session")
-    )
+    ) |>
+    dplyr::mutate(sd_flag = dplyr::coalesce(.data$sd_uncorrected > max_sd, FALSE))
 }
